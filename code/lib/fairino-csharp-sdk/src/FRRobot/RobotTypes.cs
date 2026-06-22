@@ -1,0 +1,790 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO.Ports;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+//using System.Threading.Tasks;
+
+namespace fairino
+{
+
+    /**
+    * @brief 关节位置数据类型
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct JointPos
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] jPos;   /* 六个关节位置，单位deg */
+        //public JointPos()
+        //{
+        //    jPos = new double[6]; // 初始化为长度为6的零数组
+        //}
+        public JointPos(double[] pos)
+        {
+            jPos = pos;
+        }
+
+        public JointPos(double j1, double j2, double j3, double j4, double j5, double j6)
+        {
+            jPos = new double[6] { j1, j2, j3, j4, j5, j6};
+        }
+    }
+    /**
+    * @brief 焊接中断状态
+    */
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct WELDING_BREAKOFF_STATE
+    {
+        public byte breakOffState;  // 焊接中断状态
+        public byte weldArcState;   // 焊接电弧中断状态
+    }
+    /**
+    * @brief 笛卡尔空间位置数据类型
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DescTran
+    {
+        public double x;    /* x轴坐标，单位mm  */
+        public double y;    /* y轴坐标，单位mm  */
+        public double z;    /* z轴坐标，单位mm  */
+        public DescTran(double posX, double posY, double posZ)
+        {
+            x = posX; 
+            y = posY; 
+            z = posZ;
+        }
+    }
+
+    /**
+    * @brief 欧拉角姿态数据类型
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rpy
+    {
+        public double rx;   /* 绕固定轴X旋转角度，单位：deg  */
+        public double ry;   /* 绕固定轴Y旋转角度，单位：deg  */
+        public double rz;   /* 绕固定轴Z旋转角度，单位：deg  */
+        public Rpy(double rotateX, double rotateY, double rotateZ)
+        {
+            rx = rotateX;
+            ry = rotateY;
+            rz = rotateZ;
+        }
+    }
+
+    /**
+    *@brief 笛卡尔空间位姿类型
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DescPose
+    {
+        public DescTran tran;      /* 笛卡尔空间位置  */
+        public Rpy rpy;			/* 笛卡尔空间姿态  */
+        public DescPose(DescTran descTran, Rpy rotateRpy)
+        {
+            tran = descTran;
+            rpy = rotateRpy;
+        }
+
+        public DescPose(double tranX, double tranY, double tranZ, double rX, double ry, double rz)
+        {
+            tran.x = tranX;
+            tran.y = tranY;
+            tran.z = tranZ;
+            rpy.rx = rX;
+            rpy.ry = ry;
+            rpy.rz = rz;
+        }
+    }
+
+    /**
+    * @brief 扩展轴位置数据类型
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ExaxisPos
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public double[] ePos;   /* 四个扩展轴位置，单位mm */
+        public ExaxisPos(double[] exaxisPos)
+        { 
+            ePos = exaxisPos;
+        }
+
+        public ExaxisPos(double x, double y, double z, double a)
+        {
+            ePos = new double[4] { x, y, z, a};
+        }
+
+    }
+
+    /**
+    * @brief 力传感器的受力分量和力矩分量
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ForceTorque
+    {
+        public double fx;  /* 沿x轴受力分量，单位N  */
+        public double fy;  /* 沿y轴受力分量，单位N  */
+        public double fz;  /* 沿z轴受力分量，单位N  */
+        public double tx;  /* 绕x轴力矩分量，单位Nm */
+        public double ty;  /* 绕y轴力矩分量，单位Nm */
+        public double tz;  /* 绕z轴力矩分量，单位Nm */
+        public ForceTorque(double fX, double fY, double fZ, double tX, double tY, double tZ)
+        {
+            fx = fX; 
+            fy = fY; 
+            fz = fZ; 
+            tx = tX; 
+            ty = tY; 
+            tz = tZ;
+        }
+    }
+
+    /**
+    * @brief 末端通讯参数
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AxleComParam
+    {
+        public int baudRate;    //波特率：支持 1-9600，2-14400，3-19200，4-38400，5-56000，6-67600，7-115200，8-128000；
+        public int dataBit; //数据位：数据位支持（8,9），目前常用为 8
+        public int stopBit; //停止位：1-1，2-0.5，3-2，4-1.5，目前常用为 1
+        public int verify;  //校验位：0-None，1-Odd，2-Even,目前常用为 0；
+        public int timeout;  //超时次数：1~10，主要进行超时重发，减少偶发异常提高用户体验
+        public int timeoutTimes; //超时次数：1~10，主要进行超时重发，减少偶发异常提高用户体验
+        public int period;   //周期性指令时间间隔：1~1000ms，主要用于周期性指令每次下发的时间间隔
+        public AxleComParam(int baud_Rate, int data_Bit, int stop_Bit, int verify_, int timeout_, int timeout_Times, int period_)
+        {
+            baudRate = baud_Rate;
+            dataBit = data_Bit;
+            stopBit = stop_Bit;
+            verify = verify_;
+            timeout = timeout_;
+            timeoutTimes = timeout_Times;
+            period = period_;
+        }
+    }
+
+
+    /**
+    * @brief  螺旋参数数据类型
+    */
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SpiralParam
+    {
+        public int circle_num;           /* 螺旋圈数  */
+        public float circle_angle;         /* 螺旋倾角  */
+        public float rad_init;             /* 螺旋初始半径，单位mm  */
+        public float rad_add;              /* 半径增量  */
+        public float rotaxis_add;          /* 转轴方向增量  */
+        public uint rot_direction;  /* 旋转方向，0-顺时针，1-逆时针  */
+        public int velAccMode;      // 速度加速度参数模式：0-角速度恒定；1-线速度恒定
+        public SpiralParam(int num, float angle, float initRad, float addRad, float axisAdd, uint direction, int mode)
+        {
+            circle_num = num;
+            circle_angle = angle;
+            rad_init = initRad;
+            rad_add = addRad;
+            rotaxis_add = axisAdd;
+            rot_direction = direction;
+            velAccMode = mode;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct ROBOT_AUX_STATE
+    {
+        public byte servoId;           //伺服驱动器ID号
+        public int servoErrCode;       //伺服驱动器故障码
+        public int servoState;         //伺服驱动器状态
+        public double servoPos;        //伺服当前位置
+        public float servoVel;         //伺服当前速度
+        public float servoTorque;      //伺服当前转矩    25
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct EXT_AXIS_STATUS
+    {
+        public double pos;        //扩展轴位置
+        public double vel;        //扩展轴速度
+        public int errorCode;     //扩展轴故障码
+        public byte ready;        //伺服准备好
+        public byte inPos;        //伺服到位
+        public byte alarm;        //伺服报警
+        public byte flerr;        //跟随误差
+        public byte nlimit;       //到负限位
+        public byte pLimit;       //到正限位
+        public byte mdbsOffLine;  //驱动器485总线掉线
+        public byte mdbsTimeout;  //控制卡与控制箱485通信超时
+        public byte homingStatus; //扩展轴回零状态
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct ROBOT_TIME
+    {
+        public UInt16 year;
+        public byte mouth;
+        public byte day;
+        public byte hour;
+        public byte minute;
+        public byte second;
+        public UInt16 millisecond;
+
+        public string ToString()
+        {
+            return $"{year}-{mouth}-{day}  {hour}:{minute}:{second}.{millisecond}";
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public class ROBOT_STATE_PKG
+    {
+        public UInt16 frame_head;           //帧头 0x5A5A
+        public byte frame_cnt;              // 帧计数
+        public UInt16 data_len;             //数据长度  5
+        public byte program_state;          // 程序运行状态，1-停止；2-运行；3-暂停；
+        public byte robot_state;            // 机器人运动状态，1-停止；2-运行；3-暂停；4-拖动
+        public int main_code;               // 主故障码
+        public int sub_code;                // 子故障码
+        public byte robot_mode;             // 机器人模式，1-手动模式；0-自动模式；
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] jt_cur_pos;         // 6个轴当前关节位置，单位deg
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] tl_cur_pos;         // 工具当前位置
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] flange_cur_pos;     // 末端法兰当前位置
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] actual_qd;          // 当前6个关节速度，单位deg/s
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] actual_qdd;         // 当前6个关节加速度，单位deg/s^2
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public double[] target_TCP_CmpSpeed;// TCP合成指令速度(位置,姿态)
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] target_TCP_Speed;   // TCP指令速度
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public double[] actual_TCP_CmpSpeed;// TCP合成实际速度
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] actual_TCP_Speed;   // TCP实际速度
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] jt_cur_tor;         // 6个轴当前扭矩，单位N·m
+
+        public int tool;                    // 应用的工具坐标系编号
+        public int user;                    // 应用的工件坐标系编号
+        public byte cl_dgt_output_h;        // 控制箱数字量IO输出15-8
+        public byte cl_dgt_output_l;        // 控制箱数字量IO输出7-0
+        public byte tl_dgt_output_l;        // 工具数字量IO输出7-0，仅bit0-bit1有效
+        public byte cl_dgt_input_h;         // 控制箱数字量IO输入15-8
+        public byte cl_dgt_input_l;         // 控制箱数字量IO输入7-0
+        public byte tl_dgt_input_l;         // 工具数字量IO输入7-0，仅bit0-bit1有效
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public UInt16[] cl_analog_input;        //控制箱模拟量输入
+        public UInt16 tl_anglog_input;          //工具模拟量输入                            
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] ft_sensor_raw_data; // 力矩传感器原始数据
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] ft_sensor_data;     // 力矩传感器数据
+        public byte ft_sensor_active;       // 力矩传感器激活状态，0-复位，1-激活
+
+        public byte EmergencyStop;          // 急停标志，0-未按下，1-按下
+        public int motion_done;             // 运动到位信号，1-到位，0-未到位
+        public byte gripper_motiondone;     // 夹爪运动完成信号，1-完成，0-未完成
+        public int mc_queue_len;            // 运动指令队列长度
+        public byte collisionState;         // 碰撞检测，1-碰撞，0-无碰撞
+        public int trajectory_pnum;         // 轨迹点编号
+        public byte safety_stop0_state;     // 安全停止信号SI0
+        public byte safety_stop1_state;     // 安全停止信号SI1
+        public byte gripper_fault_id;       // 错误夹爪号
+        public UInt16 gripper_fault;     /* 夹爪故障 */
+        public UInt16 gripper_active;    /* 夹爪激活状态 */
+        public byte gripper_position;       // 夹爪位置
+        public byte gripper_speed;       /* 夹爪速度 */
+        public byte gripper_current;     /* 夹爪电流 */
+        public int gripper_temp;            // 夹爪温度
+        public int gripper_voltage;         // 夹爪电压
+
+        public ROBOT_AUX_STATE auxState;   // 485扩展轴状态
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public EXT_AXIS_STATUS[] extAxisStatus; // UDP扩展轴状态
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+        public UInt16[] extDIState;        //扩展DI输入
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+        public UInt16[] extDOState;        //扩展DO输出
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public UInt16[] extAIState;        //扩展AI输入
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public UInt16[] extAOState;        //扩展AO输出
+
+        public int rbtEnableState;          // 机器人使能状态
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] jointDriverTorque;      // 机器人关节驱动器扭矩
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] jointDriverTemperature; // 机器人关节驱动器温度
+
+        public ROBOT_TIME robotTime;        // 机器人系统时间
+        public int softwareUpgradeState;    // 机器人软件升级状态
+        public UInt16 endLuaErrCode;    //末端LUA运行状态 
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
+        public  UInt16[] cl_analog_output;  //控制箱模拟量输出				  Control box analog output
+        public UInt16 tl_analog_output;     //工具模拟量输出				  Tool analog output
+
+        public float gripperRotNum;         // 旋转夹爪当前旋转圈数
+        public byte gripperRotSpeed;        // 旋转夹爪当前旋转速度百分比
+        public byte gripperRotTorque;       // 旋转夹爪当前旋转力矩百分比
+
+        public WELDING_BREAKOFF_STATE weldingBreakOffState; // 焊接中断状态
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] jt_tgt_tor;         // 关节指令力矩
+        public int smartToolState;          // SmartTool手柄按钮状态
+        public float wideVoltageCtrlBoxTemp; // 宽电压控制箱温度
+        public UInt16 wideVoltageCtrlBoxFanVel;   //宽电压控制箱风扇电流（mA）
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] toolCoord;          // 当前工具坐标系数值；x,y,z,rx,ry,rz
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] wobjCoord;          // 当前工件坐标系数值；x,y,z,rx,ry,rz
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] extoolCoord;        // 当前外部工具坐标系数值；x,y,z,rx,ry,rz
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] exAxisCoord;        // 当前扩展轴坐标系数值；x,y,z,rx,ry,rz
+
+        public double load;                 // 负载质量
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
+        public double[] loadCog;            // 负载质心
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] lastServoTarget;    // 队列中最后一个ServoJ目标位置
+        public int servoJCmdNum;            // servoJ指令计数
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] targetJointPos;     // 6个关节指令位置，单位°
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] targetJointVel;     // 6个关节指令速度，单位°/s
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] targetJointAcc;     // 6个关节指令加速度，单位°/s²
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] targetJointCurrent; // 6个关节指令电流，单位A
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] actualJointCurrent; // 6个关节当前电流，单位A
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] actualTCPForce;     // 机器人末端力矩Nm；x,y,z,rx,ry,rz
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public double[] targetTCPPos;       // 机器人TCP指令位置mm；x,y,z,rx,ry,rz
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public byte[] collisionLevel;       // 机器人碰撞等级
+
+        public double speedScaleManual;     // 手动模式全局速度百分比
+        public double speedScaleAuto;       // 自动模式全局速度百分比
+        public int luaLineNum;              // 当前lua程序运行行号
+        public byte abnomalStop;            // 0-无异常；1-有异常
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public byte[] currentLuaFileName;   // 当前运行lua程序名称
+        public byte programTotalLine;       // lua程序总行数
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public byte[] safetyBoxSingal;      // 机器人按钮盒按钮状态
+
+        public double weldVoltage;          // 焊接电压 V
+        public double weldCurrent;          // 焊接电流
+        public double weldTrackVel;         // 焊缝跟踪速度 mm/s
+
+        public byte tpdException;           // TPD轨迹加载数量超限，0-未超限，1-超限
+        public byte alarmRebootRobot;       // 警告，1-松开急停按钮请断电重启控制箱，2-关节通讯异常请断电重启控制箱
+        public byte modbusMasterConnect;    // bit0-bit7位对应ModbusTCP的0-7主站连接状态  0-未连接   1-连接
+        public byte modbusSlaveConnect;     // ModbusTCP从站连接状态 0-未连接；1-已连接
+        public byte btnBoxStopSignal;       // 按钮盒急停信号，0-松开急停；1-按下急停
+        public byte dragAlarm;              // 拖动警告，当前处于自动模式,0-不报警，1-报警 ，2-位置反馈异常不切换
+        public byte safetyDoorAlarm;        // 安全门警告；0-安全门关闭；1-安全门打开
+        public byte safetyPlaneAlarm;       // 进入安全墙警告；0-未进入安全墙；1-已进入安全墙
+        public byte motonAlarm;             // 运动警告
+        public byte interfaceAlarm;         // 进入干涉区警告
+        public int udpCmdState;             // 20007端口UDP通讯连接状态
+        public byte weldReadyState;         // 焊机准备完成状态
+        public byte alarmCheckEmergStopBtn; // 0-正常；1-通信异常，检查急停按钮是否松开
+        public byte tsTmCmdComError;        // 0-正常；1-扭矩指令通讯失败
+        public byte tsTmStateComError;      // 0-正常；1-扭矩状态通讯失败
+        public int ctrlBoxError;            // 控制箱错误
+        public byte safetyDataState;        // 安全数据状态标志，0-正常，1-异常
+        public byte forceSensorErrState;    // 力传感器连接超时故障；bit0-bit1对应力传感器ID1-ID2
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
+        public byte[] ctrlOpenLuaErrCode;   // 4个控制器外设协议错误码(500错误码)
+
+        public byte strangePosFlag;         // 当前处于奇异位姿标志；0-正常；1-奇异位姿
+        public byte alarm;                  // 警告
+        public byte driverAlarm;            // 驱动器报警轴号
+        public byte aliveSlaveNumError;     // 活动从站数量错误，0：正常；1：数量错误
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
+        public byte[] slaveComError;        // 从站错误，0：正常；1：从站掉线；2：从站状态与设置值不一致；3：从站未配置；4：从站配置错误；5：从站初始化错误；6：从站邮箱通信初始化错误
+
+        public byte cmdPointError;          // 指令点错误
+        public byte IOError;                // IO错误
+        public byte gripperError;           // 夹爪错误
+        public byte fileError;              // 文件错误
+        public byte paraError;              // 参数错误
+        public byte exaxisOutLimitError;    // 外部轴超出软限位错误
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public byte[] driverComError;       // 与驱动器通信故障
+        public byte driverError;            // 驱动器通信故障轴号
+        public byte outSoftLimitError;      // 超出软限位故障
+
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 130)]
+        public byte[] axleGenComData;       // 机器人末端透传反馈数据
+
+        public byte socketConnTimeout;     // socket连接超时标志
+        public byte socketReadTimeout;     // socket读取超时标志
+        public byte tsWebStateComErr;      // ts_web_state_com_err
+
+        public byte exaxisCoordID;         //扩展轴坐标系编号
+
+        public UInt16 check_sum;         /* 和校验 */                 
+
+        // 构造函数：初始化所有数组字段
+        public ROBOT_STATE_PKG()
+        {
+            jt_cur_pos = new double[6];
+            tl_cur_pos = new double[6];
+            flange_cur_pos = new double[6];
+            actual_qd = new double[6];
+            actual_qdd = new double[6];
+            target_TCP_CmpSpeed = new double[2];
+            target_TCP_Speed = new double[6];
+            actual_TCP_CmpSpeed = new double[2];
+            actual_TCP_Speed = new double[6];
+            jt_cur_tor = new double[6];
+            cl_analog_input = new ushort[2];
+            ft_sensor_raw_data = new double[6];
+            ft_sensor_data = new double[6];
+            extAxisStatus = new EXT_AXIS_STATUS[4];
+            extDIState = new ushort[8];
+            extDOState = new ushort[8];
+            extAIState = new ushort[4];
+            extAOState = new ushort[4];
+            jointDriverTorque = new double[6];
+            jointDriverTemperature = new double[6];
+            cl_analog_output = new ushort[2];
+            jt_tgt_tor = new double[6];
+            toolCoord = new double[6];
+            wobjCoord = new double[6];
+            extoolCoord = new double[6];
+            exAxisCoord = new double[6];
+            loadCog = new double[3];
+            lastServoTarget = new double[6];
+            targetJointPos = new double[6];
+            targetJointVel = new double[6];
+            targetJointAcc = new double[6];
+            targetJointCurrent = new double[6];
+            actualJointCurrent = new double[6];
+            actualTCPForce = new double[6];
+            targetTCPPos = new double[6];
+            collisionLevel = new byte[6];
+            currentLuaFileName = new byte[256];
+            safetyBoxSingal = new byte[6];
+            ctrlOpenLuaErrCode = new byte[4];
+            slaveComError = new byte[8];
+            driverComError = new byte[6];
+            axleGenComData = new byte[130];
+        }
+    }
+
+    enum RobotError
+    {
+        ERR_UPLOAD_FILE_NOT_FOUND = -7,   /* 上传文件不存在 */
+        ERR_SAVE_FILE_PATH_NOT_FOUND = -6,/* 保存文件路径不存在 */
+        ERR_NOT_FOUND_LUA_FILE = -5,      /* lua文件不存在 */
+        ERR_RPC_ERROR = -4,
+        ERR_SOCKET_COM_FAILED = -2,
+        ERR_OTHER = -1,
+        ERR_SUCCESS = 0,
+        ERR_PARAM_NUM = 3,
+        ERR_PARAM_VALUE = 4,
+        ERR_TPD_START_TIMER = 5,                      //tpd定时器启动失败   The tpd timer fails to start
+        ERR_TPD_CLOSE_TIMER = 6,                      //tpd定时器关闭失败   The tpd timer fails to close
+        ERR_TPD_CREATE_FILE = 7,                      //tpd文件创建失败     Failed to create the tpd file
+        ERR_TPD_FILE_OPEN_FAILED = 8,                 
+        ERR_TPD_SEND_FILENAME = 9,                    //tpd文件名发送失败   Failed to send the tpd file name
+        ERR_TPD_SEND_FILECONTENT = 10,                //tpd文件内容发送失败 Failed to send tpd file contents
+        ERR_PROGRAM_CONTENT = 11,                     //程序异常，解析停止  Program exception, parsing stopped
+        ERR_TPDFILECONTENT = 12,                      //tpd文件内容不一致   The contents of the tpd file are inconsistent
+        ERR_TPD_FILE_NUM_POINTS = 13,                 //tpd文件点数异常     The number of tpd files is abnormal
+        ERR_EXECUTION_FAILED = 14,
+        ERR_TPD_POINT_NUM = 15,                      //tpd记录点数超限     The number of tpd records exceeds the limit
+        ERR_PROTOCOL_LOADED = 16,                    //协议已加载          Protocol loaded
+        ERR_PROTOCOL_UNLOAD = 17,                    //协议未加载          Protocol unload
+        ERR_PROGRAM_IS_RUNNING = 18,                 
+        ERR_POSSENSOR_IS_INSTALL = 19,               //位姿传感器通信异常   The communication of the pose sensor is abnormal
+        ERR_WEAVE_NOT_SETTOOL = 20,                  //摆焊未设置工具       No tool is set for swing welding
+        ERR_EXAXIS_IS_ACTIVATING = 21,               //外部轴未去除激活     External axis not removed active
+        ERR_TOOL_IS_NOT_SET = 22,                    //三点法未设置工具     The three-point method does not set a tool
+        ERR_POSSENSOR_DATA_GET_FAIL = 23,            //位姿传感器数据获取失败        Failed to obtain the pose sensor data
+        ERR_EIGHTPOINT_DATA_POS = 24,                //八点法-前四点姿态变化太大     Eight point method. - The first four points change too much
+        ERR_COMPUTE_FAILED = 25,
+        ERR_EIGHTPOINT_TOOL = 26,                    //八点法-未切换到基座标系，未切换到exaxis0   Eight-point method - did not switch to the base system, did not switch to exaxis0
+        ERR_EIGHTPOINT_RESULT = 27,                  //八点法-计算结果异常  Eight-point method - Calculation results are abnormal   
+        ERR_INVERSE_KINEMATICS_COMPUTE_FAILED = 28,
+        ERR_SERVOJ_JOINT_OVERRUN = 29,
+        ERR_NON_RESSETTABLE_FAULT = 30,
+        ERR_EMERGENCY_STOP = 31,                     //急停按钮松开，请断电重启控制箱    The emergency stop button is released, please power off and restart the control box
+        ERR_MODIFY_TP_OVER = 32,                     //关节超限            Joint Over
+        ERR_EXTAXIS_CONFIG_FAILURE = 33,//外部轴未处于零位，导程、分辨率设置失败
+        ERR_WORKPIECE_NUM = 34,
+        ERR_WORKPIECE_NUM_NOT_ZERO = 35,             //请切换至工件号0      Please switch to workpiece number 0
+        ERR_FILENAME_TOO_LONG = 36,
+        ERR_TOOL_NUM = 37,
+        ERR_STRANGE_POSE = 38,                       //奇异位姿
+        ERR_SOCKET_NAME = 39,                        //socket名称无效       Socket name invalid
+        ERR_VEL_SCALE_OVER = 40,                     //速度百分比超限       Percentage of speed exceeds the limit
+        ERR_EXTAXIS_NOT_HOMING = 41,//外部轴未回零
+        ERR_LASER_OFFECT_POSE_CHANGE = 42,           //姿态变化过大         Excessive attitude change
+        ERR_CONVEYOR_IO_NOT_CONFIG = 43,             //传送带检测开关DI未配置     The conveyor belt detection switch DI is not configured
+        ERR_ROBOT_POSE_OVER = 44,                    //机器人姿态角超限      The robot attitude Angle exceeds the limit
+        ERR_EXTAXIS_NOT_ACTIVING = 45,//外部轴未激活
+        ERR_EXTAXIS_NOT_CALIB = 46,//同步功能需要标定外部轴
+        ERR_EXTAXIS_SERVO_CONFIG_FAIL = 47,//外部驱动器信息配置失败
+        ERR_EXTAXIS_SERVO_CONFIG_OVER = 48,//外部轴驱动器信息配置超时
+        ERR_EXTAXIS_UNABLE_ENABLE = 49,              //外部轴错误无法使能    External axis error cannot be enabled
+        ERR_EXTAXIS_SERVO_GET_FAIL = 50,             //外部轴驱动器信息获取失败   Failed to obtain external shaft drive information
+        ERR_EXTAXIS_SERVO_GET_OVER = 51,             //外部轴驱动器信息获取超时   Obtaining external shaft drive information timed out
+        ERR_EXTAXIS_NOT_STEP_OPERATE = 52,//同步功能不能使用单步操作
+        ERR_FT_SENSOR_NOT_ACTIVATE = 59,             //力/扭矩传感器未激活   The force/torque sensor is not active
+        ERR_FT_SENSOR_RCS = 60,                      //力/扭矩传感器参考坐标系未切换至工具    The force/torque sensor reference coordinate system is not switched to the tool
+        ERR_FT_SENSOR_NOT_HONMING = 61,              //力/扭矩传感器未设置零点    The force/torque sensor is not homing
+        ERR_FT_SENSOR_LOAD_NOT_ZERO = 62,            //力扭矩传感器负载未设置为零  Force torque sensor load is not set to zero
+        ERR_SYSTEM_TIME_GET_FAILED = 63,             //系统时间获取失败           Failed to obtain the system time
+        ERR_NOT_ADD_CMD_QUEUE = 64,
+        ERR_CIRCLE_SPIRAL_MIDDLE_POINT1 = 66,
+        ERR_CIRCLE_SPIRAL_MIDDLE_POINT2 = 67,
+        ERR_CIRCLE_SPIRAL_MIDDLE_POINT3 = 68,
+        ERR_MOVEC_MIDDLE_POINT = 69,
+        ERR_MOVEC_TARGET_POINT = 70,
+        ERR_GRIPPER_MOTION = 73,
+        ERR_LINE_POINT = 74,
+        ERR_CHANNEL_FAULT = 75,
+        ERR_WAIT_TIMEOUT = 76,
+        ERR_TPD_CMD_POINT = 82,
+        ERR_TPD_CMD_TOOL = 83,
+        ERR_WELDING_TRACKING_SEARCH = 83,           //焊缝寻位失败               Weld locating failed
+        ERR_LINE_CMD = 84,                          //直线指令错误               Line command error
+        ERR_EXAXIS_CFG_CHECK_FAILED = 90,           //外部轴配置文件检查失败      Failed to check the external axis configuration file
+        ERR_EXDEV_CFG_VERSION = 91,                 //外设配置文件版本不匹配      The version of the peripheral configuration file does not match
+        ERR_EXDEV_CFG_READ = 92,                    //外设配置文件读取失败        Failed to read the peripheral configuration file
+        ERR_SPL_CMD_POINT_NUM = 93,                 //样条指令点数超限            The number of spline instructions exceeds the limit
+        ERR_SPLINE_POINT = 94,
+        ERR_SPLINE_PARAM = 95,                      //样条参数错误               The spline parameter is incorrect
+        ERR_WIRE_SEARCH_FAILED = 96,                //焊丝寻位失败               Welding wire locating failed
+        ERR_RECORD_DATA_EMPTY = 97,                 //记录数据为空               The recorded data is empty
+        ERR_MAIN_PROG_NOT_CONFIG = 98,              //未配置主程序               The main program is not configured
+        ERR_SAFETY_STOP = 99,                       //安全停止已触发             A safe stop has been triggered
+        ERR_HOME_POINT_NOT_CONFIG = 100,            //未配置作业原点             The job origin is not configured
+        ERR_ROBOT_NOT_ENABLE = 101,                 //机器人未使能               The robot is not enabled
+        ERR_EXAXIS_NOT_ENABLE = 106,                //外部轴未使能               The external axis is not enabled
+        ERR_SPIRAL_START_POINT = 108,
+        ERR_DRAG_LOCK_INTERFERE = 110,              //请关闭进入干涉区拖动配置-阻抗回调     Please turn off Drag Configuration - Impedance callback into the interference zone
+        ERR_INTERFERE_DRAG_LOCK = 111,              //请关闭拖动示教锁定自由度功能          Turn off the drag teaching lock freedom function
+        ERR_TARGET_POSE_CANNOT_REACHED = 112,       //给定位姿无法到达
+        ERR_DMP_CMD_POINT = 114,                    //DMP指令点错误              DMP command point error
+        ERR_UNIFCIRCLE_CMD_POINT = 115,             //圆周运动指令点错误          Circular motion command point error
+        ERR_EXAXIS_DRIVER_NOT_LOAD = 116,           //扩展轴外设通信驱动未加载    The extension shaft peripheral communication driver is not loaded
+        ERR_FT_PAYLOAD = 118,                       //力传感器下负载重量错误      Load weight error under force sensor
+        ERR_FT_PAYLOAD_COG = 119,                   //力传感器下负载质心错误      Load center of mass error under the force sensor
+        ERR_TRAJ_CMD_POINT = 120,                   //轨迹指令点错误             Trace command point error
+        ERR_TRAJ_POINT_EMPTY = 121,                 //轨迹点数为0                The number of trace points is 0
+        ERR_JOINT_TORQUE_OVERRUN = 122,             //关节扭矩超限               Joint torque exceeds the limit
+        ERR_DRAG_MODE_EXIT = 123,                   //请先退出拖动模式           Exit drag mode first
+        ERR_AUX_SERVO_PARAM = 124,                  //扩展轴参数未配置           The extension axis parameters are not configured
+        ERR_FILE_GET_LUA_FILE = 125,                //恢复焊接失败-解析原程序失败         Recovery weld failed - Failed to parse the original program
+        ERR_GET_REWELD_PT_FAILED = 126,             //恢复焊接失败-无法获取再起弧点       Recovery weld failed - Unable to obtain rearc point
+        ERR_CREATE_NEW_LUA_FAIL = 127,              //恢复焊接失败-无法生成恢复程序       Recovery weld failed - Unable to generate recovery program
+        ERR_NOT_MANUAL_STOP = 128,                  //未处于手动模式/停止状态             Not in manual mode/stopped state
+        ERR_DYNAMICS_MODE = 129,                    //请先切换至新动力学模式              Please switch to the new dynamics mode first
+        ERR_POINTTABLE_NOTFOUND = 130,
+        ERR_FT_DRAG_OR_RB_DRAG = 133,               //请先切入拖动模式/力传感器辅助拖动模式       Please first enter Drag mode/Force Sensor Assisted drag mode
+        ERR_FT_SENSOR_NO_LOAD = 134,                //力/扭矩传感器无负载                Force/torque sensor no load
+        ERR_FT_SENSOR_MATRIX_INV = 135,             //力/扭矩传感器下矩阵求逆异常         Inverse anomaly of matrix under force/torque sensor
+        ERR_DETECT_DI_NOT_CONFIG = 138,             //检测开关DI未配置                   The detection switch DI is not configured
+        ERR_NO_APPLY_EXAXIS_COORDSYS = 139,         //请先应用扩展轴坐标系                Please apply the extended axis coordinate system first
+        ERR_EXTAXIS_NOT_ACTIVATED = 140,            //请先激活当前扩展轴                 Please activate the current extension axis first
+        ERR_TEACHINGPOINTNOTFOUND = 143,            //示教点位信息不存在
+        ERR_LUAFILENITFOUND = 144,                  //LUA文件不存在
+        ERR_JOINTCONFIGCHANGE = 151,                //关节配置发生变化
+        ERR_WEAVEPOINTDISTANCETOOSMALL = 152,       //摆焊指令点间距过小
+        ERR_ARCLENGTHTOOSMALL = 153,           //圆弧指令点间距太小
+
+
+        ERR_TOO_MANY_STATES = -20,
+        ERR_NEED_AT_LEAST_ONE_STATE = -19,
+        ERR_STATE_ALREADY_EXISTS = -17,
+        ERR_STATE_INVALID = -18,
+        ERR_SOCKET_RECV_FAILED = -16,   /* socket接收失败 */
+        ERR_SOCKET_SEND_FAILED = -15,    /* socket发送失败 */
+        ERR_FILE_OPEN_FAILED = -14,   /* 文件打开失败 */
+        ERR_FILE_TOO_LARGE = -13,   /* 文件大小超限 */
+        ERR_UPLOAD_FILE_ERROR = -12,   /* 上传文件异常 */
+        ERR_FILE_NAME = -11,  /* 文件名称异常 */
+        ERR_DOWN_LOAD_FILE_WRITE_FAILED = -10,   /* 下载文件写入失败 */
+        ERR_DOWN_LOAD_FILE_CHECK_FAILED = -9,     /* 文件下载校验失败 */
+        ERR_DOWN_LOAD_FILE_FAILED = -8,   /* 文件下载失败 */
+    }
+
+
+
+    /// <summary>
+    /// 机器人可配置状态枚举
+    /// 值范围 0~129
+    /// </summary>
+    /**
+    * @brief  机器人可配置状态枚举 范围 0~132
+    */
+    public enum RobotState
+    {
+        FrameHead = 0,
+        FrameCnt = 1,
+        DataLen = 2,
+        ProgramState = 3,
+        RobotState = 4,
+        MainCode = 5,
+        SubCode = 6,
+        RobotMode = 7,
+        JointCurPos = 8,
+        ToolCurPos = 9,
+        FlangeCurPos = 10,
+        ActualJointVel = 11,
+        ActualJointAcc = 12,
+        TargetTCPCmpSpeed = 13,
+        TargetTCPSpeed = 14,
+        ActualTCPCmpSpeed = 15,
+        ActualTCPSpeed = 16,
+        ActualJointTorque = 17,
+        Tool = 18,
+        User = 19,
+        ClDgtOutputH = 20,
+        ClDgtOutputL = 21,
+        TlDgtOutputL = 22,
+        ClDgtInputH = 23,
+        ClDgtInputL = 24,
+        TlDgtInputL = 25,
+        ClAnalogInput = 26,
+        TlAnglogInput = 27,
+        FtSensorRawData = 28,
+        FtSensorData = 29,
+        FtSensorActive = 30,
+        EmergencyStop = 31,
+        MotionDone = 32,
+        GripperMotiondone = 33,
+        McQueueLen = 34,
+        CollisionState = 35,
+        TrajectoryPnum = 36,
+        SafetyStop0State = 37,
+        SafetyStop1State = 38,
+        GripperFaultId = 39,
+        GripperFault = 40,
+        GripperActive = 41,
+        GripperPosition = 42,
+        GripperSpeed = 43,
+        GripperCurrent = 44,
+        GripperTemp = 45,
+        GripperVoltage = 46,
+        AuxState = 47,
+        ExtAxisStatus = 48,
+        ExtDIState = 49,
+        ExtDOState = 50,
+        ExtAIState = 51,
+        ExtAOState = 52,
+        RbtEnableState = 53,
+        JointDriverTorque = 54,
+        JointDriverTemperature = 55,
+        RobotTime = 56,
+        SoftwareUpgradeState = 57,
+        EndLuaErrCode = 58,
+        ClAnalogOutput = 59,
+        TlAnalogOutput = 60,
+        GripperRotNum = 61,
+        GripperRotSpeed = 62,
+        GripperRotTorque = 63,
+        WeldingBreakOffState = 64,
+        TargetJointTorque = 65,
+        SmartToolState = 66,
+        WideVoltageCtrlBoxTemp = 67,
+        WideVoltageCtrlBoxFanCurrent = 68,
+        ToolCoord = 69,
+        WobjCoord = 70,
+        ExtoolCoord = 71,
+        ExAxisCoord = 72,
+        Load = 73,
+        LoadCog = 74,
+        LastServoTarget = 75,
+        ServoJCmdNum = 76,
+        TargetJointPos = 77,
+        TargetJointVel = 78,
+        TargetJointAcc = 79,
+        TargetJointCurrent = 80,
+        ActualJointCurrent = 81,
+        ActualTCPForce = 82,
+        TargetTCPPos = 83,
+        CollisionLevel = 84,
+        SpeedScaleManual = 85,
+        SpeedScaleAuto = 86,
+        LuaLineNum = 87,
+        AbnomalStop = 88,
+        CurrentLuaFileName = 89,
+        ProgramTotalLine = 90,
+        SafetyBoxSingal = 91,
+        WeldVoltage = 92,
+        WeldCurrent = 93,
+        WeldTrackVel = 94,
+        TpdException = 95,
+        AlarmRebootRobot = 96,
+        ModbusMasterConnect = 97,
+        ModbusSlaveConnect = 98,
+        BtnBoxStopSignal = 99,
+        DragAlarm = 100,
+        SafetyDoorAlarm = 101,
+        SafetyPlaneAlarm = 102,
+        MotonAlarm = 103,
+        InterfaceAlarm = 104,
+        UdpCmdState = 105,
+        WeldReadyState = 106,
+        AlarmCheckEmergStopBtn = 107,
+        TsTmCmdComError = 108,
+        TsTmStateComError = 109,
+        CtrlBoxError = 110,
+        SafetyDataState = 111,
+        ForceSensorErrState = 112,
+        CtrlOpenLuaErrCode = 113,
+        StrangePosFlag = 114,
+        Alarm = 115,
+        DriverAlarm = 116,
+        AliveSlaveNumError = 117,
+        SlaveComError = 118,
+        CmdPointError = 119,
+        IOError = 120,
+        GripperError = 121,
+        FileError = 122,
+        ParaError = 123,
+        ExaxisOutLimitError = 124,
+        DriverComError = 125,
+        DriverError = 126,
+        OutSoftLimitError = 127,
+        AxleGenComData = 128,
+        SocketConnTimeout = 129,     //socket连接超时，bit0-bit4:socketID 1-4
+        SocketReadTimeout = 130,     //socket读取超时，bit0-bit4:socketID 1-4
+        TsWebStateComErr = 131,     //web-扭矩通讯失败；0-正常；1-失败
+        ExaxisCoordID = 132          //扩展轴坐标系编号
+    }
+
+    internal class RobotTypes
+    {
+
+    }
+}

@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Local config and workflow scripts (not pushed)
+.env/
+workflow/
