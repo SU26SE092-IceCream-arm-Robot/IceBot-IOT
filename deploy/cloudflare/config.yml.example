@@ -1,0 +1,14 @@
+# Cloudflare Tunnel — copy to config.yml after: cloudflared tunnel create icebot
+# Docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+
+tunnel: <TUNNEL_UUID>
+credentials-file: C:\cloudflared\<TUNNEL_UUID>.json
+
+ingress:
+  # Public hostname (configure in Cloudflare DNS dashboard → CNAME to <tunnel-id>.cfargotunnel.com)
+  - hostname: ice-shop.example.com
+    service: http://localhost:5080
+  - service: http_status:404
+
+# IceBot must run: IceBot.exe serve
+# Local API: GET /health, POST /api/orders

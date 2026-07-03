@@ -6,4 +6,15 @@ obj/
 
 # Local config and workflow scripts (not pushed)
 .env/
-workflow/
+/workflow/
+code/workflow/
+
+# Deploy secrets
+deploy/duckdns/duckdns.env
+deploy/cloudflare/config.yml
+deploy/cloudflare/*.json
+deploy/cloudflare/cloudflared.exe
+
+# IceBot per-site config (next to exe at runtime)
+**/config/icebot.site.env
+**/config/duckdns.env
