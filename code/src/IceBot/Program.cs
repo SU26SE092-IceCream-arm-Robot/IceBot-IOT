@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using IceBot.Config;
+using IceBot.Machines;
 using IceBot.Networking;
 using IceBot.Workflow;
 
@@ -37,13 +38,16 @@ namespace IceBot
                 case "test":
                     RunTestMode();
                     break;
+                case "test-cup":
+                    RunCupMachineTestMode();
+                    break;
                 case "provision":
                     WorkflowProvisioner.RunInteractive();
                     Pause();
                     break;
                 default:
                     Console.WriteLine($"Unknown command: {command}");
-                    Console.WriteLine("Usage: IceBot [setup|serve|test|provision]");
+                    Console.WriteLine("Usage: IceBot [setup|serve|test|test-cup|provision]");
                     Pause();
                     break;
             }
@@ -65,7 +69,8 @@ namespace IceBot
                 Console.WriteLine("3. Tai file Lua tu BE (mock: BeApi.GetLua)");
                 Console.WriteLine("4. Chay server (nhan don tu BE)");
                 Console.WriteLine("5. Test robot (chay file lua)");
-                Console.WriteLine("6. Thoat");
+                Console.WriteLine("6. Test may tha coc (serial)");
+                Console.WriteLine("7. Thoat");
                 Console.WriteLine();
                 Console.Write("Chon: ");
                 var choice = Console.ReadLine()?.Trim();
@@ -91,6 +96,9 @@ namespace IceBot
                         RunTestMode();
                         break;
                     case "6":
+                        RunCupMachineTestMode();
+                        break;
+                    case "7":
                         return;
                     default:
                         Console.WriteLine("Lua chon khong hop le.");
@@ -179,6 +187,55 @@ namespace IceBot
             }
 
             Console.ReadLine();
+        }
+
+        private static void RunCupMachineTestMode()
+        {
+            PrintBanner();
+            var comPort = SiteConfigStore.Load().GetMachinePort(MachineRegistry.CupDropping);
+            if (string.IsNullOrWhiteSpace(comPort))
+            {
+                Console.WriteLine("[WARN] Chua cau hinh cong COM cho may tha coc. Chon menu 1 de cau hinh.");
+                Pause();
+                return;
+            }
+
+            Console.WriteLine($"Cong COM: {comPort}");
+            Console.WriteLine("1. Query trang thai | 2. Tha 1 coc | ENTER = quay lai");
+            Console.Write("Chon: ");
+            var choice = Console.ReadLine()?.Trim();
+            if (string.IsNullOrEmpty(choice))
+            {
+                return;
+            }
+
+            try
+            {
+                using (var client = new CupDroppingMachineClient(comPort))
+                {
+                    client.Connect();
+                    switch (choice)
+                    {
+                        case "1":
+                            var status = client.QueryStatus();
+                            Console.WriteLine($"[MACHINE] {status}");
+                            break;
+                        case "2":
+                            var ok = client.DispenseCup();
+                            Console.WriteLine(ok ? "[MACHINE] Dispense OK." : "[MACHINE] Dispense FAILED.");
+                            break;
+                        default:
+                            Console.WriteLine("Lua chon khong hop le.");
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] {ex.Message}");
+            }
+
+            Pause();
         }
 
         private static void PrintBanner()

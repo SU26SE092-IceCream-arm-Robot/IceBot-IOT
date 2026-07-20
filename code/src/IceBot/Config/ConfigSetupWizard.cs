@@ -1,4 +1,5 @@
 using System;
+using IceBot.Machines;
 
 namespace IceBot.Config
 {
@@ -21,7 +22,18 @@ namespace IceBot.Config
                 PublicUrl = Prompt("Public URL cho BE (Cloudflare, vd: https://shop.api.tenban.com)", current.PublicUrl),
                 ApiKey = PromptSecret("API key chia se voi BE (X-Api-Key)", current.ApiKey),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
+                MachinePorts = new System.Collections.Generic.Dictionary<string, string>(current.MachinePorts, System.StringComparer.OrdinalIgnoreCase),
             };
+
+            var cupPort = Prompt("COM port may tha coc (vd: COM3, de trong neu chua lap)", current.GetMachinePort(MachineRegistry.CupDropping));
+            if (string.IsNullOrWhiteSpace(cupPort))
+            {
+                settings.MachinePorts.Remove(MachineRegistry.CupDropping);
+            }
+            else
+            {
+                settings.MachinePorts[MachineRegistry.CupDropping] = cupPort;
+            }
 
             SiteConfigStore.Save(settings);
 
@@ -44,6 +56,8 @@ namespace IceBot.Config
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
+            var cupPort = settings.GetMachinePort(MachineRegistry.CupDropping);
+            Console.WriteLine($"  May tha coc    : {(string.IsNullOrEmpty(cupPort) ? "(chua cau hinh)" : cupPort)}");
             Console.WriteLine($"  Local API      : {AppConfig.ApiListenPrefix}");
             Console.WriteLine($"  BE POST orders : {settings.PublicUrl.TrimEnd('/')}/api/orders");
             Console.WriteLine($"  BE GET health  : {settings.PublicUrl.TrimEnd('/')}/health");

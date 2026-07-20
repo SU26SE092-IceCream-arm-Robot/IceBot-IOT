@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace IceBot.Config
 {
     internal sealed class SiteSettings
@@ -9,6 +12,14 @@ namespace IceBot.Config
         public string BeApiUrl { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
         public string RobotIp { get; set; } = AppConfig.DefaultRobotIp;
+
+        // Peripheral machines wired directly to this PC over serial, keyed by machine type
+        // (e.g. "cup_dropping" -> "COM3"). See IceBot.Machines.MachineRegistry.
+        public Dictionary<string, string> MachinePorts { get; set; } =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public string GetMachinePort(string machineType) =>
+            MachinePorts.TryGetValue(machineType, out var port) ? port : string.Empty;
 
         public string DuckDnsDomain =>
             string.IsNullOrWhiteSpace(DuckDnsSubdomain)

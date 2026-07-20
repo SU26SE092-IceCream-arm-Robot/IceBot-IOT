@@ -48,6 +48,7 @@ namespace IceBot.Config
                     case "BE_API_URL": settings.BeApiUrl = value; break;
                     case "API_KEY": settings.ApiKey = value; break;
                     case "ROBOT_IP": settings.RobotIp = value; break;
+                    case "MACHINE_PORTS": settings.MachinePorts = ParseMachinePorts(value); break;
                 }
             }
 
@@ -70,6 +71,7 @@ namespace IceBot.Config
                 $"BE_API_URL={settings.BeApiUrl}",
                 $"API_KEY={settings.ApiKey}",
                 $"ROBOT_IP={settings.RobotIp}",
+                $"MACHINE_PORTS={SerializeMachinePorts(settings.MachinePorts)}",
             };
 
             File.WriteAllLines(SiteConfigPath, lines, Encoding.UTF8);
@@ -99,6 +101,45 @@ namespace IceBot.Config
         private static void SetEnv(string name, string value)
         {
             Environment.SetEnvironmentVariable(name, string.IsNullOrWhiteSpace(value) ? null : value);
+        }
+
+        // Encoded as "type1:COM3,type2:COM4" — see SiteSettings.MachinePorts.
+        private static Dictionary<string, string> ParseMachinePorts(string value)
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return result;
+            }
+
+            foreach (var entry in value.Split(','))
+            {
+                var idx = entry.IndexOf(':');
+                if (idx <= 0)
+                {
+                    continue;
+                }
+
+                var type = entry.Substring(0, idx).Trim();
+                var port = entry.Substring(idx + 1).Trim();
+                if (type.Length > 0 && port.Length > 0)
+                {
+                    result[type] = port;
+                }
+            }
+
+            return result;
+        }
+
+        private static string SerializeMachinePorts(Dictionary<string, string> machinePorts)
+        {
+            var parts = new List<string>();
+            foreach (var kvp in machinePorts)
+            {
+                parts.Add($"{kvp.Key}:{kvp.Value}");
+            }
+
+            return string.Join(",", parts);
         }
 
         private static bool TryParseLine(string line, out string key, out string value)
