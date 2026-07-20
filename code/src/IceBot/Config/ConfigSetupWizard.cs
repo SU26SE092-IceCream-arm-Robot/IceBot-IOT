@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using IceBot.Machines;
 
 namespace IceBot.Config
@@ -26,18 +27,18 @@ namespace IceBot.Config
                 MachinePorts = new Dictionary<string, string>(current.MachinePorts, StringComparer.OrdinalIgnoreCase),
             };
 
-            // One COM-port prompt per registered machine module — add a module to
-            // MachineRegistry.Modules and it shows up here automatically.
-            foreach (var module in MachineRegistry.Modules)
+            // One COM-port prompt per registered machine that actually needs serial (IMachineTrigger)
+            // — a plain arm-motion machine (IMachineModule only) has no port to configure.
+            foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {
-                var port = Prompt($"COM port {module.DisplayName} (vd: COM3, de trong neu chua lap)", current.GetMachinePort(module.MachineType));
+                var port = Prompt($"COM port {trigger.DisplayName} (vd: COM3, de trong neu chua lap)", current.GetMachinePort(trigger.MachineType));
                 if (string.IsNullOrWhiteSpace(port))
                 {
-                    settings.MachinePorts.Remove(module.MachineType);
+                    settings.MachinePorts.Remove(trigger.MachineType);
                 }
                 else
                 {
-                    settings.MachinePorts[module.MachineType] = port;
+                    settings.MachinePorts[trigger.MachineType] = port;
                 }
             }
 
@@ -62,10 +63,10 @@ namespace IceBot.Config
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
-            foreach (var module in MachineRegistry.Modules)
+            foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {
-                var port = settings.GetMachinePort(module.MachineType);
-                Console.WriteLine($"  {module.DisplayName,-15}: {(string.IsNullOrEmpty(port) ? "(chua cau hinh)" : port)}");
+                var port = settings.GetMachinePort(trigger.MachineType);
+                Console.WriteLine($"  {trigger.DisplayName,-15}: {(string.IsNullOrEmpty(port) ? "(chua cau hinh)" : port)}");
             }
             Console.WriteLine($"  Local API      : {AppConfig.ApiListenPrefix}");
             Console.WriteLine($"  BE POST orders : {settings.PublicUrl.TrimEnd('/')}/api/orders");

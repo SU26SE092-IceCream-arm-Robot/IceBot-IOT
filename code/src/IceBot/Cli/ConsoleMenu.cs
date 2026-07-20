@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using IceBot.Config;
 using IceBot.Machines;
@@ -15,7 +17,7 @@ namespace IceBot.Cli
         {
             while (true)
             {
-                Console.Clear();
+                SafeClear();
                 PrintBanner();
                 var settings = SiteConfigStore.Load();
                 Console.WriteLine(settings.IsConfigured
@@ -147,44 +149,46 @@ namespace IceBot.Cli
             Console.ReadLine();
         }
 
-        // Lists every registered machine module (MachineRegistry.Modules) so a newly added
-        // machine shows up here with no changes needed in this file.
+        // Lists every registered machine that can actually be tested over serial
+        // (IMachineTrigger) — a newly added one shows up here with no changes needed in this
+        // file. Plain arm-motion machines (IMachineModule only, no serial) have nothing to test
+        // here; running their .lua file via menu 5 is the whole test.
         public static void RunMachineTestMode()
         {
             PrintBanner();
-            var modules = MachineRegistry.Modules;
-            if (modules.Count == 0)
+            var triggers = MachineRegistry.Modules.OfType<IMachineTrigger>().ToList();
+            if (triggers.Count == 0)
             {
-                Console.WriteLine("[WARN] Chua co may ngoai vi nao duoc dang ky trong MachineRegistry.");
+                Console.WriteLine("[WARN] Chua co may nao ho tro serial duoc dang ky trong MachineRegistry.");
                 Pause();
                 return;
             }
 
             Console.WriteLine("Chon may de test:");
-            for (var i = 0; i < modules.Count; i++)
+            for (var i = 0; i < triggers.Count; i++)
             {
-                Console.WriteLine($"  {i + 1}. {modules[i].DisplayName} ({modules[i].MachineType})");
+                Console.WriteLine($"  {i + 1}. {triggers[i].DisplayName} ({triggers[i].MachineType})");
             }
 
             Console.Write("Chon (ENTER = quay lai): ");
             var machineChoice = Console.ReadLine()?.Trim();
             if (string.IsNullOrEmpty(machineChoice)
                 || !int.TryParse(machineChoice, out var index)
-                || index < 1 || index > modules.Count)
+                || index < 1 || index > triggers.Count)
             {
                 return;
             }
 
-            var module = modules[index - 1];
-            var comPort = SiteConfigStore.Load().GetMachinePort(module.MachineType);
+            var trigger = triggers[index - 1];
+            var comPort = SiteConfigStore.Load().GetMachinePort(trigger.MachineType);
             if (string.IsNullOrWhiteSpace(comPort))
             {
-                Console.WriteLine($"[WARN] Chua cau hinh cong COM cho '{module.DisplayName}'. Chon menu 1 de cau hinh.");
+                Console.WriteLine($"[WARN] Chua cau hinh cong COM cho '{trigger.DisplayName}'. Chon menu 1 de cau hinh.");
                 Pause();
                 return;
             }
 
-            var diagnostics = module as IMachineDiagnostics;
+            var diagnostics = trigger as IMachineDiagnostics;
             Console.WriteLine($"Cong COM: {comPort}");
             Console.WriteLine(diagnostics != null
                 ? "1. Query trang thai | 2. Trigger | ENTER = quay lai"
@@ -204,7 +208,7 @@ namespace IceBot.Cli
                 }
                 else if (actionChoice == "2")
                 {
-                    module.Trigger(comPort);
+                    trigger.Trigger(comPort);
                 }
                 else
                 {
@@ -248,6 +252,20 @@ namespace IceBot.Cli
             Console.WriteLine();
             Console.WriteLine("Nhan ENTER de tiep tuc...");
             Console.ReadLine();
+        }
+
+        // Console.Clear() throws IOException when stdout/stdin isn't an attached console
+        // buffer (redirected/piped — e.g. a scripted run, or output piped to a log file).
+        // Purely cosmetic, so it's safe to just skip clearing in that case.
+        private static void SafeClear()
+        {
+            try
+            {
+                Console.Clear();
+            }
+            catch (IOException)
+            {
+            }
         }
     }
 }

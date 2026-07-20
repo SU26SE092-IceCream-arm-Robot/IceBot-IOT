@@ -54,18 +54,19 @@ IceBot-IOT/
 │       ├── Api/BeApi.cs            # Client gọi BE lấy Lua (hiện là mock)
 │       ├── Cli/ConsoleMenu.cs      # Toàn bộ UI console: menu, serve/test/test-machine mode
 │       ├── Config/                 # AppConfig, SiteConfigStore, SiteSettings, ConfigSetupWizard
-│       ├── Machines/                       # Giao tiếp serial trực tiếp với máy ngoại vi (Path A)
-│       │   ├── IMachineModule.cs           #   interface 1 máy phải implement (bắt buộc)
+│       ├── Machines/                       # Định danh + điều khiển serial cho máy ngoại vi (Path A)
+│       │   ├── IMachineModule.cs           #   interface MỌI máy phải implement (định danh + vị trí)
+│       │   ├── IMachineTrigger.cs          #   interface tuỳ chọn: máy có cổng COM thật mới cần
 │       │   ├── IMachineDiagnostics.cs      #   interface tuỳ chọn: query trạng thái cho menu test
 │       │   ├── SerialFrameCodec.cs         #   hạ tầng dùng chung: đóng/mở khung, checksum
 │       │   ├── MachineRegistry.cs          #   nơi ĐĂNG KÝ module — 1 dòng / máy mới
 │       │   └── CupDropping/                #   1 "module" hoàn chỉnh cho 1 máy, 1 thư mục/máy
-│       │       ├── CupDroppingMachineModule.cs   # implement IMachineModule (+ IMachineDiagnostics)
+│       │       ├── CupDroppingMachineModule.cs   # implement IMachineTrigger (+ IMachineDiagnostics)
 │       │       ├── CupDroppingMachineClient.cs   # giao thức serial thô (SerialPort)
 │       │       └── CupMachineStatus.cs
 │       ├── Networking/LocalApiServer.cs  # HTTP API nội bộ (ingress cho Cloudflare Tunnel)
-│       ├── Robot/FairinoLuaExecutor.cs   # Upload + chạy .lua trên Fairino
-│       └── Workflow/               # WorkflowProvisioner, WorkflowRunner
+│       ├── Robot/FairinoLuaExecutor.cs   # Upload/chạy .lua + MoveToTeachingPoint (Home) trên Fairino
+│       └── Workflow/               # WorkflowProvisioner, WorkflowRunner, WorkflowQueueBuilder
 ├── workflow/                       # File .lua theo từng bước (gitignored, tải từ BE)
 ├── deploy/                         # Script cài đặt DuckDNS + Cloudflare Tunnel
 └── docs/                           # Tài liệu giao thức phần cứng (vd. máy thả cốc)
@@ -135,30 +136,37 @@ Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitigno
 
 ## Điều khiển máy trong hệ thống
 
-Mỗi máy ngoại vi có giao thức serial riêng (Path A) là **1 module tự khép kín** — thêm máy mới vào hệ thống = thêm 1 module, không phải sửa rải rác nhiều nơi.
+**Mọi file `.lua` đều gắn với 1 định danh máy** — không có chuyện 1 bước không thuộc về máy nào. Mỗi máy là **1 module tự khép kín**; thêm máy mới vào hệ thống = thêm 1 module, không phải sửa rải rác nhiều nơi.
 
 ### Kiến trúc module
 
 ```
-IMachineModule (interface, Machines/IMachineModule.cs)
-  ├─ MachineType     : id ổn định, dùng làm key trong MachinePorts (vd "cup_dropping")
-  ├─ DisplayName      : tên hiển thị (vd "May tha coc")
-  ├─ StepNames         : những bước (.lua) trigger máy này (vd ["cup_s"])
-  └─ Trigger(comPort) : gửi tín hiệu thật cho máy — gọi ngay sau khi tay máy chạy xong bước đó
+IMachineModule (interface, Machines/IMachineModule.cs) — MỌI máy đều implement cái này
+  ├─ MachineType : id ổn định (vd "cup_dropping")
+  ├─ DisplayName  : tên hiển thị (vd "May tha coc")
+  ├─ Position      : vị trí vật lý trên dây chuyền (số nhỏ hơn = đứng trước)
+  └─ StepNames     : những bước (.lua) thuộc về máy này (vd ["cup_s"])
+
+IMachineTrigger : IMachineModule (interface tuỳ chọn, Machines/IMachineTrigger.cs)
+  └─ Trigger(comPort) : chỉ máy nào có giao thức serial thật (đấu cổng COM vào PC) mới cần
+                         implement thêm cái này — gọi ngay sau khi tay máy chạy xong bước đó.
+                         Máy thuần di chuyển tay máy (không có phần cứng serial riêng) chỉ cần
+                         implement IMachineModule, KHÔNG cần Trigger.
 
 IMachineDiagnostics (interface tuỳ chọn, Machines/IMachineDiagnostics.cs)
   └─ GetStatusText(comPort) : cho phép menu test hiện thêm lựa chọn "Query trạng thái"
 
 MachineRegistry.Modules (Machines/MachineRegistry.cs)
-  └─ danh sách các module đã đăng ký — nơi DUY NHẤT cần thêm 1 dòng khi có máy mới
+  └─ danh sách MỌI máy đã đăng ký (kể cả máy không có Trigger) — nơi DUY NHẤT cần thêm 1 dòng khi có máy mới
 ```
 
-`WorkflowRunner`, `ConfigSetupWizard` (hỏi cổng COM), và menu 6 "Test máy ngoại vi" **đều đọc từ `MachineRegistry.Modules`** — không có switch-case hay code đặc thù cho từng máy nằm rải rác nữa.
+`WorkflowQueueBuilder` (sắp xếp bước) đọc `Position` từ **mọi** máy trong `MachineRegistry.Modules`. `WorkflowRunner` (bắn tín hiệu), `ConfigSetupWizard` (hỏi cổng COM), và menu 6 "Test máy ngoại vi" chỉ đọc các máy implement thêm `IMachineTrigger` (`MachineRegistry.Modules.OfType<IMachineTrigger>()`) — vì chỉ những máy đó mới thật sự cần cổng COM.
 
 ### Thêm 1 máy mới — chỉ cần
 
-1. Tạo thư mục `Machines/<TenMay>/`, viết `<TenMay>Client.cs` (giao thức serial thô, giống `CupDropping/CupDroppingMachineClient.cs` — tái dùng `SerialFrameCodec` nếu cùng khuôn khung lệnh).
-2. Viết `<TenMay>Module.cs` implement `IMachineModule` (và `IMachineDiagnostics` nếu máy có lệnh query trạng thái) — xem `Machines/CupDropping/CupDroppingMachineModule.cs` làm mẫu.
+1. Tạo thư mục `Machines/<TenMay>/`.
+2. Nếu máy có giao thức serial riêng (đấu cổng COM): viết `<TenMay>Client.cs` (giao thức thô, giống `CupDropping/CupDroppingMachineClient.cs` — tái dùng `SerialFrameCodec` nếu cùng khuôn khung lệnh) + `<TenMay>Module.cs` implement `IMachineTrigger` (và `IMachineDiagnostics` nếu có lệnh query trạng thái) — xem `Machines/CupDropping/CupDroppingMachineModule.cs` làm mẫu.
+   Nếu máy chỉ thuần di chuyển tay máy (không có phần cứng serial riêng, vd trạm đặt khay): chỉ cần viết `<TenMay>Module.cs` implement `IMachineModule` (không cần `Trigger`).
 3. Thêm đúng **1 dòng** vào `MachineRegistry.Modules`:
    ```csharp
    public static readonly IReadOnlyList<IMachineModule> Modules = new IMachineModule[]
@@ -168,15 +176,31 @@ MachineRegistry.Modules (Machines/MachineRegistry.cs)
    };
    ```
 
-Xong — `ConfigSetupWizard` tự hỏi thêm cổng COM cho máy mới, `WorkflowRunner` tự bắn tín hiệu đúng bước, menu 6 tự liệt kê máy mới để test. Không cần sửa `WorkflowRunner.cs`, `ConfigSetupWizard.cs`, hay `ConsoleMenu.cs`.
+Xong — `WorkflowQueueBuilder` tự biết vị trí của máy mới để sắp xếp; nếu máy có `IMachineTrigger` thì `ConfigSetupWizard` tự hỏi thêm cổng COM, `WorkflowRunner` tự bắn tín hiệu đúng bước, menu 6 tự liệt kê để test. Không cần sửa `WorkflowRunner.cs`, `ConfigSetupWizard.cs`, hay `ConsoleMenu.cs`.
 
-Các máy chưa có giao thức serial riêng (máy kem, topping...) vẫn dùng đường cũ (Path B): `.lua` gọi `SetDO(...)` để kích 24V ra mạch ngoài → PCB tự chế → động cơ bước — không cần module cho các máy này.
+Các máy chưa có giao thức serial riêng (máy kem, topping...) vẫn dùng đường cũ (Path B) bên trong `.lua`: `SetDO(...)` để kích 24V ra mạch ngoài → PCB tự chế → động cơ bước — vẫn cần đăng ký 1 `IMachineModule` (để có `Position`), chỉ là không cần `IMachineTrigger`.
+
+### Sắp xếp thứ tự bước theo vị trí máy (`WorkflowQueueBuilder`)
+
+Khi 1 đơn hàng cần nhiều bước (vd cốc + kem + topping + khay), các bước đó có thể được tập hợp **không theo thứ tự** (tùy nguồn dữ liệu đơn hàng). `code/src/IceBot/Workflow/WorkflowQueueBuilder.cs` sắp xếp lại chúng theo đúng thứ tự vật lý trên dây chuyền trước khi đưa vào `WorkflowRunner.RunQueue`:
+
+```csharp
+var ordered = WorkflowQueueBuilder.BuildQueue(new[] { "deliver_tray", "ice_chocolate_s", "cup_s" });
+// → sắp theo Position của từng module đã đăng ký (cup_s trước, vì CupDroppingMachineModule.Position = 1)
+WorkflowRunner.RunQueue(ordered, AppConfig.RobotIp);
+```
+
+- Thứ tự dựa vào `IMachineModule.Position` của máy gắn với bước đó (số nhỏ hơn = đứng trước trên dây chuyền). **Vì mọi file `.lua` đều gắn với 1 máy đã đăng ký trong `MachineRegistry`, mọi bước đều phải có `Position` xác định** — kể cả máy thuần di chuyển tay máy (vd trạm đặt khay) cũng cần đăng ký `IMachineModule` để có vị trí, dù không cần `IMachineTrigger`.
+- Trường hợp 1 bước không tìm thấy máy nào trong `MachineRegistry` sẽ bị xếp xuống cuối — đây là **cơ chế phòng vệ**, báo hiệu thiếu đăng ký máy trong `MachineRegistry.Modules`, không phải trạng thái bình thường.
+- Đây là bước **gộp hàng đợi**, tách biệt với việc **chạy** hàng đợi (`WorkflowRunner`) — dùng khi xây dựng phần "đơn hàng → danh sách bước" (vẫn đang TODO, xem Trạng thái triển khai).
 
 ## Lua workflow scripts
 
 - Mỗi file `.lua` trong `workflow/` là **một bước tay máy**, viết theo quy ước: 1 điểm bắt đầu → 1 điểm kết thúc + một số hành động ở giữa (`WaitMs`, `SetDO`...) — **không** quay lại điểm bắt đầu ở cuối file. IceBot không quan tâm tên/note các điểm bên trong file, chỉ nạp và chạy hết nội dung **từ trên xuống dưới** (`FairinoLuaExecutor.RunScript`).
 - Được tải về qua menu 3 / `IceBot.exe provision` (hiện gọi `BeApi.GetLua` — đang là mock, chưa nối BE thật).
-- **Nối nhiều bước liên tục** (không cần merge gì thêm): vì mỗi file chỉ có 1 đoạn đường (không round-trip), chạy tuần tự từng file là tay máy đã tự đi liên tục — điểm kết thúc file trước = điểm bắt đầu thực tế của file sau. Tay máy **chỉ quay về Home** lúc khởi động/reset phần mềm, hoặc sau khi hoàn thành 1 sản phẩm (cần một bước `home.lua` chèn vào hàng đợi ở đúng điểm đó — phần ánh xạ đơn hàng → hàng đợi này vẫn đang TODO).
+- **Nối nhiều bước liên tục** (không cần merge gì thêm): vì mỗi file chỉ có 1 đoạn đường (không round-trip), chạy tuần tự từng file là tay máy đã tự đi liên tục — điểm kết thúc file trước = điểm bắt đầu thực tế của file sau.
+- **Điểm Home (`robot_home`)**: tay máy có 1 **teaching point tên `robot_home` lưu sẵn trong bộ điều khiển robot** (qua app Fairino) — **không** phải file `.lua`. `WorkflowRunner.RunQueue` gọi `FairinoLuaExecutor.MoveToTeachingPoint("robot_home")` (đọc điểm trực tiếp từ controller bằng `GetRobotTeachingPoint` rồi `MoveJ`) **tự động ở đầu** (sau khi kết nối = "vừa bật/reset") **và ở cuối** (sau khi xong toàn bộ hàng đợi = "xong 1 sản phẩm") mỗi lần chạy. Giữa các bước trong 1 sản phẩm thì **không** quay về Home. Đây là hành vi có sẵn trong code, không cần cấu hình gì thêm.
+  - Nếu điểm được lưu dưới tên khác, đổi hằng số `HomeTeachingPoint` trong `WorkflowRunner.cs`.
 - ⚠️ File mẫu `workflow/lay_coc.lua` hiện có trong repo là **script demo/test** (do FaiRobot Studio sinh, có đi khứ hồi A→B→A) — **không** phải khuôn mẫu cho file bước sản xuất thật, đừng copy cấu trúc round-trip của nó.
 
 ## Deploy (DuckDNS + Cloudflare Tunnel)
@@ -207,9 +231,10 @@ Script trong `deploy/` dùng để mở đường cho BE trên cloud gọi vào 
 | `WorkflowRunner` — chạy tuần tự từng bước, mỗi file `.lua` chạy trọn vẹn (nối liền tự nhiên, xem Lua workflow scripts) | ✅ Xong |
 | Kiến trúc module máy ngoại vi (`IMachineModule` + `MachineRegistry.Modules`) — thêm máy = thêm 1 module | ✅ Xong |
 | Máy thả cốc — module + client serial (`Machines/CupDropping/`) | ✅ Xong |
+| `WorkflowQueueBuilder` — sắp xếp bước theo `Position` của máy trước khi gộp thành 1 workflow | ✅ Xong (bước không gắn máy nào thì chưa có vị trí xác định, xem ghi chú ở mục Điều khiển máy) |
+| Tự quay về Home (`robot_home`) ở đầu + cuối mỗi lần chạy hàng đợi | ✅ Xong (đọc teaching point `robot_home` từ controller qua SDK — cần đã lưu điểm này trên robot) |
 | Kết nối BE thật (`BeApi`) | ❌ Chưa (đang mock) |
 | Ánh xạ đơn hàng → danh sách bước (số lượng, vị/topping → queue) | ❌ Chưa |
-| Bước quay về Home giữa các sản phẩm / lúc khởi động | ❌ Chưa (cần chèn `home.lua` vào queue ở đúng chỗ khi build queue) |
 | `POST /api/orders` → chạy thực tế | ❌ Chưa (mới log + trả 202) |
 
 Xem thêm chi tiết giao thức máy thả cốc tại [`docs/301 Cup-Dropping Machine Serial Communication Protocol V0.0.3.md`](docs/301%20Cup-Dropping%20Machine%20Serial%20Communication%20Protocol%20V0.0.3.md).

@@ -7,8 +7,13 @@ namespace IceBot.Machines
 {
     // The one place to touch (besides writing the module itself) when adding a new machine:
     // add its module instance to Modules below. Everything else — WorkflowRunner triggering
-    // it, ConfigSetupWizard asking for its COM port, the console test menu listing it —
+    // it (if it implements IMachineTrigger), ConfigSetupWizard asking for its COM port,
+    // WorkflowQueueBuilder ordering steps by its Position, the console test menu listing it —
     // reads from this registry automatically.
+    //
+    // Every workflow step (.lua file) belongs to exactly one machine identifier — there is no
+    // such thing as a step with no machine. Register every machine here, not just the ones
+    // that need a serial connection (see IMachineModule vs IMachineTrigger).
     internal static class MachineRegistry
     {
         public static readonly IReadOnlyList<IMachineModule> Modules = new IMachineModule[]
