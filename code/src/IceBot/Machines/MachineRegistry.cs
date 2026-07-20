@@ -1,28 +1,41 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using IceBot.Machines.CupDropping;
 
 namespace IceBot.Machines
 {
-    // Maps a workflow step (the .lua step file name) to a peripheral machine wired
-    // directly to this PC over a serial port. The step's .lua file always runs first
-    // (arm moves through it top-to-bottom); once it finishes, IceBot sends this machine's
-    // own signal/command over serial — the arm is already in position by then. Steps not
-    // listed here are plain arm-motion steps with no follow-up peripheral trigger.
+    // The one place to touch (besides writing the module itself) when adding a new machine:
+    // add its module instance to Modules below. Everything else — WorkflowRunner triggering
+    // it, ConfigSetupWizard asking for its COM port, the console test menu listing it —
+    // reads from this registry automatically.
     internal static class MachineRegistry
     {
-        public const string CupDropping = "cup_dropping";
+        public static readonly IReadOnlyList<IMachineModule> Modules = new IMachineModule[]
+        {
+            new CupDroppingMachineModule(),
+        };
 
-        private static readonly Dictionary<string, string> StepToMachineType =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                { "cup_s", CupDropping },
-            };
+        private static readonly Dictionary<string, IMachineModule> ByStepName = BuildStepIndex();
 
-        public static bool TryGetMachineType(string stepFileName, out string machineType)
+        public static bool TryGetModule(string stepFileName, out IMachineModule module)
         {
             var key = Path.GetFileNameWithoutExtension(stepFileName);
-            return StepToMachineType.TryGetValue(key, out machineType!);
+            return ByStepName.TryGetValue(key, out module!);
+        }
+
+        private static Dictionary<string, IMachineModule> BuildStepIndex()
+        {
+            var map = new Dictionary<string, IMachineModule>(StringComparer.OrdinalIgnoreCase);
+            foreach (var module in Modules)
+            {
+                foreach (var step in module.StepNames)
+                {
+                    map[step] = module;
+                }
+            }
+
+            return map;
         }
     }
 }

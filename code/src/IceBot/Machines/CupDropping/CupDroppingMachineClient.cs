@@ -1,7 +1,8 @@
 using System;
 using System.IO.Ports;
+using IceBot.Machines;
 
-namespace IceBot.Machines
+namespace IceBot.Machines.CupDropping
 {
     // Host-side client for the "301 Cup-Dropping Machine Serial Communication Protocol V0.0.3".
     // IceBot (PC) is the host; the cup-dropping machine mainboard is the slave.

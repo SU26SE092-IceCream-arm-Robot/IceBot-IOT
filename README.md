@@ -50,10 +50,19 @@ IceBot-IOT/
 │   ├── IceBot-IOT.sln
 │   ├── lib/fairino-csharp-sdk/     # Fairino Robot C# SDK (vendored)
 │   └── src/IceBot/
-│       ├── Program.cs              # Entry point, menu, CLI
+│       ├── Program.cs              # Entry point mỏng: parse args, giao cho Cli/
 │       ├── Api/BeApi.cs            # Client gọi BE lấy Lua (hiện là mock)
-│       ├── Config/                 # AppConfig, SiteConfigStore, ConfigSetupWizard
-│       ├── Machines/               # Giao tiếp serial trực tiếp với máy ngoại vi (Path A)
+│       ├── Cli/ConsoleMenu.cs      # Toàn bộ UI console: menu, serve/test/test-machine mode
+│       ├── Config/                 # AppConfig, SiteConfigStore, SiteSettings, ConfigSetupWizard
+│       ├── Machines/                       # Giao tiếp serial trực tiếp với máy ngoại vi (Path A)
+│       │   ├── IMachineModule.cs           #   interface 1 máy phải implement (bắt buộc)
+│       │   ├── IMachineDiagnostics.cs      #   interface tuỳ chọn: query trạng thái cho menu test
+│       │   ├── SerialFrameCodec.cs         #   hạ tầng dùng chung: đóng/mở khung, checksum
+│       │   ├── MachineRegistry.cs          #   nơi ĐĂNG KÝ module — 1 dòng / máy mới
+│       │   └── CupDropping/                #   1 "module" hoàn chỉnh cho 1 máy, 1 thư mục/máy
+│       │       ├── CupDroppingMachineModule.cs   # implement IMachineModule (+ IMachineDiagnostics)
+│       │       ├── CupDroppingMachineClient.cs   # giao thức serial thô (SerialPort)
+│       │       └── CupMachineStatus.cs
 │       ├── Networking/LocalApiServer.cs  # HTTP API nội bộ (ingress cho Cloudflare Tunnel)
 │       ├── Robot/FairinoLuaExecutor.cs   # Upload + chạy .lua trên Fairino
 │       └── Workflow/               # WorkflowProvisioner, WorkflowRunner
@@ -96,7 +105,7 @@ Menu tương tác khi chạy `IceBot.exe` không tham số:
 | 3 | Tải file Lua từ BE (hiện là mock `BeApi.GetLua`) |
 | 4 | Chạy server — nhận đơn từ BE (`serve` mode, cổng 5080) |
 | 5 | Test robot — chạy file `.lua` test từ `workflow/` |
-| 6 | Test máy thả cốc (serial) — query trạng thái / thả 1 cốc |
+| 6 | Test máy ngoại vi (serial) — chọn 1 máy trong danh sách đã đăng ký, query trạng thái / trigger |
 | 7 | Thoát |
 
 CLI tương ứng:
@@ -108,7 +117,7 @@ CLI tương ứng:
 | `IceBot.exe provision` | Tải Lua từ BE (mock) → `workflow/` |
 | `IceBot.exe serve` | Chạy HTTP API nội bộ trên cổng `5080` |
 | `IceBot.exe test` | Chạy workflow test trên tay máy |
-| `IceBot.exe test-cup` | Menu test máy thả cốc qua serial |
+| `IceBot.exe test-machine` | Menu test máy ngoại vi qua serial |
 
 ## Cấu hình site
 
@@ -126,12 +135,42 @@ Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitigno
 
 ## Điều khiển máy trong hệ thống
 
-- `code/src/IceBot/Machines/SerialFrameCodec.cs` — đóng/mở khung lệnh (checksum, length, end code `0xFF`) theo đúng `docs/301 Cup-Dropping Machine Serial Communication Protocol V0.0.3.md`.
-- `code/src/IceBot/Machines/CupDroppingMachineClient.cs` — mở `SerialPort` (115200-8N1), gửi lệnh Query Status (`0x01`), Dispense (`0x04`), Shutdown (`0x03`); timeout 1s, tự gửi lại tối đa 3 lần trước khi báo lỗi giao tiếp (đúng đặc tả).
-- `code/src/IceBot/Machines/MachineRegistry.cs` — ánh xạ tên bước trong hàng đợi (vd `cup_s`) sang loại máy ngoại vi (`cup_dropping`) **cần bắn tín hiệu thêm sau khi bước đó chạy xong**. **Thêm máy mới**: viết `<Machine>Client` mới trong `Machines/`, đăng ký bước tương ứng vào `MachineRegistry`, và thêm `MachinePorts` cho loại máy đó trong cấu hình site.
-- `code/src/IceBot/Workflow/WorkflowRunner.cs` — với mỗi bước trong hàng đợi: **luôn** upload/chạy `.lua` của bước đó trên tay máy Fairino trước; chạy xong, nếu bước này khớp `MachineRegistry` thì gửi thêm lệnh serial trực tiếp tới máy tương ứng. File `.lua` không thể tự gửi được tín hiệu serial (Fairino Lua không có lệnh UART thô) nên tín hiệu thật luôn do IceBot (C#) gửi.
+Mỗi máy ngoại vi có giao thức serial riêng (Path A) là **1 module tự khép kín** — thêm máy mới vào hệ thống = thêm 1 module, không phải sửa rải rác nhiều nơi.
 
-Các máy chưa có giao thức serial riêng (máy kem, topping...) vẫn dùng đường cũ: `.lua` gọi `SetDO(...)` để kích 24V ra mạch ngoài → PCB tự chế → động cơ bước.
+### Kiến trúc module
+
+```
+IMachineModule (interface, Machines/IMachineModule.cs)
+  ├─ MachineType     : id ổn định, dùng làm key trong MachinePorts (vd "cup_dropping")
+  ├─ DisplayName      : tên hiển thị (vd "May tha coc")
+  ├─ StepNames         : những bước (.lua) trigger máy này (vd ["cup_s"])
+  └─ Trigger(comPort) : gửi tín hiệu thật cho máy — gọi ngay sau khi tay máy chạy xong bước đó
+
+IMachineDiagnostics (interface tuỳ chọn, Machines/IMachineDiagnostics.cs)
+  └─ GetStatusText(comPort) : cho phép menu test hiện thêm lựa chọn "Query trạng thái"
+
+MachineRegistry.Modules (Machines/MachineRegistry.cs)
+  └─ danh sách các module đã đăng ký — nơi DUY NHẤT cần thêm 1 dòng khi có máy mới
+```
+
+`WorkflowRunner`, `ConfigSetupWizard` (hỏi cổng COM), và menu 6 "Test máy ngoại vi" **đều đọc từ `MachineRegistry.Modules`** — không có switch-case hay code đặc thù cho từng máy nằm rải rác nữa.
+
+### Thêm 1 máy mới — chỉ cần
+
+1. Tạo thư mục `Machines/<TenMay>/`, viết `<TenMay>Client.cs` (giao thức serial thô, giống `CupDropping/CupDroppingMachineClient.cs` — tái dùng `SerialFrameCodec` nếu cùng khuôn khung lệnh).
+2. Viết `<TenMay>Module.cs` implement `IMachineModule` (và `IMachineDiagnostics` nếu máy có lệnh query trạng thái) — xem `Machines/CupDropping/CupDroppingMachineModule.cs` làm mẫu.
+3. Thêm đúng **1 dòng** vào `MachineRegistry.Modules`:
+   ```csharp
+   public static readonly IReadOnlyList<IMachineModule> Modules = new IMachineModule[]
+   {
+       new CupDroppingMachineModule(),
+       new TenMayModule(),   // ← thêm dòng này
+   };
+   ```
+
+Xong — `ConfigSetupWizard` tự hỏi thêm cổng COM cho máy mới, `WorkflowRunner` tự bắn tín hiệu đúng bước, menu 6 tự liệt kê máy mới để test. Không cần sửa `WorkflowRunner.cs`, `ConfigSetupWizard.cs`, hay `ConsoleMenu.cs`.
+
+Các máy chưa có giao thức serial riêng (máy kem, topping...) vẫn dùng đường cũ (Path B): `.lua` gọi `SetDO(...)` để kích 24V ra mạch ngoài → PCB tự chế → động cơ bước — không cần module cho các máy này.
 
 ## Lua workflow scripts
 
@@ -155,7 +194,7 @@ Script trong `deploy/` dùng để mở đường cho BE trên cloud gọi vào 
 | Triệu chứng | Nguyên nhân thường gặp |
 |-------------|-------------------------|
 | `RPC failed with error code ...` khi test robot | Sai `ROBOT_IP`, tay máy chưa bật, hoặc PC không cùng LAN `192.168.58.x` với control box |
-| Menu 6 / `test-cup` báo "Chua cau hinh cong COM" | Chưa nhập cổng COM máy thả cốc ở menu 1 |
+| Menu 6 / `test-machine` báo "Chua cau hinh cong COM" | Chưa nhập cổng COM cho máy đó ở menu 1 |
 | `Cup-dropping machine communication error: no valid reply after 3 resend(s)` | Sai cổng COM, sai baud rate/đấu dây RS232-RS485, hoặc máy thả cốc chưa cấp nguồn |
 | `Checksum mismatch` / `Length mismatch` từ máy thả cốc | Nhiễu đường truyền hoặc đấu sai chân TX/RX — kiểm tra cách ly & dây tín hiệu |
 
@@ -166,7 +205,8 @@ Script trong `deploy/` dùng để mở đường cho BE trên cloud gọi vào 
 | Menu + CLI | ✅ Xong |
 | Config wizard (DuckDNS, tunnel, robot IP, cổng COM máy ngoại vi) | ✅ Xong |
 | `WorkflowRunner` — chạy tuần tự từng bước, mỗi file `.lua` chạy trọn vẹn (nối liền tự nhiên, xem Lua workflow scripts) | ✅ Xong |
-| Máy thả cốc — giao tiếp serial trực tiếp sau khi tay máy vào vị trí (`IceBot.Machines`) | ✅ Xong |
+| Kiến trúc module máy ngoại vi (`IMachineModule` + `MachineRegistry.Modules`) — thêm máy = thêm 1 module | ✅ Xong |
+| Máy thả cốc — module + client serial (`Machines/CupDropping/`) | ✅ Xong |
 | Kết nối BE thật (`BeApi`) | ❌ Chưa (đang mock) |
 | Ánh xạ đơn hàng → danh sách bước (số lượng, vị/topping → queue) | ❌ Chưa |
 | Bước quay về Home giữa các sản phẩm / lúc khởi động | ❌ Chưa (cần chèn `home.lua` vào queue ở đúng chỗ khi build queue) |

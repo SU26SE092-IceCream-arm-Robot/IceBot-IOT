@@ -44,9 +44,9 @@ namespace IceBot.Workflow
 
                     armExecutor.RunScript(fullPath);
 
-                    if (MachineRegistry.TryGetMachineType(stepName, out var machineType))
+                    if (MachineRegistry.TryGetModule(stepName, out var module))
                     {
-                        RunPeripheralTrigger(machineType);
+                        Trigger(module);
                     }
                 }
             }
@@ -56,38 +56,16 @@ namespace IceBot.Workflow
         }
 
         // Fires right after the arm finishes the step's .lua file (arm is already in position).
-        private static void RunPeripheralTrigger(string machineType)
+        private static void Trigger(IMachineModule module)
         {
-            var comPort = SiteConfigStore.Load().GetMachinePort(machineType);
+            var comPort = SiteConfigStore.Load().GetMachinePort(module.MachineType);
             if (string.IsNullOrWhiteSpace(comPort))
             {
                 throw new InvalidOperationException(
-                    $"Chua cau hinh cong COM cho may '{machineType}'. Chon menu 1 de cau hinh.");
+                    $"Chua cau hinh cong COM cho may '{module.DisplayName}'. Chon menu 1 de cau hinh.");
             }
 
-            switch (machineType)
-            {
-                case MachineRegistry.CupDropping:
-                    RunCupDroppingTrigger(comPort);
-                    break;
-                default:
-                    throw new InvalidOperationException($"Khong ho tro loai may '{machineType}'.");
-            }
-        }
-
-        private static void RunCupDroppingTrigger(string comPort)
-        {
-            using (var client = new CupDroppingMachineClient(comPort))
-            {
-                client.Connect();
-                Console.WriteLine($"[MACHINE] cup_dropping @ {comPort}: dispensing cup...");
-                var ok = client.DispenseCup();
-                Console.WriteLine(ok ? "[MACHINE] Dispense OK." : "[MACHINE] Dispense FAILED.");
-                if (!ok)
-                {
-                    throw new InvalidOperationException("May tha coc bao loi (setting failed).");
-                }
-            }
+            module.Trigger(comPort);
         }
     }
 }
