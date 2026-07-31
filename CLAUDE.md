@@ -72,7 +72,7 @@ POSTing completion/failure status back to BE.
 
 Each store has its own BE account (`STORE_ACCOUNT`/`STORE_PASSWORD` in `config/icebot.site.env`,
 set via 1.1 or entered inline at the login gate). "1.1" here means: main menu item 1 ("Cau
-hinh"), then item 1 in that submenu ("Cau hinh NextBird") — each submenu
+hinh"), then item 1 in that submenu ("Cau hinh NetBird") — each submenu
 renumbers from 1 on screen (no literal "1.1" keystroke; see `Cli/ConsoleMenu.cs`).
 **Login is mandatory to reach the menu or `serve` mode** — `ConsoleMenu.Run()` and
 `ConsoleMenu.RunServeMode()` both call `StoreAuth.RequireLogin()` first thing on startup, which
@@ -113,21 +113,28 @@ tracked-in-git folder for a fixed sample script the user supplies, used only for
 arm/upload/run pipeline, independent of any real order content. Missing sample file → the step
 is skipped with a message, not an error.
 
-## Ingress: NextBird (replaced DuckDNS + Cloudflare Tunnel)
+## Ingress: NetBird (replaced DuckDNS + Cloudflare Tunnel)
 
-The store no longer uses DuckDNS + Cloudflare Tunnel for cloud→edge ingress — **NextBird**
-replaces both (dynamic DNS *and* the tunnel itself). IceBot's side of this shrank to a single
-secret: `NextBirdSetupKey` (`NEXTBIRD_SETUP_KEY` in `config/icebot.site.env`, prompted as
-`NextBirdSetup_key` in menu Cau hinh > 1), used by NextBird to identify the store and open the
-path in — IceBot itself does not call any NextBird API, it just stores the key.
-`SiteSettings.IsConfigured` now checks `NextBirdSetupKey` + `PublicUrl` (previously
+The store no longer uses DuckDNS + Cloudflare Tunnel for cloud→edge ingress — **NetBird**
+(the real https://netbird.io CLI/product — mind the spelling, not "NextBird") replaces both
+(dynamic DNS *and* the tunnel itself, a WireGuard-based mesh network). IceBot's side of this is
+a single secret: `NetBirdSetupKey` (`NETBIRD_SETUP_KEY` in `config/icebot.site.env`, prompted as
+"NetBird setup key" in menu Cau hinh > 1). Unlike `BeApi`/NextBird-the-cloud-API (there is no
+such API — NetBird is a real installed CLI), IceBot **actively shells out to it**:
+`Config/NetBirdSetup.cs` (`NetBirdSetup.RunUp`) launches `netbird up --setup-key <key>` as a
+child process (`Process.Start`, `netbird` must be on PATH) whenever the operator enters a setup
+key that differs from what's already saved — this is what "may Edge se tu dong setup NetBird"
+means; the operator no longer runs `netbird up` by hand in a separate terminal.
+`ConfigSetupWizard.Run()` calls it right after prompting for the key, before the rest of the
+wizard, and prints NetBird's own stdout/stderr back to the console (`[OK]`/`[ERROR]`). Missing
+`netbird` binary or a failed run does **not** abort the wizard — it's reported and the wizard
+continues (matches the "warn and continue" pattern used elsewhere, e.g. missing COM port).
+`SiteSettings.IsConfigured` now checks `NetBirdSetupKey` + `PublicUrl` (previously
 `DuckDnsSubdomain`/`DuckDnsToken`/`PublicUrl`). All DuckDNS/Cloudflare-specific fields
 (`DuckDnsSubdomain`, `DuckDnsToken`, `TunnelName`, `DuckDnsDomain`, the synced `duckdns.env`
 file) are gone from `SiteSettings`/`SiteConfigStore`/`AppConfig` — do not reintroduce them.
 **Not yet touched:** `deploy/duckdns/`, `deploy/cloudflare/`, and `deploy/icebot/start-serve.ps1`
-still reference the old stack; they're stale until NextBird's actual deployment mechanism is
-known (no real NextBird integration exists yet, same "mock until BE is real" pattern as
-`BeApi`).
+still reference the old stack; they're stale until someone writes the NetBird equivalent.
 
 ## Conventions
 

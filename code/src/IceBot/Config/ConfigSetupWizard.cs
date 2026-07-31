@@ -10,16 +10,26 @@ namespace IceBot.Config
         public static void Run()
         {
             Console.WriteLine();
-            Console.WriteLine("=== Cau hinh NextBird ===");
+            Console.WriteLine("=== Cau hinh NetBird ===");
             Console.WriteLine("Nhan ENTER de giu gia tri hien tai (neu co).");
             Console.WriteLine();
 
             var current = SiteConfigStore.Load();
 
+            var netBirdSetupKey = PromptSecret("NetBird setup key", current.NetBirdSetupKey);
+            if (!string.IsNullOrWhiteSpace(netBirdSetupKey) && netBirdSetupKey != current.NetBirdSetupKey)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Dang chay 'netbird up --setup-key ...' ...");
+                var ok = NetBirdSetup.RunUp(netBirdSetupKey, out var netBirdMessage);
+                Console.WriteLine(ok ? $"[OK] {netBirdMessage}" : $"[ERROR] {netBirdMessage}");
+                Console.WriteLine();
+            }
+
             var settings = new SiteSettings
             {
-                NextBirdSetupKey = PromptSecret("NextBirdSetup_key", current.NextBirdSetupKey),
-                PublicUrl = Prompt("Public URL cho BE (NextBird cap, vd: https://shop.api.tenban.com)", current.PublicUrl),
+                NetBirdSetupKey = netBirdSetupKey,
+                PublicUrl = Prompt("Public URL cho BE (NetBird cap, vd: https://shop.api.tenban.com)", current.PublicUrl),
                 ApiKey = PromptSecret("API key chia se voi BE (X-Api-Key)", current.ApiKey),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
                 StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
@@ -57,15 +67,14 @@ namespace IceBot.Config
             Console.WriteLine();
             PrintSummary(settings);
             Console.WriteLine();
-            Console.WriteLine("Buoc tiep theo (mot lan tren may nay):");
-            Console.WriteLine("  1. Dam bao NextBirdSetup_key da duoc kich hoat ben NextBird");
-            Console.WriteLine("  2. Chon menu 'Chay he thong' trong IceBot");
+            Console.WriteLine("Buoc tiep theo:");
+            Console.WriteLine("  Chon menu 'Chay he thong' trong IceBot");
         }
 
         public static void PrintSummary(SiteSettings settings)
         {
             Console.WriteLine("--- Cau hinh hien tai ---");
-            Console.WriteLine($"  NextBirdSetup_key : {(string.IsNullOrEmpty(settings.NextBirdSetupKey) ? "(chua dat)" : "****")}");
+            Console.WriteLine($"  NetBird setup key : {(string.IsNullOrEmpty(settings.NetBirdSetupKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");

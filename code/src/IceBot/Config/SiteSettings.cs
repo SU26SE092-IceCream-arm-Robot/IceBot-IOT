@@ -5,9 +5,9 @@ namespace IceBot.Config
 {
     internal sealed class SiteSettings
     {
-        // Ingress tunnel — NextBird replaces the old DuckDNS + Cloudflare Tunnel setup. IceBot
-        // only needs the setup key; NextBird handles opening the path in and assigning PublicUrl.
-        public string NextBirdSetupKey { get; set; } = string.Empty;
+        // Ingress tunnel — NetBird replaces the old DuckDNS + Cloudflare Tunnel setup. IceBot
+        // only needs the setup key; NetBird handles opening the path in and assigning PublicUrl.
+        public string NetBirdSetupKey { get; set; } = string.Empty;
         public string PublicUrl { get; set; } = string.Empty;
         public string BeApiUrl { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
@@ -37,7 +37,7 @@ namespace IceBot.Config
         public List<string> ProvisionedSteps { get; set; } = new List<string>();
 
         public bool IsConfigured =>
-            !string.IsNullOrWhiteSpace(NextBirdSetupKey)
+            !string.IsNullOrWhiteSpace(NetBirdSetupKey)
             && !string.IsNullOrWhiteSpace(PublicUrl);
     }
 }

@@ -14,10 +14,10 @@ namespace IceBot.Config
         public static string ApiKey =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_API_KEY"), SiteConfigStore.Load().ApiKey);
 
-        // Setup key for NextBird (replaces the old DuckDNS + Cloudflare Tunnel ingress) —
-        // NextBird uses this to identify the store and open the path in to this Edge PC.
-        public static string NextBirdSetupKey =>
-            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_NEXTBIRD_SETUP_KEY"), SiteConfigStore.Load().NextBirdSetupKey);
+        // Setup key for NetBird (replaces the old DuckDNS + Cloudflare Tunnel ingress) —
+        // NetBird uses this to identify the store and open the path in to this Edge PC.
+        public static string NetBirdSetupKey =>
+            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_NETBIRD_SETUP_KEY"), SiteConfigStore.Load().NetBirdSetupKey);
 
         public static string PublicUrl =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_PUBLIC_URL"), SiteConfigStore.Load().PublicUrl, "https://your-shop.example.com");

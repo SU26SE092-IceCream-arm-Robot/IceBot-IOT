@@ -14,7 +14,7 @@
 - [Cấu hình site](#cấu-hình-site)
 - [Điều khiển máy trong hệ thống](#điều-khiển-máy-trong-hệ-thống)
 - [Lua workflow scripts](#lua-workflow-scripts)
-- [Deploy (NextBird)](#deploy-nextbird)
+- [Deploy (NetBird)](#deploy-netbird)
 - [Xử lý sự cố thường gặp](#xử-lý-sự-cố-thường-gặp)
 - [Trạng thái triển khai](#trạng-thái-triển-khai)
 
@@ -24,7 +24,7 @@
 
 ```
 Cloud BE (đơn hàng/thanh toán)
-        │ POST /api/orders  (qua NextBird)
+        │ POST /api/orders  (qua NetBird)
         ▼
 IceBot.exe (robot controller, PC tại cửa hàng)
         │
@@ -63,12 +63,12 @@ IceBot-IOT/
 │       │       ├── CupDroppingMachineModule.cs   # implement IMachineTrigger (+ IMachineDiagnostics)
 │       │       ├── CupDroppingMachineClient.cs   # giao thức serial thô (SerialPort)
 │       │       └── CupMachineStatus.cs
-│       ├── Networking/LocalApiServer.cs  # HTTP API nội bộ (ingress cho NextBird)
+│       ├── Networking/LocalApiServer.cs  # HTTP API nội bộ (ingress cho NetBird)
 │       ├── Robot/FairinoLuaExecutor.cs   # Upload/chạy .lua + MoveToTeachingPoint (Home) trên Fairino
 │       └── Workflow/               # WorkflowProvisioner, WorkflowRunner, OrderRequest, OrderQueue
 ├── workflow/                       # File .lua theo từng bước (gitignored, tải từ BE)
 ├── test-workflow/                  # File .lua mẫu để test tay robot (KHÔNG phải từ BE, xem README trong đó)
-├── deploy/                         # Script cài đặt ingress (DuckDNS+Cloudflare cũ — cho NextBird xem ghi chú Deploy)
+├── deploy/                         # Script cài đặt ingress (DuckDNS+Cloudflare cũ — cho NetBird xem ghi chú Deploy)
 └── docs/                           # Tài liệu giao thức phần cứng (vd. máy thả cốc)
 ```
 
@@ -101,7 +101,7 @@ Menu tương tác khi chạy `IceBot.exe` không tham số — menu chính chỉ
 
 ```
 Menu chinh                       Chon 1 -> CAU HINH             Chon 2 -> TEST MAY
-1. Cau hinh                      1. Cau hinh NextBird            1. Test tay Robot
+1. Cau hinh                      1. Cau hinh NetBird            1. Test tay Robot
 2. Test may                      2. Xem cau hinh hien tai        2. Test ket noi may ngoai vi (Serial)
 3. Chay he thong                 3. Tai file Lua tu BE (mock)    0. Quay lai
 0. Thoat                         0. Quay lai
@@ -113,7 +113,7 @@ Menu chinh                       Chon 1 -> CAU HINH             Chon 2 -> TEST M
 | Chính | 2 | Test máy — mở submenu |
 | Chính | 3 | Chạy hệ thống — nhận đơn từ BE (`serve` mode, cổng 5080) |
 | Chính | 0 | Thoát |
-| Cấu hình | 1 | Cấu hình NextBird (`NextBirdSetup_key`) + Public URL + IP robot + tài khoản cửa hàng + cổng COM máy ngoại vi |
+| Cấu hình | 1 | Cấu hình NetBird (`NetBirdSetup_key`) + Public URL + IP robot + tài khoản cửa hàng + cổng COM máy ngoại vi |
 | Cấu hình | 2 | Xem cấu hình hiện tại |
 | Cấu hình | 3 | Tải file Lua từ BE (hiện là mock `BeApi.GetLua`) — **ghi nhớ định danh máy đã nhập**, xem bên dưới |
 | Cấu hình | 0 | Quay lại menu chính |
@@ -178,8 +178,8 @@ Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitigno
 
 | Biến | Ý nghĩa |
 |------|---------|
-| `NEXTBIRD_SETUP_KEY` | Key thiết lập NextBird — NextBird dùng key này để nhận diện cửa hàng và mở đường vào Edge (thay cho DuckDNS + Cloudflare Tunnel cũ) |
-| `PUBLIC_URL` | URL công khai để BE gọi vào IceBot (do NextBird cấp) |
+| `NETBIRD_SETUP_KEY` | Key thiết lập NetBird — NetBird dùng key này để nhận diện cửa hàng và mở đường vào Edge (thay cho DuckDNS + Cloudflare Tunnel cũ) |
+| `PUBLIC_URL` | URL công khai để BE gọi vào IceBot (do NetBird cấp) |
 | `BE_API_URL` | Base URL của BE (dự phòng, chưa dùng — đang mock) |
 | `API_KEY` | Secret chia sẻ với BE, gửi qua header `X-Api-Key` (chiều BE → IceBot) |
 | `ROBOT_IP` | IP control box Fairino (mặc định `192.168.58.2`) |
@@ -253,15 +253,15 @@ BE gửi kèm trong đơn hàng luôn cả **danh sách file `.lua` và đúng t
   - Nếu điểm được lưu dưới tên khác, đổi hằng số `HomeTeachingPoint` trong `WorkflowRunner.cs`.
 - ⚠️ File mẫu `workflow/lay_coc.lua` hiện có trong repo là **script demo/test** (do FaiRobot Studio sinh, có đi khứ hồi A→B→A) — **không** phải khuôn mẫu cho file bước sản xuất thật, đừng copy cấu trúc round-trip của nó.
 
-## Deploy (NextBird)
+## Deploy (NetBird)
 
-Ingress cloud → Edge giờ dùng **NextBird** thay cho DuckDNS + Cloudflare Tunnel. Về phía IceBot, chỉ cần nhập `NextBirdSetup_key` ở Cấu hình > 1 (menu tương tác) — IceBot không tự gọi API NextBird nào, chỉ lưu key đó lại; NextBird tự lo việc nhận diện cửa hàng và mở đường vào Edge (không cần port-forward router).
+Ingress cloud → Edge giờ dùng **[NetBird](https://netbird.io)** thay cho DuckDNS + Cloudflare Tunnel — đây là NetBird CLI/mesh network thật, không phải API riêng của dự án. Ở Cấu hình > 1, chỉ cần nhập setup key (vd `7980A958-3B57-42E1-93EE-3DE008A9AD10`) — IceBot **tự động chạy `netbird up --setup-key <key>`** ngay lúc đó (`Config/NetBirdSetup.cs`), không cần bạn tự mở terminal gõ lệnh. Yêu cầu: đã cài NetBird CLI và có trong PATH trên máy Edge — nếu thiếu, wizard báo lỗi rõ ràng nhưng vẫn tiếp tục lưu các mục cấu hình khác (không chặn).
 
 | Script | Vai trò |
 |--------|---------|
 | `deploy/icebot/start-serve.ps1` | Build (nếu cần) rồi chạy `IceBot.exe serve` |
 
-⚠️ `deploy/duckdns/` và `deploy/cloudflare/` vẫn còn trong repo nhưng **đã lỗi thời** — thuộc stack ingress cũ, chưa có script tương ứng cho NextBird (đang chờ xác định cơ chế deploy thật của NextBird).
+⚠️ `deploy/duckdns/` và `deploy/cloudflare/` vẫn còn trong repo nhưng **đã lỗi thời** — thuộc stack ingress cũ, chưa có script tương ứng cho NetBird (đang chờ xác định cơ chế deploy thật của NetBird).
 
 ## Xử lý sự cố thường gặp
 
@@ -277,7 +277,7 @@ Ingress cloud → Edge giờ dùng **NextBird** thay cho DuckDNS + Cloudflare Tu
 | Hạng mục | Trạng thái |
 |----------|------------|
 | Menu + CLI | ✅ Xong |
-| Config wizard (NextBird setup key, public URL, robot IP, tài khoản cửa hàng, cổng COM máy ngoại vi) | ✅ Xong |
+| Config wizard (NetBird setup key, public URL, robot IP, tài khoản cửa hàng, cổng COM máy ngoại vi) | ✅ Xong |
 | Đăng nhập cửa hàng — `BeApi.Login` (mock) → lưu `BE_SESSION_KEY`, bắt buộc trước khi vào menu/serve, `IceBot.exe login` để đăng nhập lại thủ công | ✅ Xong (mock; key chưa được đính kèm vào request thật nào vì chưa có request Edge → BE thật) |
 | `WorkflowRunner` — chạy tuần tự từng bước, mỗi file `.lua` chạy trọn vẹn (nối liền tự nhiên, xem Lua workflow scripts) | ✅ Xong |
 | Kiến trúc module máy ngoại vi (`IMachineModule` + `MachineRegistry.Modules`) — thêm máy = thêm 1 module | ✅ Xong |
