@@ -71,7 +71,7 @@ namespace IceBot.Cli
                     : "Trang thai cau hinh: CHUA DU");
                 Console.WriteLine();
                 Console.WriteLine("CAU HINH");
-                Console.WriteLine("1. Cau hinh DuckDNS + Cloudflare Tunnel");
+                Console.WriteLine("1. Cau hinh NextBird");
                 Console.WriteLine("2. Xem cau hinh hien tai");
                 Console.WriteLine("3. Tai file Lua tu BE (mock: BeApi.GetLua)");
                 Console.WriteLine("0. Quay lai");
@@ -197,7 +197,7 @@ namespace IceBot.Cli
             var settings = SiteConfigStore.Load();
             if (!settings.IsConfigured)
             {
-                Console.WriteLine("[WARN] Chua cau hinh day du. Vao menu Cau hinh -> muc 1 de nhap DuckDNS + Cloudflare.");
+                Console.WriteLine("[WARN] Chua cau hinh day du. Vao menu Cau hinh -> muc 1 de nhap NextBird.");
                 Console.WriteLine();
             }
 
@@ -207,7 +207,7 @@ namespace IceBot.Cli
             {
                 api.Start();
                 Console.WriteLine();
-                Console.WriteLine("Server dang chay. Cho don tu BE qua Cloudflare Tunnel.");
+                Console.WriteLine("Server dang chay. Cho don tu BE qua NextBird.");
                 Console.WriteLine("Lenh: test = chay lua | exit = thoat");
                 Console.WriteLine();
 
@@ -323,9 +323,8 @@ namespace IceBot.Cli
 
         private static void PrintIngressInfo()
         {
-            Console.WriteLine("Ingress (DuckDNS + Cloudflare Tunnel):");
-            Console.WriteLine($"  DuckDNS domain : {AppConfig.DuckDnsDomain}");
-            Console.WriteLine($"  Tunnel name    : {AppConfig.TunnelName}");
+            Console.WriteLine("Ingress (NextBird):");
+            Console.WriteLine($"  NextBirdSetup_key : {(string.IsNullOrEmpty(AppConfig.NextBirdSetupKey) ? "chua dat" : "da dat")}");
             Console.WriteLine($"  Public URL     : {AppConfig.PublicUrl}");
             Console.WriteLine($"  Local API      : {AppConfig.ApiListenPrefix}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(AppConfig.ApiKey) ? "chua dat" : "da dat")}");

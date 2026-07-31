@@ -5,9 +5,9 @@ namespace IceBot.Config
 {
     internal sealed class SiteSettings
     {
-        public string DuckDnsSubdomain { get; set; } = string.Empty;
-        public string DuckDnsToken { get; set; } = string.Empty;
-        public string TunnelName { get; set; } = "icebot";
+        // Ingress tunnel — NextBird replaces the old DuckDNS + Cloudflare Tunnel setup. IceBot
+        // only needs the setup key; NextBird handles opening the path in and assigning PublicUrl.
+        public string NextBirdSetupKey { get; set; } = string.Empty;
         public string PublicUrl { get; set; } = string.Empty;
         public string BeApiUrl { get; set; } = string.Empty;
         public string ApiKey { get; set; } = string.Empty;
@@ -36,14 +36,8 @@ namespace IceBot.Config
         // of testing every machine type ever coded into MachineRegistry.Modules.
         public List<string> ProvisionedSteps { get; set; } = new List<string>();
 
-        public string DuckDnsDomain =>
-            string.IsNullOrWhiteSpace(DuckDnsSubdomain)
-                ? string.Empty
-                : $"{DuckDnsSubdomain.Trim()}.duckdns.org";
-
         public bool IsConfigured =>
-            !string.IsNullOrWhiteSpace(DuckDnsSubdomain)
-            && !string.IsNullOrWhiteSpace(DuckDnsToken)
+            !string.IsNullOrWhiteSpace(NextBirdSetupKey)
             && !string.IsNullOrWhiteSpace(PublicUrl);
     }
 }

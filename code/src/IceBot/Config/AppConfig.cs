@@ -14,8 +14,10 @@ namespace IceBot.Config
         public static string ApiKey =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_API_KEY"), SiteConfigStore.Load().ApiKey);
 
-        public static string DuckDnsDomain =>
-            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_DUCKDNS_DOMAIN"), SiteConfigStore.Load().DuckDnsDomain, "your-shop.duckdns.org");
+        // Setup key for NextBird (replaces the old DuckDNS + Cloudflare Tunnel ingress) —
+        // NextBird uses this to identify the store and open the path in to this Edge PC.
+        public static string NextBirdSetupKey =>
+            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_NEXTBIRD_SETUP_KEY"), SiteConfigStore.Load().NextBirdSetupKey);
 
         public static string PublicUrl =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_PUBLIC_URL"), SiteConfigStore.Load().PublicUrl, "https://your-shop.example.com");
@@ -34,9 +36,6 @@ namespace IceBot.Config
         // store has logged in at least once (mandatory at app startup, or `IceBot.exe login`).
         public static string BeSessionKey =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_BE_SESSION_KEY"), SiteConfigStore.Load().BeSessionKey);
-
-        public static string TunnelName =>
-            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_TUNNEL_NAME"), SiteConfigStore.Load().TunnelName, "icebot");
 
         public static readonly string[] TestScriptQueue =
         {

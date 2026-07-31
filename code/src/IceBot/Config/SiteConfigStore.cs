@@ -15,9 +15,6 @@ namespace IceBot.Config
         public static string SiteConfigPath =>
             Path.Combine(ConfigDirectory, "icebot.site.env");
 
-        public static string DuckDnsEnvPath =>
-            Path.Combine(ConfigDirectory, "duckdns.env");
-
         public static SiteSettings Load()
         {
             if (_cached != null)
@@ -41,9 +38,7 @@ namespace IceBot.Config
 
                 switch (key)
                 {
-                    case "DUCKDNS_SUBDOMAIN": settings.DuckDnsSubdomain = value; break;
-                    case "DUCKDNS_TOKEN": settings.DuckDnsToken = value; break;
-                    case "TUNNEL_NAME": settings.TunnelName = value; break;
+                    case "NEXTBIRD_SETUP_KEY": settings.NextBirdSetupKey = value; break;
                     case "PUBLIC_URL": settings.PublicUrl = value; break;
                     case "BE_API_URL": settings.BeApiUrl = value; break;
                     case "API_KEY": settings.ApiKey = value; break;
@@ -68,9 +63,7 @@ namespace IceBot.Config
             var lines = new[]
             {
                 "# IceBot site config — do not commit to git",
-                $"DUCKDNS_SUBDOMAIN={settings.DuckDnsSubdomain}",
-                $"DUCKDNS_TOKEN={settings.DuckDnsToken}",
-                $"TUNNEL_NAME={settings.TunnelName}",
+                $"NEXTBIRD_SETUP_KEY={settings.NextBirdSetupKey}",
                 $"PUBLIC_URL={settings.PublicUrl}",
                 $"BE_API_URL={settings.BeApiUrl}",
                 $"API_KEY={settings.ApiKey}",
@@ -84,26 +77,17 @@ namespace IceBot.Config
 
             File.WriteAllLines(SiteConfigPath, lines, Encoding.UTF8);
 
-            var duckLines = new[]
-            {
-                "# Synced from IceBot config wizard",
-                $"DUCKDNS_SUBDOMAIN={settings.DuckDnsSubdomain}",
-                $"DUCKDNS_TOKEN={settings.DuckDnsToken}",
-            };
-            File.WriteAllLines(DuckDnsEnvPath, duckLines, Encoding.UTF8);
-
             _cached = settings;
             ApplyToEnvironment(settings);
         }
 
         public static void ApplyToEnvironment(SiteSettings settings)
         {
-            SetEnv("ICEBOT_DUCKDNS_DOMAIN", settings.DuckDnsDomain);
+            SetEnv("ICEBOT_NEXTBIRD_SETUP_KEY", settings.NextBirdSetupKey);
             SetEnv("ICEBOT_PUBLIC_URL", settings.PublicUrl);
             SetEnv("ICEBOT_BE_API_URL", settings.BeApiUrl);
             SetEnv("ICEBOT_API_KEY", settings.ApiKey);
             SetEnv("ICEBOT_ROBOT_IP", settings.RobotIp);
-            SetEnv("ICEBOT_TUNNEL_NAME", settings.TunnelName);
             SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
             SetEnv("ICEBOT_BE_SESSION_KEY", settings.BeSessionKey);
         }

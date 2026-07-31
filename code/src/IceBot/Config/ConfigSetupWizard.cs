@@ -10,7 +10,7 @@ namespace IceBot.Config
         public static void Run()
         {
             Console.WriteLine();
-            Console.WriteLine("=== Cau hinh DuckDNS + Cloudflare Tunnel ===");
+            Console.WriteLine("=== Cau hinh NextBird ===");
             Console.WriteLine("Nhan ENTER de giu gia tri hien tai (neu co).");
             Console.WriteLine();
 
@@ -18,10 +18,8 @@ namespace IceBot.Config
 
             var settings = new SiteSettings
             {
-                DuckDnsSubdomain = Prompt("DuckDNS subdomain (vd: ice-shop-01)", current.DuckDnsSubdomain),
-                DuckDnsToken = PromptSecret("DuckDNS token", current.DuckDnsToken),
-                TunnelName = Prompt("Cloudflare tunnel name (vd: icebot)", current.TunnelName),
-                PublicUrl = Prompt("Public URL cho BE (Cloudflare, vd: https://shop.api.tenban.com)", current.PublicUrl),
+                NextBirdSetupKey = PromptSecret("NextBirdSetup_key", current.NextBirdSetupKey),
+                PublicUrl = Prompt("Public URL cho BE (NextBird cap, vd: https://shop.api.tenban.com)", current.PublicUrl),
                 ApiKey = PromptSecret("API key chia se voi BE (X-Api-Key)", current.ApiKey),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
                 StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
@@ -60,16 +58,14 @@ namespace IceBot.Config
             PrintSummary(settings);
             Console.WriteLine();
             Console.WriteLine("Buoc tiep theo (mot lan tren may nay):");
-            Console.WriteLine("  1. deploy\\duckdns\\register-scheduled-task.ps1");
-            Console.WriteLine("  2. deploy\\cloudflare\\setup-tunnel.ps1  (sau khi cloudflared tunnel login)");
-            Console.WriteLine("  3. Chon menu 'Chay server' trong IceBot");
+            Console.WriteLine("  1. Dam bao NextBirdSetup_key da duoc kich hoat ben NextBird");
+            Console.WriteLine("  2. Chon menu 'Chay he thong' trong IceBot");
         }
 
         public static void PrintSummary(SiteSettings settings)
         {
             Console.WriteLine("--- Cau hinh hien tai ---");
-            Console.WriteLine($"  DuckDNS        : {settings.DuckDnsDomain}");
-            Console.WriteLine($"  Tunnel name    : {settings.TunnelName}");
+            Console.WriteLine($"  NextBirdSetup_key : {(string.IsNullOrEmpty(settings.NextBirdSetupKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
