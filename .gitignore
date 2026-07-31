@@ -4,6 +4,9 @@ obj/
 *.suo
 .vs/
 
+# STM32CubeIDE / CMake build output (firmware)
+firmware/**/build/
+
 # Local config and workflow scripts (not pushed)
 .env/
 /workflow/
