@@ -255,7 +255,13 @@ BE gửi kèm trong đơn hàng luôn cả **danh sách file `.lua` và đúng t
 
 ## Deploy (NetBird)
 
-Ingress cloud → Edge giờ dùng **[NetBird](https://netbird.io)** thay cho DuckDNS + Cloudflare Tunnel — đây là NetBird CLI/mesh network thật, không phải API riêng của dự án. Ở Cấu hình > 1, chỉ cần nhập setup key (vd `7980A958-3B57-42E1-93EE-3DE008A9AD10`) — IceBot **tự động chạy `netbird up --setup-key <key>`** ngay lúc đó (`Config/NetBirdSetup.cs`), không cần bạn tự mở terminal gõ lệnh. Yêu cầu: đã cài NetBird CLI và có trong PATH trên máy Edge — nếu thiếu, wizard báo lỗi rõ ràng nhưng vẫn tiếp tục lưu các mục cấu hình khác (không chặn).
+Ingress cloud → Edge giờ dùng **[NetBird](https://netbird.io)** thay cho DuckDNS + Cloudflare Tunnel — đây là NetBird CLI/mesh network thật, không phải API riêng của dự án. Ở Cấu hình > 1, chỉ cần nhập setup key (vd `7980A958-3B57-42E1-93EE-3DE008A9AD10`) — IceBot tự lo phần còn lại (`Config/NetBirdSetup.cs`):
+
+1. **Chưa cài NetBird trên máy này (lần đầu chạy IceBot trên 1 Edge PC mới)** → tự động chạy `winget install --id Netbird.Netbird --silent` để cài, không cần thao tác tay.
+2. Sau đó (hoặc nếu đã cài sẵn) → tự chạy `netbird up --setup-key <key>` để kết nối.
+3. Việc kiểm tra/kết nối này **chạy lại mỗi lần mở IceBot** (menu tương tác lẫn `serve`), ngay sau bước đăng nhập — không chỉ lúc nhập key ở wizard, phòng trường hợp máy Edge bị cài lại/mất NetBird sau này.
+
+Yêu cầu: máy Edge cần có `winget` (có sẵn trên Windows 10/11 bản mới) và kết nối internet ở lần cài đầu tiên; việc cài driver mạng ảo của NetBird cần quyền Administrator — nếu IceBot không chạy quyền admin, bước cài/kết nối sẽ báo lỗi rõ ràng (không treo máy, có timeout) nhưng **không chặn** các phần khác của app.
 
 | Script | Vai trò |
 |--------|---------|
@@ -278,6 +284,7 @@ Ingress cloud → Edge giờ dùng **[NetBird](https://netbird.io)** thay cho Du
 |----------|------------|
 | Menu + CLI | ✅ Xong |
 | Config wizard (NetBird setup key, public URL, robot IP, tài khoản cửa hàng, cổng COM máy ngoại vi) | ✅ Xong |
+| Tự cài NetBird qua winget nếu máy chưa có + tự `netbird up` mỗi lần mở app (`Config/NetBirdSetup.cs`) | ✅ Xong |
 | Đăng nhập cửa hàng — `BeApi.Login` (mock) → lưu `BE_SESSION_KEY`, bắt buộc trước khi vào menu/serve, `IceBot.exe login` để đăng nhập lại thủ công | ✅ Xong (mock; key chưa được đính kèm vào request thật nào vì chưa có request Edge → BE thật) |
 | `WorkflowRunner` — chạy tuần tự từng bước, mỗi file `.lua` chạy trọn vẹn (nối liền tự nhiên, xem Lua workflow scripts) | ✅ Xong |
 | Kiến trúc module máy ngoại vi (`IMachineModule` + `MachineRegistry.Modules`) — thêm máy = thêm 1 module | ✅ Xong |

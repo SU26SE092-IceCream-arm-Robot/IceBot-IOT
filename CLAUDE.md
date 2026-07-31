@@ -119,16 +119,29 @@ The store no longer uses DuckDNS + Cloudflare Tunnel for cloud→edge ingress �
 (the real https://netbird.io CLI/product — mind the spelling, not "NextBird") replaces both
 (dynamic DNS *and* the tunnel itself, a WireGuard-based mesh network). IceBot's side of this is
 a single secret: `NetBirdSetupKey` (`NETBIRD_SETUP_KEY` in `config/icebot.site.env`, prompted as
-"NetBird setup key" in menu Cau hinh > 1). Unlike `BeApi`/NextBird-the-cloud-API (there is no
-such API — NetBird is a real installed CLI), IceBot **actively shells out to it**:
-`Config/NetBirdSetup.cs` (`NetBirdSetup.RunUp`) launches `netbird up --setup-key <key>` as a
-child process (`Process.Start`, `netbird` must be on PATH) whenever the operator enters a setup
-key that differs from what's already saved — this is what "may Edge se tu dong setup NetBird"
-means; the operator no longer runs `netbird up` by hand in a separate terminal.
-`ConfigSetupWizard.Run()` calls it right after prompting for the key, before the rest of the
-wizard, and prints NetBird's own stdout/stderr back to the console (`[OK]`/`[ERROR]`). Missing
-`netbird` binary or a failed run does **not** abort the wizard — it's reported and the wizard
-continues (matches the "warn and continue" pattern used elsewhere, e.g. missing COM port).
+"NetBird setup key" in menu Cau hinh > 1). Unlike `BeApi` (mock, no real HTTP yet), NetBird is a
+real installed CLI and IceBot **actively shells out to it** via `Config/NetBirdSetup.cs`:
+- `NetBirdSetup.RunUp(setupKey, out message)` resolves the `netbird` executable
+  (`ResolveExecutable()` — bare `"netbird"` if it resolves via this process's PATH, else checks
+  the known install path `%ProgramFiles%\Netbird\netbird.exe` directly; this second check
+  matters because a process that outlives an installer never sees the installer's PATH update).
+  **If NetBird isn't found on this machine at all, it's installed automatically** via
+  `winget install --id Netbird.Netbird --silent --accept-package-agreements
+  --accept-source-agreements` (3 min timeout) before continuing — this is the "may Edge tu dong
+  cai NetBird" behavior; the operator never installs it or runs `netbird up` by hand. Then it
+  runs `netbird up --setup-key <key>` (1 min timeout) as a child process and surfaces NetBird's
+  own stdout/stderr as the result message.
+- Called from **two places**, both non-blocking (report `[OK]`/`[WARN]`/`[ERROR]`, never abort):
+  `ConfigSetupWizard.Run()` (right after the key prompt, only if the key is new/changed), and
+  `ConsoleMenu.EnsureNetBirdConnected()` (called at the top of both `ConsoleMenu.Run()` and
+  `ConsoleMenu.RunServeMode()`, right after `StoreAuth.RequireLogin()`, whenever a setup key is
+  already saved) — the second one is what makes a *fresh* Edge PC image work: the key was
+  provisioned before, NetBird wasn't installed yet, first `IceBot.exe` launch installs it with
+  no wizard re-entry needed.
+- Process timeouts exist specifically because `winget`/driver install can trigger a UAC
+  elevation prompt that a non-interactive process can never satisfy — instead of hanging
+  forever, `RunProcess` kills the child after the timeout and reports "may dang cho quyen admin
+  (UAC), chay IceBot voi quyen Administrator".
 `SiteSettings.IsConfigured` now checks `NetBirdSetupKey` + `PublicUrl` (previously
 `DuckDnsSubdomain`/`DuckDnsToken`/`PublicUrl`). All DuckDNS/Cloudflare-specific fields
 (`DuckDnsSubdomain`, `DuckDnsToken`, `TunnelName`, `DuckDnsDomain`, the synced `duckdns.env`

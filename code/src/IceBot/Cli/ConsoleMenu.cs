@@ -19,6 +19,7 @@ namespace IceBot.Cli
         {
             PrintBanner();
             StoreAuth.RequireLogin();
+            EnsureNetBirdConnected();
             Pause();
 
             while (true)
@@ -192,6 +193,7 @@ namespace IceBot.Cli
         {
             PrintBanner();
             StoreAuth.RequireLogin();
+            EnsureNetBirdConnected();
             Console.WriteLine();
 
             var settings = SiteConfigStore.Load();
@@ -309,6 +311,26 @@ namespace IceBot.Cli
             }
 
             Pause();
+        }
+
+        // Runs once at the top of both entry points (interactive menu and `serve`), right after
+        // the login gate. If a NetBird setup key is already saved but this particular machine
+        // doesn't have the NetBird CLI yet (fresh Edge PC image, first run), NetBirdSetup.RunUp
+        // installs it automatically before connecting — the operator never has to do this by
+        // hand. Non-blocking: a failure here only warns, it does not stop the app from starting
+        // (matches the "warn and continue" pattern used for other missing config).
+        private static void EnsureNetBirdConnected()
+        {
+            var setupKey = AppConfig.NetBirdSetupKey;
+            if (string.IsNullOrWhiteSpace(setupKey))
+            {
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Kiem tra NetBird...");
+            var ok = NetBirdSetup.RunUp(setupKey, out var message);
+            Console.WriteLine(ok ? $"[OK] {message}" : $"[WARN] {message}");
         }
 
         private static void PrintBanner()
