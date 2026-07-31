@@ -73,8 +73,9 @@ namespace IceBot.Cli
                 Console.WriteLine();
                 Console.WriteLine("CAU HINH");
                 Console.WriteLine("1. Cau hinh NetBird");
-                Console.WriteLine("2. Xem cau hinh hien tai");
-                Console.WriteLine("3. Tai file Lua tu BE (mock: BeApi.GetLua)");
+                Console.WriteLine("2. Cau hinh he thong (API key, robot IP, tai khoan, cong COM)");
+                Console.WriteLine("3. Xem cau hinh hien tai");
+                Console.WriteLine("4. Tai file Lua tu BE (mock: BeApi.GetLua)");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -83,14 +84,18 @@ namespace IceBot.Cli
                 switch (choice)
                 {
                     case "1":
-                        ConfigSetupWizard.Run();
+                        ConfigSetupWizard.RunNetBird();
                         Pause();
                         break;
                     case "2":
-                        ConfigSetupWizard.PrintSummary(settings);
+                        ConfigSetupWizard.RunSystemSettings();
                         Pause();
                         break;
                     case "3":
+                        ConfigSetupWizard.PrintSummary(settings);
+                        Pause();
+                        break;
+                    case "4":
                         WorkflowProvisioner.RunInteractive();
                         Pause();
                         break;

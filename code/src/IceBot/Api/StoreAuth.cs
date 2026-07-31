@@ -5,8 +5,8 @@ namespace IceBot.Api
 {
     /// <summary>
     /// Logs this store into BE using the account/password saved via the config wizard (menu
-    /// Cau hinh, item 1), and persists the key BE returns (SiteSettings.BeSessionKey) for
-    /// future outbound BE requests.
+    /// Cau hinh, item 2 "Cau hinh he thong"), and persists the key BE returns
+    /// (SiteSettings.BeSessionKey) for future outbound BE requests.
     /// </summary>
     internal static class StoreAuth
     {
@@ -28,7 +28,7 @@ namespace IceBot.Api
             var settings = SiteConfigStore.Load();
             if (string.IsNullOrWhiteSpace(settings.StoreAccount) || string.IsNullOrWhiteSpace(settings.StorePassword))
             {
-                Console.WriteLine("[WARN] Chua cau hinh tai khoan/mat khau cua hang. Vao menu Cau hinh -> muc 1 de nhap.");
+                Console.WriteLine("[WARN] Chua cau hinh tai khoan/mat khau cua hang. Vao menu Cau hinh -> muc 2 de nhap.");
                 return;
             }
 

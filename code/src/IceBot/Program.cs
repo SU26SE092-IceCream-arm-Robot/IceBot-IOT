@@ -28,7 +28,8 @@ namespace IceBot
             {
                 case "setup":
                 case "config":
-                    ConfigSetupWizard.Run();
+                    ConfigSetupWizard.RunNetBird();
+                    ConfigSetupWizard.RunSystemSettings();
                     ConsoleMenu.Pause();
                     break;
                 case "login":

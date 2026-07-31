@@ -100,11 +100,13 @@ code/src/IceBot/bin/Release/net472/IceBot.exe serve
 Menu tương tác khi chạy `IceBot.exe` không tham số — menu chính chỉ có 4 dòng; chọn `1` hoặc `2` mở submenu riêng (đánh số lại từ 1 trong submenu đó, không phải mã ghép kiểu `1.1`); `0` luôn là "quay lại" (trong submenu) hoặc "thoát" (menu chính):
 
 ```
-Menu chinh                       Chon 1 -> CAU HINH             Chon 2 -> TEST MAY
-1. Cau hinh                      1. Cau hinh NetBird            1. Test tay Robot
-2. Test may                      2. Xem cau hinh hien tai        2. Test ket noi may ngoai vi (Serial)
-3. Chay he thong                 3. Tai file Lua tu BE (mock)    0. Quay lai
-0. Thoat                         0. Quay lai
+Menu chinh                       Chon 1 -> CAU HINH                          Chon 2 -> TEST MAY
+1. Cau hinh                      1. Cau hinh NetBird                         1. Test tay Robot
+2. Test may                      2. Cau hinh he thong (API key, robot IP,    2. Test ket noi may ngoai vi (Serial)
+3. Chay he thong                    tai khoan, cong COM)                     0. Quay lai
+0. Thoat                         3. Xem cau hinh hien tai
+                                  4. Tai file Lua tu BE (mock)
+                                  0. Quay lai
 ```
 
 | Menu | Mục | Chức năng |
@@ -113,9 +115,10 @@ Menu chinh                       Chon 1 -> CAU HINH             Chon 2 -> TEST M
 | Chính | 2 | Test máy — mở submenu |
 | Chính | 3 | Chạy hệ thống — nhận đơn từ BE (`serve` mode, cổng 5080) |
 | Chính | 0 | Thoát |
-| Cấu hình | 1 | Cấu hình NetBird (`NetBirdSetup_key`) + Public URL + IP robot + tài khoản cửa hàng + cổng COM máy ngoại vi |
-| Cấu hình | 2 | Xem cấu hình hiện tại |
-| Cấu hình | 3 | Tải file Lua từ BE (hiện là mock `BeApi.GetLua`) — **ghi nhớ định danh máy đã nhập**, xem bên dưới |
+| Cấu hình | 1 | **Cấu hình NetBird** — chỉ 2 thứ NetBird thực sự cần: setup key + Public URL |
+| Cấu hình | 2 | **Cấu hình hệ thống** — mọi thứ còn lại: API key chia sẻ với BE, IP robot, tài khoản cửa hàng, cổng COM máy ngoại vi |
+| Cấu hình | 3 | Xem cấu hình hiện tại |
+| Cấu hình | 4 | Tải file Lua từ BE (hiện là mock `BeApi.GetLua`) — **ghi nhớ định danh máy đã nhập**, xem bên dưới |
 | Cấu hình | 0 | Quay lại menu chính |
 | Test máy | 1 | **Test tay Robot** — 2 bước: (1) test kết nối tay máy, (2) nạp + chạy 1 file `.lua` mẫu (xem bên dưới) |
 | Test máy | 2 | **Test kết nối máy ngoại vi (Serial)** — test kết nối cho toàn bộ máy ngoại vi cửa hàng này đã khai báo (xem bên dưới) |
@@ -132,7 +135,7 @@ Chỉ test tay máy, tách làm 2 bước độc lập, không đụng gì tới
 
 Test kết nối cho **đúng những máy ngoại vi cửa hàng này thật sự có** — không phải mọi máy từng được code trong `MachineRegistry`. Cơ chế:
 
-- Khi nhập định danh máy ở **Cấu hình > 3** để tải file Lua từ BE (vd `cup_s, ice_chocolate_s`), Edge **tự lưu lại** các định danh này (`SiteSettings.ProvisionedSteps`, dựa trên tên file BE thực sự trả về — kể cả khi nhập bundle như `FR5`/`full`).
+- Khi nhập định danh máy ở **Cấu hình > 4** để tải file Lua từ BE (vd `cup_s, ice_chocolate_s`), Edge **tự lưu lại** các định danh này (`SiteSettings.ProvisionedSteps`, dựa trên tên file BE thực sự trả về — kể cả khi nhập bundle như `FR5`/`full`).
 - Test máy > 2 lặp qua đúng danh sách đã lưu đó, map ngược về máy qua `MachineRegistry.TryGetModule`, rồi gọi `TestConnection(comPort)` — dùng chung 1 cơ chế cho mọi máy có `IMachineTrigger`, không cần biết máy đó cụ thể là gì.
 - Định danh không map được máy nào có RS485 (vd `deliver_tray`, `lay_coc` — thuần di chuyển tay máy) thì tự bỏ qua, không hiện ra.
 
@@ -150,7 +153,7 @@ CLI tương ứng:
 | Lệnh | Mục đích |
 |------|----------|
 | `IceBot.exe` | Mở menu tương tác |
-| `IceBot.exe setup` | Wizard cấu hình → `config/icebot.site.env` |
+| `IceBot.exe setup` | Chạy cả 2 wizard (NetBird + hệ thống) liền nhau → `config/icebot.site.env` |
 | `IceBot.exe login` | Đăng nhập tài khoản cửa hàng → lưu key BE trả về |
 | `IceBot.exe provision` | Tải Lua từ BE (mock) → `workflow/` (+ ghi nhớ định danh máy) |
 | `IceBot.exe serve` | Chạy HTTP API nội bộ trên cổng `5080` |
@@ -174,7 +177,7 @@ Mục "Cấu hình" > 1 vẫn có prompt tài khoản/mật khẩu (để đổi
 
 ## Cấu hình site
 
-Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitignored, tạo qua Cấu hình > 1 hoặc `IceBot.exe setup`):
+Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitignored, tạo qua Cấu hình > 1 / > 2 hoặc `IceBot.exe setup`):
 
 | Biến | Ý nghĩa |
 |------|---------|
@@ -186,7 +189,7 @@ Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitigno
 | `STORE_ACCOUNT` / `STORE_PASSWORD` | Tài khoản cửa hàng do BE cấp — dùng để đăng nhập (bắt buộc lúc khởi động, hoặc `IceBot.exe login` để đăng nhập lại thủ công) |
 | `BE_SESSION_KEY` | Key BE trả về sau khi đăng nhập thành công — dùng cho các request IceBot → BE sau này (chiều ngược `API_KEY`) |
 | `MACHINE_PORTS` | Cổng COM theo từng loại máy ngoại vi, dạng `cup_dropping:COM3,...` |
-| `PROVISIONED_STEPS` | Định danh bước (.lua, không đuôi) đã tải qua Cấu hình > 3, tích luỹ dần — dùng để biết Test máy > 2 cần kiểm tra kết nối cho máy nào |
+| `PROVISIONED_STEPS` | Định danh bước (.lua, không đuôi) đã tải qua Cấu hình > 4, tích luỹ dần — dùng để biết Test máy > 2 cần kiểm tra kết nối cho máy nào |
 
 ## Điều khiển máy trong hệ thống
 
@@ -236,7 +239,7 @@ MachineRegistry.Modules (Machines/MachineRegistry.cs)
    };
    ```
 
-Xong — nếu máy có `IMachineTrigger` thì `ConfigSetupWizard` tự hỏi thêm cổng COM, `WorkflowRunner` tự bắn tín hiệu đúng bước, Test máy > 2 tự kiểm tra kết nối được (miễn định danh bước của máy đó đã được ghi nhận qua Cấu hình > 3). Không cần sửa `WorkflowRunner.cs`, `ConfigSetupWizard.cs`, hay `ConsoleMenu.cs`.
+Xong — nếu máy có `IMachineTrigger` thì `ConfigSetupWizard` (Cấu hình > 2) tự hỏi thêm cổng COM, `WorkflowRunner` tự bắn tín hiệu đúng bước, Test máy > 2 tự kiểm tra kết nối được (miễn định danh bước của máy đó đã được ghi nhận qua Cấu hình > 4). Không cần sửa `WorkflowRunner.cs`, `ConfigSetupWizard.cs`, hay `ConsoleMenu.cs`.
 
 Máy ngoại vi chưa có driver RS485 (vd topping hiện tại) thì **chưa được coi là đã tích hợp** — vẫn cần đăng ký 1 `IMachineModule` để bước `.lua` của nó có định danh, nhưng phải bổ sung `<TenMay>Client.cs` + `IMachineTrigger` theo đúng rule trên trước khi máy đó thật sự trigger được.
 
@@ -247,7 +250,7 @@ BE gửi kèm trong đơn hàng luôn cả **danh sách file `.lua` và đúng t
 ## Lua workflow scripts
 
 - Mỗi file `.lua` trong `workflow/` là **một bước tay máy**, viết theo quy ước: 1 điểm bắt đầu → 1 điểm kết thúc + `WaitMs` nếu cần chờ — **không** quay lại điểm bắt đầu ở cuối file, và **không** tự kích máy ngoại vi bên trong file (việc đó do IceBot làm qua RS485 sau khi file chạy xong). IceBot không quan tâm tên/note các điểm bên trong file, chỉ nạp và chạy hết nội dung **từ trên xuống dưới** (`FairinoLuaExecutor.RunScript`).
-- Được tải về qua Cấu hình > 3 / `IceBot.exe provision` (hiện gọi `BeApi.GetLua` — đang là mock, chưa nối BE thật).
+- Được tải về qua Cấu hình > 4 / `IceBot.exe provision` (hiện gọi `BeApi.GetLua` — đang là mock, chưa nối BE thật).
 - **Nối nhiều bước liên tục** (không cần merge gì thêm): vì mỗi file chỉ có 1 đoạn đường (không round-trip), chạy tuần tự từng file là tay máy đã tự đi liên tục — điểm kết thúc file trước = điểm bắt đầu thực tế của file sau.
 - **Điểm Home (`robot_home`)**: tay máy có 1 **teaching point tên `robot_home` lưu sẵn trong bộ điều khiển robot** (qua app Fairino) — **không** phải file `.lua`. `WorkflowRunner.RunQueue` gọi `FairinoLuaExecutor.MoveToTeachingPoint("robot_home")` (đọc điểm trực tiếp từ controller bằng `GetRobotTeachingPoint` rồi `MoveJ`) **tự động ở đầu** (sau khi kết nối = "vừa bật/reset") **và ở cuối** (sau khi xong toàn bộ hàng đợi = "xong 1 sản phẩm") mỗi lần chạy. Giữa các bước trong 1 sản phẩm thì **không** quay về Home. Đây là hành vi có sẵn trong code, không cần cấu hình gì thêm.
   - Nếu điểm được lưu dưới tên khác, đổi hằng số `HomeTeachingPoint` trong `WorkflowRunner.cs`.
@@ -274,7 +277,7 @@ Yêu cầu: máy Edge cần có `winget` (có sẵn trên Windows 10/11 bản m�
 | Triệu chứng | Nguyên nhân thường gặp |
 |-------------|-------------------------|
 | `RPC failed with error code ...` khi test robot | Sai `ROBOT_IP`, tay máy chưa bật, hoặc PC không cùng LAN `192.168.58.x` với control box |
-| Test máy > 2 / `test-machine` báo "Chua cau hinh cong COM" | Chưa nhập cổng COM cho máy đó ở Cấu hình > 1 |
+| Test máy > 2 / `test-machine` báo "Chua cau hinh cong COM" | Chưa nhập cổng COM cho máy đó ở Cấu hình > 2 |
 | `Cup-dropping machine communication error: no valid reply after 3 resend(s)` | Sai cổng COM, sai baud rate/đấu dây RS232-RS485, hoặc máy thả cốc chưa cấp nguồn |
 | `Checksum mismatch` / `Length mismatch` từ máy thả cốc | Nhiễu đường truyền hoặc đấu sai chân TX/RX — kiểm tra cách ly & dây tín hiệu |
 
@@ -283,7 +286,7 @@ Yêu cầu: máy Edge cần có `winget` (có sẵn trên Windows 10/11 bản m�
 | Hạng mục | Trạng thái |
 |----------|------------|
 | Menu + CLI | ✅ Xong |
-| Config wizard (NetBird setup key, public URL, robot IP, tài khoản cửa hàng, cổng COM máy ngoại vi) | ✅ Xong |
+| Config wizard — tách riêng "Cấu hình NetBird" (setup key, public URL) và "Cấu hình hệ thống" (API key, robot IP, tài khoản cửa hàng, cổng COM) | ✅ Xong |
 | Tự cài NetBird qua winget nếu máy chưa có + tự `netbird up` mỗi lần mở app (`Config/NetBirdSetup.cs`) | ✅ Xong |
 | Đăng nhập cửa hàng — `BeApi.Login` (mock) → lưu `BE_SESSION_KEY`, bắt buộc trước khi vào menu/serve, `IceBot.exe login` để đăng nhập lại thủ công | ✅ Xong (mock; key chưa được đính kèm vào request thật nào vì chưa có request Edge → BE thật) |
 | `WorkflowRunner` — chạy tuần tự từng bước, mỗi file `.lua` chạy trọn vẹn (nối liền tự nhiên, xem Lua workflow scripts) | ✅ Xong |
@@ -291,7 +294,7 @@ Yêu cầu: máy Edge cần có `winget` (có sẵn trên Windows 10/11 bản m�
 | Máy thả cốc — module + client serial (`Machines/CupDropping/`) | ✅ Xong |
 | Máy làm kem — module + client serial RS485 (`Machines/IceCream/`) | ✅ Xong |
 | Test máy > 1 "Test tay Robot" — test kết nối + nạp/chạy 1 file `.lua` mẫu từ `test-workflow/` (tách biệt `workflow/`) | ✅ Xong (file mẫu do người dùng tự cung cấp, chưa có sẵn trong repo) |
-| Test máy > 2 "Test kết nối máy ngoại vi" — dùng `SiteSettings.ProvisionedSteps` (ghi nhớ từ Cấu hình > 3) để biết cần test máy nào, gọi chung `IMachineTrigger.TestConnection` cho mọi máy | ✅ Xong |
+| Test máy > 2 "Test kết nối máy ngoại vi" — dùng `SiteSettings.ProvisionedSteps` (ghi nhớ từ Cấu hình > 4) để biết cần test máy nào, gọi chung `IMachineTrigger.TestConnection` cho mọi máy | ✅ Xong |
 | Tự quay về Home (`robot_home`) ở đầu + cuối mỗi lần chạy hàng đợi | ✅ Xong (đọc teaching point `robot_home` từ controller qua SDK — cần đã lưu điểm này trên robot) |
 | Kết nối BE thật (`BeApi`) | ❌ Chưa (đang mock — cả `GetLua` lẫn `Login`) |
 | `POST /api/orders` → chạy thực tế | ✅ Xong — BE gửi kèm `steps` (tên file + đúng thứ tự chạy), IceBot kiểm tra file tồn tại rồi chạy qua `OrderQueue` → `WorkflowRunner.RunQueue` (chạy tuần tự, không chặn HTTP thread) |

@@ -71,13 +71,17 @@ POSTing completion/failure status back to BE.
 ## Store login
 
 Each store has its own BE account (`STORE_ACCOUNT`/`STORE_PASSWORD` in `config/icebot.site.env`,
-set via 1.1 or entered inline at the login gate). "1.1" here means: main menu item 1 ("Cau
-hinh"), then item 1 in that submenu ("Cau hinh NetBird") — each submenu
-renumbers from 1 on screen (no literal "1.1" keystroke; see `Cli/ConsoleMenu.cs`).
+set via 1.2 or entered inline at the login gate). "1.2" here means: main menu item 1 ("Cau
+hinh"), then item 2 in that submenu ("Cau hinh he thong") — each submenu renumbers from 1 on
+screen (no literal "1.2" keystroke; see `Cli/ConsoleMenu.cs`). Note this is a **different**
+submenu item than NetBird's own config (1.1, "Cau hinh NetBird") — `ConfigSetupWizard` is split
+into `RunNetBird()` (NetBird setup key + Public URL only) and `RunSystemSettings()` (API key,
+robot IP, store account/password, COM ports) precisely so these two concerns don't live in one
+combined prompt anymore.
 **Login is mandatory to reach the menu or `serve` mode** — `ConsoleMenu.Run()` and
 `ConsoleMenu.RunServeMode()` both call `StoreAuth.RequireLogin()` first thing on startup, which
 **loops, blocking, until `BeApi.Login` succeeds** (mock — `Api/BeApi.cs`); prompts inline for
-account/password if not already configured (1.1 is not a prerequisite), typing `exit` quits the
+account/password if not already configured (1.2 is not a prerequisite), typing `exit` quits the
 app instead of retrying.
 `RequireLogin()` only actually gates once per process (`StoreAuth._loggedInThisRun`) — entering
 the menu logs in once, and picking "3. Chay he thong" from inside the menu does not ask again;
@@ -132,7 +136,7 @@ real installed CLI and IceBot **actively shells out to it** via `Config/NetBirdS
   runs `netbird up --setup-key <key>` (1 min timeout) as a child process and surfaces NetBird's
   own stdout/stderr as the result message.
 - Called from **two places**, both non-blocking (report `[OK]`/`[WARN]`/`[ERROR]`, never abort):
-  `ConfigSetupWizard.Run()` (right after the key prompt, only if the key is new/changed), and
+  `ConfigSetupWizard.RunNetBird()` (right after the key prompt, only if the key is new/changed), and
   `ConsoleMenu.EnsureNetBirdConnected()` (called at the top of both `ConsoleMenu.Run()` and
   `ConsoleMenu.RunServeMode()`, right after `StoreAuth.RequireLogin()`, whenever a setup key is
   already saved) — the second one is what makes a *fresh* Edge PC image work: the key was

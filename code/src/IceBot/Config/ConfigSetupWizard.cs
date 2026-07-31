@@ -7,17 +7,20 @@ namespace IceBot.Config
 {
     internal static class ConfigSetupWizard
     {
-        public static void Run()
+        // Only the two fields NetBird itself actually needs. Everything else in SiteSettings
+        // (API key, robot IP, store account, COM ports, ProvisionedSteps, BeApiUrl) is left
+        // untouched — see RunSystemSettings() for those.
+        public static void RunNetBird()
         {
             Console.WriteLine();
             Console.WriteLine("=== Cau hinh NetBird ===");
             Console.WriteLine("Nhan ENTER de giu gia tri hien tai (neu co).");
             Console.WriteLine();
 
-            var current = SiteConfigStore.Load();
+            var settings = SiteConfigStore.Load();
 
-            var netBirdSetupKey = PromptSecret("NetBird setup key", current.NetBirdSetupKey);
-            if (!string.IsNullOrWhiteSpace(netBirdSetupKey) && netBirdSetupKey != current.NetBirdSetupKey)
+            var netBirdSetupKey = PromptSecret("NetBird setup key", settings.NetBirdSetupKey);
+            if (!string.IsNullOrWhiteSpace(netBirdSetupKey) && netBirdSetupKey != settings.NetBirdSetupKey)
             {
                 Console.WriteLine();
                 Console.WriteLine("Dang chay 'netbird up --setup-key ...' ...");
@@ -26,10 +29,35 @@ namespace IceBot.Config
                 Console.WriteLine();
             }
 
+            settings.NetBirdSetupKey = netBirdSetupKey;
+            settings.PublicUrl = Prompt("Public URL cho BE (NetBird cap, vd: https://shop.api.tenban.com)", settings.PublicUrl);
+
+            SiteConfigStore.Save(settings);
+
+            Console.WriteLine();
+            Console.WriteLine("[OK] Da luu cau hinh: " + SiteConfigStore.SiteConfigPath);
+            Console.WriteLine();
+            PrintSummary(settings);
+        }
+
+        // Everything that is NOT NetBird: API key, robot IP, store account/password, COM ports.
+        public static void RunSystemSettings()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== Cau hinh he thong ===");
+            Console.WriteLine("Nhan ENTER de giu gia tri hien tai (neu co).");
+            Console.WriteLine();
+
+            var current = SiteConfigStore.Load();
+
             var settings = new SiteSettings
             {
-                NetBirdSetupKey = netBirdSetupKey,
-                PublicUrl = Prompt("Public URL cho BE (NetBird cap, vd: https://shop.api.tenban.com)", current.PublicUrl),
+                // Carried forward as-is — not this wizard's concern.
+                NetBirdSetupKey = current.NetBirdSetupKey,
+                PublicUrl = current.PublicUrl,
+                BeApiUrl = current.BeApiUrl,
+                ProvisionedSteps = new List<string>(current.ProvisionedSteps),
+
                 ApiKey = PromptSecret("API key chia se voi BE (X-Api-Key)", current.ApiKey),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
                 StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
@@ -66,9 +94,6 @@ namespace IceBot.Config
             Console.WriteLine("[OK] Da luu cau hinh: " + SiteConfigStore.SiteConfigPath);
             Console.WriteLine();
             PrintSummary(settings);
-            Console.WriteLine();
-            Console.WriteLine("Buoc tiep theo:");
-            Console.WriteLine("  Chon menu 'Chay he thong' trong IceBot");
         }
 
         public static void PrintSummary(SiteSettings settings)

@@ -90,7 +90,7 @@ namespace IceBot.Workflow
             if (string.IsNullOrWhiteSpace(comPort))
             {
                 throw new InvalidOperationException(
-                    $"Chua cau hinh cong COM cho may '{trigger.DisplayName}'. Vao menu Cau hinh -> muc 1 de cau hinh.");
+                    $"Chua cau hinh cong COM cho may '{trigger.DisplayName}'. Vao menu Cau hinh -> muc 2 de cau hinh.");
             }
 
             trigger.Trigger(comPort);
