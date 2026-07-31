@@ -48,7 +48,11 @@ namespace IceBot.Config
                     case "BE_API_URL": settings.BeApiUrl = value; break;
                     case "API_KEY": settings.ApiKey = value; break;
                     case "ROBOT_IP": settings.RobotIp = value; break;
+                    case "STORE_ACCOUNT": settings.StoreAccount = value; break;
+                    case "STORE_PASSWORD": settings.StorePassword = value; break;
+                    case "BE_SESSION_KEY": settings.BeSessionKey = value; break;
                     case "MACHINE_PORTS": settings.MachinePorts = ParseMachinePorts(value); break;
+                    case "PROVISIONED_STEPS": settings.ProvisionedSteps = ParseList(value); break;
                 }
             }
 
@@ -71,7 +75,11 @@ namespace IceBot.Config
                 $"BE_API_URL={settings.BeApiUrl}",
                 $"API_KEY={settings.ApiKey}",
                 $"ROBOT_IP={settings.RobotIp}",
+                $"STORE_ACCOUNT={settings.StoreAccount}",
+                $"STORE_PASSWORD={settings.StorePassword}",
+                $"BE_SESSION_KEY={settings.BeSessionKey}",
                 $"MACHINE_PORTS={SerializeMachinePorts(settings.MachinePorts)}",
+                $"PROVISIONED_STEPS={string.Join(",", settings.ProvisionedSteps)}",
             };
 
             File.WriteAllLines(SiteConfigPath, lines, Encoding.UTF8);
@@ -96,6 +104,8 @@ namespace IceBot.Config
             SetEnv("ICEBOT_API_KEY", settings.ApiKey);
             SetEnv("ICEBOT_ROBOT_IP", settings.RobotIp);
             SetEnv("ICEBOT_TUNNEL_NAME", settings.TunnelName);
+            SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
+            SetEnv("ICEBOT_BE_SESSION_KEY", settings.BeSessionKey);
         }
 
         private static void SetEnv(string name, string value)
@@ -140,6 +150,27 @@ namespace IceBot.Config
             }
 
             return string.Join(",", parts);
+        }
+
+        // Encoded as "a,b,c" — see SiteSettings.ProvisionedSteps.
+        private static List<string> ParseList(string value)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return result;
+            }
+
+            foreach (var entry in value.Split(','))
+            {
+                var trimmed = entry.Trim();
+                if (trimmed.Length > 0)
+                {
+                    result.Add(trimmed);
+                }
+            }
+
+            return result;
         }
 
         private static bool TryParseLine(string line, out string key, out string value)

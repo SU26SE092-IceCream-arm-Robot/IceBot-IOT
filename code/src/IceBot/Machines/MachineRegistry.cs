@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using IceBot.Machines.CupDropping;
+using IceBot.Machines.IceCream;
 
 namespace IceBot.Machines
 {
     // The one place to touch (besides writing the module itself) when adding a new machine:
     // add its module instance to Modules below. Everything else — WorkflowRunner triggering
-    // it (if it implements IMachineTrigger), ConfigSetupWizard asking for its COM port,
-    // WorkflowQueueBuilder ordering steps by its Position, the console test menu listing it —
-    // reads from this registry automatically.
+    // it (if it implements IMachineTrigger), ConfigSetupWizard asking for its COM port, the
+    // console test menu listing it — reads from this registry automatically.
     //
     // Every workflow step (.lua file) belongs to exactly one machine identifier — there is no
     // such thing as a step with no machine. Register every machine here, not just the ones
@@ -19,6 +19,7 @@ namespace IceBot.Machines
         public static readonly IReadOnlyList<IMachineModule> Modules = new IMachineModule[]
         {
             new CupDroppingMachineModule(),
+            new IceCreamMachineModule(),
         };
 
         private static readonly Dictionary<string, IMachineModule> ByStepName = BuildStepIndex();

@@ -66,6 +66,8 @@ namespace IceBot.Workflow
                     Console.WriteLine($"  [OK] {script.FileName}");
                 }
 
+                RememberProvisionedSteps(saved);
+
                 return new ProvisionResult
                 {
                     Success = true,
@@ -102,6 +104,33 @@ namespace IceBot.Workflow
             }
 
             return list;
+        }
+
+        // Records which peripheral machine step names this store actually has, based on the
+        // .lua files BE just returned (not the raw model strings typed in — a bundle keyword
+        // like "FR5" expands to several files, and it's the resulting step names that
+        // MachineRegistry.TryGetModule can resolve). "Test may > 2 Test ket noi may ngoai vi"
+        // reads this list back to know which machines to check.
+        private static void RememberProvisionedSteps(IReadOnlyList<string> savedFileNames)
+        {
+            var settings = SiteConfigStore.Load();
+            var known = new HashSet<string>(settings.ProvisionedSteps, StringComparer.OrdinalIgnoreCase);
+
+            var added = false;
+            foreach (var fileName in savedFileNames)
+            {
+                var stepName = Path.GetFileNameWithoutExtension(fileName);
+                if (known.Add(stepName))
+                {
+                    settings.ProvisionedSteps.Add(stepName);
+                    added = true;
+                }
+            }
+
+            if (added)
+            {
+                SiteConfigStore.Save(settings);
+            }
         }
 
         private static ProvisionResult Fail(string message)

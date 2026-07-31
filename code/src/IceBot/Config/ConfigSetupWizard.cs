@@ -24,8 +24,18 @@ namespace IceBot.Config
                 PublicUrl = Prompt("Public URL cho BE (Cloudflare, vd: https://shop.api.tenban.com)", current.PublicUrl),
                 ApiKey = PromptSecret("API key chia se voi BE (X-Api-Key)", current.ApiKey),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
+                StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
+                StorePassword = PromptSecret("Mat khau cua hang", current.StorePassword),
                 MachinePorts = new Dictionary<string, string>(current.MachinePorts, StringComparer.OrdinalIgnoreCase),
             };
+
+            // A previously saved key was obtained for the old account/password — if either
+            // changed here, it's stale until the store logs in again (`IceBot.exe login`, or
+            // automatically next time the app starts).
+            settings.BeSessionKey =
+                settings.StoreAccount == current.StoreAccount && settings.StorePassword == current.StorePassword
+                    ? current.BeSessionKey
+                    : string.Empty;
 
             // One COM-port prompt per registered machine that actually needs serial (IMachineTrigger)
             // — a plain arm-motion machine (IMachineModule only) has no port to configure.
@@ -63,6 +73,8 @@ namespace IceBot.Config
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
+            Console.WriteLine($"  Tai khoan cua hang : {(string.IsNullOrEmpty(settings.StoreAccount) ? "(chua dat)" : settings.StoreAccount)}");
+            Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.BeSessionKey) ? "CHUA (IceBot.exe login)" : "ROI")}");
             foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {
                 var port = settings.GetMachinePort(trigger.MachineType);

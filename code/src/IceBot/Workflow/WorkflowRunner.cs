@@ -27,7 +27,13 @@ namespace IceBot.Workflow
         // in between run back-to-back with no jump back to home — see the Lua chaining rule.
         public static void RunQueue(IReadOnlyList<string> scriptFileNames, string robotIp)
         {
-            var workflowDir = AppConfig.GetWorkflowDirectory();
+            RunQueue(scriptFileNames, robotIp, AppConfig.GetWorkflowDirectory());
+        }
+
+        // Overload for running steps from a folder other than workflow/ (e.g. test-workflow/'s
+        // sample robot-test script, which is not a BE-provisioned file).
+        public static void RunQueue(IReadOnlyList<string> scriptFileNames, string robotIp, string workflowDir)
+        {
             Console.WriteLine($"[WORKFLOW] Directory: {workflowDir}");
 
             Console.WriteLine($"[WORKFLOW] Queue ({scriptFileNames.Count} step(s)):");
@@ -84,7 +90,7 @@ namespace IceBot.Workflow
             if (string.IsNullOrWhiteSpace(comPort))
             {
                 throw new InvalidOperationException(
-                    $"Chua cau hinh cong COM cho may '{trigger.DisplayName}'. Chon menu 1 de cau hinh.");
+                    $"Chua cau hinh cong COM cho may '{trigger.DisplayName}'. Vao menu Cau hinh -> muc 1 de cau hinh.");
             }
 
             trigger.Trigger(comPort);

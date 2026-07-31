@@ -1,4 +1,5 @@
 using System;
+using IceBot.Api;
 using IceBot.Cli;
 using IceBot.Config;
 using IceBot.Workflow;
@@ -30,6 +31,10 @@ namespace IceBot
                     ConfigSetupWizard.Run();
                     ConsoleMenu.Pause();
                     break;
+                case "login":
+                    StoreAuth.RunInteractive();
+                    ConsoleMenu.Pause();
+                    break;
                 case "serve":
                     ConsoleMenu.RunServeMode();
                     break;
@@ -37,7 +42,7 @@ namespace IceBot
                     ConsoleMenu.RunTestMode();
                     break;
                 case "test-machine":
-                    ConsoleMenu.RunMachineTestMode();
+                    ConsoleMenu.RunPeripheralConnectionTestMode();
                     break;
                 case "provision":
                     WorkflowProvisioner.RunInteractive();
@@ -45,7 +50,7 @@ namespace IceBot
                     break;
                 default:
                     Console.WriteLine($"Unknown command: {command}");
-                    Console.WriteLine("Usage: IceBot [setup|serve|test|test-machine|provision]");
+                    Console.WriteLine("Usage: IceBot [setup|login|serve|test|test-machine|provision]");
                     ConsoleMenu.Pause();
                     break;
             }

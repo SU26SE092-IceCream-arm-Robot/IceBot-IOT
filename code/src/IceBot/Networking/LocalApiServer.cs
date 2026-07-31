@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using IceBot.Config;
+using IceBot.Workflow;
 
 namespace IceBot.Networking
 {
@@ -81,11 +82,7 @@ namespace IceBot.Networking
 
                 if (request.HttpMethod == "POST" && path == "/api/orders")
                 {
-                    var body = ReadBody(request);
-                    Console.WriteLine($"[API] Order received ({body.Length} bytes):");
-                    Console.WriteLine(body);
-                    // TODO: map order → workflow queue → run on robot
-                    WriteJson(response, 202, "{\"status\":\"accepted\"}");
+                    HandleOrder(request, response);
                     return;
                 }
 
@@ -106,6 +103,44 @@ namespace IceBot.Networking
                 Console.WriteLine($"[API] Request error: {ex.Message}");
                 WriteJson(response, 500, "{\"error\":\"internal_error\"}");
             }
+        }
+
+        // BE resolves which .lua files an order needs and the order to run them in — IceBot
+        // just validates the named files exist locally and hands them to WorkflowRunner as-is
+        // (see OrderRequest / OrderQueue). No order->step mapping or reordering happens here.
+        private static void HandleOrder(HttpListenerRequest request, HttpListenerResponse response)
+        {
+            var body = ReadBody(request);
+
+            OrderRequest order;
+            try
+            {
+                order = OrderRequest.Parse(body);
+            }
+            catch (FormatException ex)
+            {
+                Console.WriteLine($"[API] Don hang khong hop le: {ex.Message}");
+                WriteJson(response, 400, $"{{\"error\":\"invalid_order\",\"message\":\"{JsonEscape(ex.Message)}\"}}");
+                return;
+            }
+
+            var workflowDir = AppConfig.GetWorkflowDirectory();
+            var missing = order.Steps.Find(step => !File.Exists(Path.Combine(workflowDir, step)));
+            if (missing != null)
+            {
+                Console.WriteLine($"[API] Don '{order.OrderId}' bi tu choi: khong tim thay file '{missing}' trong {workflowDir}");
+                WriteJson(response, 400, $"{{\"error\":\"missing_lua_file\",\"file\":\"{JsonEscape(missing)}\"}}");
+                return;
+            }
+
+            Console.WriteLine($"[API] Don '{order.OrderId}' hop le: {string.Join(" -> ", order.Steps)}");
+            OrderQueue.Enqueue(order);
+            WriteJson(response, 202, "{\"status\":\"accepted\"}");
+        }
+
+        private static string JsonEscape(string value)
+        {
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
         private static bool Authorize(HttpListenerRequest request)

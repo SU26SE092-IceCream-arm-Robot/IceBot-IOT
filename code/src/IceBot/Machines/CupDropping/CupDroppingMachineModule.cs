@@ -12,9 +12,6 @@ namespace IceBot.Machines.CupDropping
 
         public string DisplayName => "May tha coc";
 
-        // First station on the line — the cup must exist before anything can be dispensed into it.
-        public int Position => 1;
-
         public IReadOnlyCollection<string> StepNames { get; } = new[] { "cup_s" };
 
         public void Trigger(string comPort)
@@ -38,6 +35,15 @@ namespace IceBot.Machines.CupDropping
             {
                 client.Connect();
                 return client.QueryStatus().ToString();
+            }
+        }
+
+        public void TestConnection(string comPort)
+        {
+            using (var client = new CupDroppingMachineClient(comPort))
+            {
+                client.Connect();
+                client.QueryStatus();
             }
         }
     }

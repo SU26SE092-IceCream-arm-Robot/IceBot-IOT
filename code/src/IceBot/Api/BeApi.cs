@@ -15,6 +15,13 @@ namespace IceBot.Api
         public string Content { get; }
     }
 
+    internal sealed class LoginResult
+    {
+        public bool Success { get; set; }
+        public string Key { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+
     /// <summary>
     /// Cloud BE API client.
     /// Contract: one request may return 1 or many .lua files in a single response.
@@ -22,6 +29,23 @@ namespace IceBot.Api
     /// </summary>
     internal static class BeApi
     {
+        /// <summary>
+        /// Per-store login. Contract (target): POST {BeApiUrl}/api/auth/login
+        /// { account, password } -> { key } — each store has its own account; a successful
+        /// login returns a key IceBot attaches to future outbound BE requests (see
+        /// AppConfig.BeSessionKey). TODO: replace mock with the real HTTP call once BE exposes it.
+        /// </summary>
+        public static LoginResult Login(string account, string password)
+        {
+            if (string.IsNullOrWhiteSpace(account) || string.IsNullOrWhiteSpace(password))
+            {
+                return new LoginResult { Success = false, Message = "Thieu tai khoan hoac mat khau." };
+            }
+
+            var key = $"mock-key-{account.Trim().ToLowerInvariant()}-{Guid.NewGuid():N}";
+            return new LoginResult { Success = true, Key = key, Message = "Dang nhap thanh cong (mock)." };
+        }
+
         public static IReadOnlyList<LuaScript> GetLua(string model)
         {
             return GetLua(new[] { model });
