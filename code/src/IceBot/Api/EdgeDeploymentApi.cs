@@ -64,15 +64,12 @@ namespace IceBot.Api
 
         public static void AcknowledgeAccepted(Guid commandId)
         {
-            Send<object>(
-                $"commands/{commandId:D}/ack",
-                new
-                {
-                    ackStatus = "Accepted",
-                    acknowledgedAt = DateTimeOffset.UtcNow,
-                    physicalOutputMayHaveOccurred = false,
-                    localStatePersisted = true
-                });
+            Acknowledge(commandId, "Accepted", true);
+        }
+
+        public static void AcknowledgeReceived(Guid commandId)
+        {
+            Acknowledge(commandId, "Received", false);
         }
 
         public static void ReportDeployment(
@@ -158,6 +155,19 @@ namespace IceBot.Api
                     throw new InvalidOperationException(envelope?.Message ?? $"BE request failed (HTTP {(int)response.StatusCode}).");
                 return envelope.Data!;
             }
+        }
+
+        private static void Acknowledge(Guid commandId, string status, bool localStatePersisted)
+        {
+            Send<object>(
+                $"commands/{commandId:D}/ack",
+                new
+                {
+                    ackStatus = status,
+                    acknowledgedAt = DateTimeOffset.UtcNow,
+                    physicalOutputMayHaveOccurred = false,
+                    localStatePersisted
+                });
         }
 
         private static void ValidateConfiguration(out Uri baseUri, out Guid endpointId, out string certificatePath)

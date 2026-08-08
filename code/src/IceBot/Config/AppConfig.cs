@@ -87,6 +87,11 @@ namespace IceBot.Config
             return workflowNextToExe;
         }
 
+        public static string GetOrderInboxDirectory()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "order-inbox");
+        }
+
         public static string GetTestWorkflowDirectory()
         {
             var nextToExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test-workflow");

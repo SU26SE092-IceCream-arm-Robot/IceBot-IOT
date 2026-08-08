@@ -210,8 +210,10 @@ namespace IceBot.Cli
 
             PrintIngressInfo();
 
+            using (var orderReceiver = new EdgeOrderCommandReceiver())
             using (var api = new LocalApiServer())
             {
+                orderReceiver.Start();
                 api.Start();
                 Console.WriteLine();
                 Console.WriteLine("Server dang chay. Cho don tu BE qua NetBird.");

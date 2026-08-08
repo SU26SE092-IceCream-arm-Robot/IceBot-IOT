@@ -270,6 +270,34 @@ a Docker-only hostname such as `minio:9000` is invalid outside the BE host.
 
 ---
 
+## ExecuteOrder receipt (durable inbox)
+
+`serve` mode starts `EdgeOrderCommandReceiver` alongside the legacy local HTTP server. The receiver
+uses the Full Edge mTLS identity and calls command pull every five seconds. It selects only
+`CommandType = ExecuteOrder`; deployment commands remain owned by the explicit provisioning flow.
+
+For each ExecuteOrder command, Edge currently:
+
+1. Validates schema version 4, envelope/payload `CommandId`, `OrderId`, `OrderNumber`, non-empty
+   order lines, positive line `Quantity`, and non-empty robot programs.
+2. Writes the original immutable payload to
+   `data/order-inbox/{CommandId}.json` using a temporary file followed by rename.
+3. Treats the command file name as the idempotency key, so a redelivered command is not stored
+   twice.
+4. Sends transport ACK `Received`. It deliberately does not send `Accepted` yet because the
+   command has not been converted into a durable local execution job/outbox.
+
+This phase only receives orders safely. It does **not** drive the robot. The next phase must read
+the durable inbox, verify active release provenance, order robot programs/artifacts by
+`BindingOrder`/`RunOrder`, execute the complete workflow once per production unit, persist unit
+progress, and send Accepted/running/completed/failed reports. Each quantity unit must be a full
+home-to-home run so only one ice cream is produced at a time.
+
+The private BE URL remains a deployment input. Without `BE_API_URL`, execution endpoint ID, and
+client PFX, `serve` logs one configuration warning and leaves the receiver disabled.
+
+---
+
 ## Tech Stack
 
 | Item | Choice |
@@ -519,6 +547,7 @@ MoveJ(
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done; private BE URL and provisioned endpoint certificate are deployment inputs still to add |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |
+| Background ExecuteOrder command pull in `serve` + schema validation + disk inbox + Received ACK | ✅ Done; receipt only, execution intentionally pending |
 | `serve` — `LocalApiServer` `/health` | ✅ Done |
 | Fairino `LuaUpload` → `ProgramRun` | ✅ Done |
 | `WorkflowRunner` — sequential step queue, each `.lua` file run in full (chaining is free — see script chaining rule) | ✅ Done |
@@ -599,6 +628,8 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 | `code/src/IceBot/Workflow/WorkflowRunner.cs` | Run script queue on robot |
 | `code/src/IceBot/Workflow/OrderRequest.cs` | `POST /api/orders` payload DTO (`orderId` + BE-ordered `steps`) + JSON parse/validate |
 | `code/src/IceBot/Workflow/OrderQueue.cs` | Single background worker that runs accepted orders through `WorkflowRunner.RunQueue` one at a time |
+| `code/src/IceBot/Workflow/EdgeOrderCommandReceiver.cs` | Five-second mTLS command-pull loop for ExecuteOrder; stores and ACKs received commands |
+| `code/src/IceBot/Workflow/EdgeOrderInbox.cs` | Schema-4 receipt validation and durable CommandId-keyed JSON inbox |
 | `code/src/IceBot/Robot/FairinoLuaExecutor.cs` | Upload + run Lua on Fairino; `MoveToTeachingPoint` (home) via `GetRobotTeachingPoint` + `MoveJ` |
 | `code/src/IceBot/Machines/IMachineModule.cs` | Interface every machine implements (MachineType, DisplayName, StepNames) — no step is machine-less |
 | `code/src/IceBot/Machines/IMachineTrigger.cs` | Optional interface for machines wired over RS485 — adds `Trigger(comPort)` and `TestConnection(comPort)` |
