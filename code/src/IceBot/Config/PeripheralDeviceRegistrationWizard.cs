@@ -6,6 +6,23 @@ namespace IceBot.Config
 {
     internal static class PeripheralDeviceRegistrationWizard
     {
+        public static void PrintDeviceList()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== DANH SACH MAY NGOAI VI ===");
+            Console.WriteLine();
+
+            var settings = SiteConfigStore.Load();
+            for (var i = 0; i < MachineRegistry.Modules.Count; i++)
+            {
+                var machine = MachineRegistry.Modules[i];
+                var deviceId = settings.GetMachineDeviceId(machine.MachineType);
+                Console.WriteLine($"{i + 1}. {machine.DisplayName}");
+                Console.WriteLine($"   Dinh danh Edge : {machine.MachineType}");
+                Console.WriteLine($"   DeviceId BE    : {(deviceId == Guid.Empty ? "CHUA DANG KY" : deviceId.ToString("D"))}");
+            }
+        }
+
         public static void Run()
         {
             Console.WriteLine();

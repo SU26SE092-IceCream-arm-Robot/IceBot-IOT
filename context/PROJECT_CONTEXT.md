@@ -225,6 +225,9 @@ Set it to the BE's private **HTTPS** base URL, without `/api`, through menu conf
 
 - The Edge operator can register a machine implemented in `MachineRegistry` through
   **Cau hinh > 5. Dang ky may ngoai vi voi BE**, or `IceBot.exe register-device`.
+- **Cau hinh > 6. Danh sach may ngoai vi** prints every machine in `MachineRegistry`, its stable
+  local `MachineType`, and the BE `DeviceId` saved after registration. Missing mappings are shown
+  as `CHUA DANG KY`; this view is local/read-only and does not call BE.
 - Registration calls the current operator-authorized BE route
   `POST /api/v1/management/kiosks/{kioskId}/devices` using `BE_ACCESS_TOKEN`. On HTTP 401,
   IceBot rotates tokens once through `StoreAuth.TryRefresh` and retries once.
