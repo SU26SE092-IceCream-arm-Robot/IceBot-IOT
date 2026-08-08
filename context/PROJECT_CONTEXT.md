@@ -296,6 +296,53 @@ home-to-home run so only one ice cream is produced at a time.
 The private BE URL remains a deployment input. Without `BE_API_URL`, execution endpoint ID, and
 client PFX, `serve` logs one configuration warning and leaves the receiver disabled.
 
+### ExecuteOrder failure scenarios and open decisions
+
+The following cases are required design inputs for the execution phase. They are documented now
+but are **not fully implemented** by the receipt-only worker.
+
+#### BE delivers an order for another store/kiosk
+
+- BE command pull authenticates one execution endpoint and queries commands by that endpoint's
+  bound kiosk and endpoint ID, so cross-kiosk delivery should already be prevented server-side.
+- Edge must still perform defense-in-depth validation before storing/accepting a command:
+  `TargetExecutionEndpointId` must equal local `EXECUTION_ENDPOINT_ID`; payload `KioskId` must
+  equal a locally provisioned kiosk ID; release ID/checksum must equal the active deployment.
+- **Current gap:** the receipt validator checks command/order identity and structure but does not
+  yet persist a local kiosk ID or enforce these kiosk/endpoint/release comparisons.
+- On mismatch, Edge must not execute or ACK `Accepted`. It should quarantine the command, emit an
+  auditable rejection/error code, and let BE/support investigate; silently rerouting the order is
+  forbidden.
+
+#### Edge receives more orders than it can safely hold or execute
+
+- Command pull is naturally bounded per request (`maxCommands` is at most 20), but the current
+  disk inbox has no total item/byte/age limit and therefore is not complete backpressure.
+- Before execution is enabled, add configurable inbox capacity, minimum free-disk threshold,
+  oldest-command age monitoring, and queue-depth health/telemetry.
+- When capacity is reached, Edge must stop pulling/accepting new work and report a busy/capacity
+  condition. Commands should remain durable in BE for later pull; Edge must not acknowledge them
+  as accepted and must not drop the oldest order to make room.
+- **Open decision:** product/operations must choose maximum queued order count, maximum inbox
+  bytes, maximum waiting time, and whether BE stops sales for this kiosk or redirects new sales.
+
+#### Ingredients run out during production
+
+- Execution is one production unit (one ice cream) at a time. Quantity `N` means `N` complete
+  home-to-home workflow runs, never batching one step across all products.
+- Before starting each unit, Edge should check the required ingredient/machine readiness snapshot.
+  If insufficient, do not start that unit; keep all remaining units/orders pending and report an
+  out-of-stock/busy condition to BE.
+- If stock runs out or a machine fails after physical output may have occurred, stop at a safe
+  boundary, mark the current unit failed/requires manual intervention with
+  `physicalOutputMayHaveOccurred=true`, and do not automatically retry it.
+- Remaining units and later orders must not run until replenishment and an explicit resume/retry
+  decision. Edge must preserve their durable queue state.
+- Refund, remake, partial fulfillment, cancellation, or routing to another kiosk are BE/business
+  decisions. Edge reports facts and provenance; it must not silently choose compensation.
+- **Current gap:** ingredient readiness, per-unit durable progress, pause/resume, failure reports,
+  and BE compensation coordination are not implemented yet.
+
 ---
 
 ## Tech Stack
