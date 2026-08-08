@@ -39,6 +39,26 @@ namespace IceBot.Config
         public static string OperatorRefreshToken =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_BE_REFRESH_TOKEN"), SiteConfigStore.Load().OperatorRefreshToken);
 
+        public static Guid ExecutionEndpointId
+        {
+            get
+            {
+                var value = FirstNonEmpty(
+                    Environment.GetEnvironmentVariable("ICEBOT_EXECUTION_ENDPOINT_ID"),
+                    SiteConfigStore.Load().ExecutionEndpointId == Guid.Empty ? null : SiteConfigStore.Load().ExecutionEndpointId.ToString("D"));
+                return Guid.TryParse(value, out var endpointId) ? endpointId : Guid.Empty;
+            }
+        }
+
+        public static string ExecutionClientCertificatePath =>
+            FirstNonEmpty(
+                Environment.GetEnvironmentVariable("ICEBOT_EXECUTION_CLIENT_CERT_PATH"),
+                SiteConfigStore.Load().ExecutionClientCertificatePath);
+
+        // Secret: configure only on the Edge host/service environment, never icebot.site.env.
+        public static string ExecutionClientCertificatePassword =>
+            Environment.GetEnvironmentVariable("ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD") ?? string.Empty;
+
         public static readonly string[] TestScriptQueue =
         {
             "lay_coc.lua"

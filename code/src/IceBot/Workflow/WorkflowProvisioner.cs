@@ -15,27 +15,21 @@ namespace IceBot.Workflow
     }
 
     /// <summary>
-    /// Fetches .lua files via a single BeApi.GetLua() call and saves them to workflow/.
+    /// Pulls an authenticated Full Edge deployment and installs its verified Lua bundle.
     /// </summary>
     internal static class WorkflowProvisioner
     {
         public static void RunInteractive()
         {
             Console.WriteLine();
-            Console.WriteLine("=== Tai file Lua tu BE (mock) ===");
-            Console.WriteLine("API: BeApi.GetLua(models) — 1 lan goi, tra ve 1 hoac nhieu file");
+            Console.WriteLine("=== Dong bo deployment Lua tu BE ===");
+            Console.WriteLine("API: execution endpoint command pull (mTLS)");
+            Console.WriteLine($"BE private URL: {(string.IsNullOrWhiteSpace(AppConfig.BeApiUrl) ? "CHUA DAT - can bo sung dia chi HTTPS qua NetBird" : AppConfig.BeApiUrl)}");
             Console.WriteLine($"Workflow: {AppConfig.GetWorkflowDirectory()}");
             Console.WriteLine();
-            Console.WriteLine("Model co san:");
-            Console.WriteLine("  FR5 / full     -> BE tra ve full bundle (5 file)");
-            Console.WriteLine("  cup_s, ...     -> BE tra ve 1 file / model");
-            Console.WriteLine();
-            Console.Write("Nhap model (phan cach dau phay): ");
-            var input = Console.ReadLine()?.Trim() ?? string.Empty;
-
-            Console.WriteLine();
-            var result = FetchAndSave(SplitModels(input));
+            var result = FullEdgeConfigurationInstaller.PullAndInstall();
             PrintResult(result);
+            foreach (var file in result.SavedFiles) Console.WriteLine("  [OK] " + file);
         }
 
         public static ProvisionResult FetchAndSave(IEnumerable<string> models)

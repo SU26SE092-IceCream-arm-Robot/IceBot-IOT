@@ -75,7 +75,7 @@ namespace IceBot.Cli
                 Console.WriteLine("1. Cau hinh NetBird");
                 Console.WriteLine("2. Cau hinh he thong (robot IP, tai khoan cua hang, cong COM)");
                 Console.WriteLine("3. Xem cau hinh hien tai");
-                Console.WriteLine("4. Tai file Lua tu BE (mock: BeApi.GetLua)");
+                Console.WriteLine("4. Dong bo deployment Lua tu BE (mTLS)");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -155,7 +155,7 @@ namespace IceBot.Cli
             var settings = SiteConfigStore.Load();
             if (settings.ProvisionedSteps.Count == 0)
             {
-                Console.WriteLine("Chua co may ngoai vi nao duoc ghi nhan. Vao Cau hinh > 3 de tai file Lua tu BE truoc.");
+                Console.WriteLine("Chua co Lua artifact nao duoc ghi nhan. Vao Cau hinh > 4 de dong bo deployment tu BE truoc.");
                 Pause();
                 return;
             }

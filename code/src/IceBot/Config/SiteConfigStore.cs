@@ -47,6 +47,12 @@ namespace IceBot.Config
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
                     case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
                     case "BE_REFRESH_TOKEN": settings.OperatorRefreshToken = value; break;
+                    case "EXECUTION_ENDPOINT_ID": Guid.TryParse(value, out var endpointId); settings.ExecutionEndpointId = endpointId; break;
+                    case "EXECUTION_CLIENT_CERT_PATH": settings.ExecutionClientCertificatePath = value; break;
+                    case "ACTIVE_CONFIGURATION_DEPLOYMENT_ID": Guid.TryParse(value, out var deploymentId); settings.ActiveConfigurationDeploymentId = deploymentId; break;
+                    case "ACTIVE_CONFIGURATION_RELEASE_ID": Guid.TryParse(value, out var releaseId); settings.ActiveConfigurationReleaseId = releaseId; break;
+                    case "ACTIVE_CONFIGURATION_RELEASE_CHECKSUM": settings.ActiveConfigurationReleaseChecksum = value; break;
+                    case "EXECUTION_REPORT_SEQUENCE": long.TryParse(value, out var sequence); settings.ExecutionReportSequence = sequence; break;
                     case "MACHINE_PORTS": settings.MachinePorts = ParseMachinePorts(value); break;
                     case "PROVISIONED_STEPS": settings.ProvisionedSteps = ParseList(value); break;
                 }
@@ -73,6 +79,12 @@ namespace IceBot.Config
                 $"STORE_PASSWORD={settings.StorePassword}",
                 $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
                 $"BE_REFRESH_TOKEN={settings.OperatorRefreshToken}",
+                $"EXECUTION_ENDPOINT_ID={settings.ExecutionEndpointId:D}",
+                $"EXECUTION_CLIENT_CERT_PATH={settings.ExecutionClientCertificatePath}",
+                $"ACTIVE_CONFIGURATION_DEPLOYMENT_ID={settings.ActiveConfigurationDeploymentId:D}",
+                $"ACTIVE_CONFIGURATION_RELEASE_ID={settings.ActiveConfigurationReleaseId:D}",
+                $"ACTIVE_CONFIGURATION_RELEASE_CHECKSUM={settings.ActiveConfigurationReleaseChecksum}",
+                $"EXECUTION_REPORT_SEQUENCE={settings.ExecutionReportSequence}",
                 $"MACHINE_PORTS={SerializeMachinePorts(settings.MachinePorts)}",
                 $"PROVISIONED_STEPS={string.Join(",", settings.ProvisionedSteps)}",
             };
@@ -93,6 +105,8 @@ namespace IceBot.Config
             SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
             SetEnv("ICEBOT_BE_ACCESS_TOKEN", settings.OperatorAccessToken);
             SetEnv("ICEBOT_BE_REFRESH_TOKEN", settings.OperatorRefreshToken);
+            SetEnv("ICEBOT_EXECUTION_ENDPOINT_ID", settings.ExecutionEndpointId == Guid.Empty ? string.Empty : settings.ExecutionEndpointId.ToString("D"));
+            SetEnv("ICEBOT_EXECUTION_CLIENT_CERT_PATH", settings.ExecutionClientCertificatePath);
         }
 
         private static void SetEnv(string name, string value)

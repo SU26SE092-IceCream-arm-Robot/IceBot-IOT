@@ -63,8 +63,14 @@ namespace IceBot.Config
                 ApiKey = current.ApiKey,
                 StorePassword = current.StorePassword,
                 ProvisionedSteps = new List<string>(current.ProvisionedSteps),
+                ActiveConfigurationDeploymentId = current.ActiveConfigurationDeploymentId,
+                ActiveConfigurationReleaseId = current.ActiveConfigurationReleaseId,
+                ActiveConfigurationReleaseChecksum = current.ActiveConfigurationReleaseChecksum,
+                ExecutionReportSequence = current.ExecutionReportSequence,
 
                 BeApiUrl = Prompt("Backend API URL (vd: https://api.icebot.vn)", current.BeApiUrl),
+                ExecutionEndpointId = PromptGuid("Execution endpoint ID (BE provision)", current.ExecutionEndpointId),
+                ExecutionClientCertificatePath = Prompt("Execution client certificate PFX path", current.ExecutionClientCertificatePath),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
                 StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
                 MachinePorts = new Dictionary<string, string>(current.MachinePorts, StringComparer.OrdinalIgnoreCase),
@@ -109,6 +115,9 @@ namespace IceBot.Config
             Console.WriteLine($"  NetBird setup key : {(string.IsNullOrEmpty(settings.NetBirdSetupKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  Backend API URL: {settings.BeApiUrl}");
+            Console.WriteLine($"  Execution endpoint: {(settings.ExecutionEndpointId == Guid.Empty ? "(chua dat)" : settings.ExecutionEndpointId.ToString("D"))}");
+            Console.WriteLine($"  Client certificate: {(string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) ? "(chua dat)" : settings.ExecutionClientCertificatePath)}");
+            Console.WriteLine($"  Active deployment: {(settings.ActiveConfigurationDeploymentId == Guid.Empty ? "(chua co)" : settings.ActiveConfigurationDeploymentId.ToString("D"))}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
             Console.WriteLine($"  Tai khoan cua hang : {(string.IsNullOrEmpty(settings.StoreAccount) ? "(chua dat)" : settings.StoreAccount)}");
@@ -129,6 +138,17 @@ namespace IceBot.Config
             Console.Write($"{label}{suffix}: ");
             var input = Console.ReadLine()?.Trim() ?? string.Empty;
             return string.IsNullOrEmpty(input) ? current : input;
+        }
+
+        private static Guid PromptGuid(string label, Guid current)
+        {
+            while (true)
+            {
+                var value = Prompt(label, current == Guid.Empty ? string.Empty : current.ToString("D"));
+                if (string.IsNullOrWhiteSpace(value)) return Guid.Empty;
+                if (Guid.TryParse(value, out var parsed) && parsed != Guid.Empty) return parsed;
+                Console.WriteLine("Gia tri phai la GUID hop le.");
+            }
         }
 
         private static string PromptSecret(string label, string current)
