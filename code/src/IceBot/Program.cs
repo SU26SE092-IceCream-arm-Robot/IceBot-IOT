@@ -49,9 +49,14 @@ namespace IceBot
                     WorkflowProvisioner.RunInteractive();
                     ConsoleMenu.Pause();
                     break;
+                case "register-device":
+                    StoreAuth.RequireLogin();
+                    PeripheralDeviceRegistrationWizard.Run();
+                    ConsoleMenu.Pause();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {command}");
-                    Console.WriteLine("Usage: IceBot [setup|login|serve|test|test-machine|provision]");
+                    Console.WriteLine("Usage: IceBot [setup|login|serve|test|test-machine|provision|register-device]");
                     ConsoleMenu.Pause();
                     break;
             }

@@ -76,6 +76,7 @@ namespace IceBot.Cli
                 Console.WriteLine("2. Cau hinh he thong (robot IP, tai khoan cua hang, cong COM)");
                 Console.WriteLine("3. Xem cau hinh hien tai");
                 Console.WriteLine("4. Dong bo deployment Lua tu BE (mTLS)");
+                Console.WriteLine("5. Dang ky may ngoai vi voi BE");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -97,6 +98,10 @@ namespace IceBot.Cli
                         break;
                     case "4":
                         WorkflowProvisioner.RunInteractive();
+                        Pause();
+                        break;
+                    case "5":
+                        PeripheralDeviceRegistrationWizard.Run();
                         Pause();
                         break;
                     case "0":

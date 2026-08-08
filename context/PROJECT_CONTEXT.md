@@ -221,6 +221,23 @@ Operator login is implemented against the real BE contract:
 Set it to the BE's private **HTTPS** base URL, without `/api`, through menu configuration,
 `BE_API_URL` in `icebot.site.env`, or `ICEBOT_BE_API_URL`.
 
+### Peripheral device registration with BE
+
+- The Edge operator can register a machine implemented in `MachineRegistry` through
+  **Cau hinh > 5. Dang ky may ngoai vi voi BE**, or `IceBot.exe register-device`.
+- Registration calls the current operator-authorized BE route
+  `POST /api/v1/management/kiosks/{kioskId}/devices` using `BE_ACCESS_TOKEN`. On HTTP 401,
+  IceBot rotates tokens once through `StoreAuth.TryRefresh` and retries once.
+- The BE contract requires `DeviceTypeId`, `Code`, and `Name`; `DeviceModelId`, serial number,
+  position, and firmware are optional. `KioskId` is entered once and saved locally.
+- After HTTP 201, IceBot persists the BE-generated identity as
+  `MACHINE_DEVICE_IDS=<MachineType>:<DeviceId>,...`. Future status/device-event uplinks must
+  resolve the BE identity through `SiteSettings.GetMachineDeviceId(machineType)`.
+- `KIOSK_ID` is stored only because this management API requires it. A future mTLS Edge-specific
+  registration route should derive the kiosk from `ExecutionEndpointId` and remove this input.
+- **Deployment note:** `BE_API_URL` still needs the private HTTPS BE URL reachable through
+  NetBird. Never commit that environment-specific URL, operator tokens, or device credentials.
+
 ---
 
 ## Lua deployment synchronization (Full Edge)

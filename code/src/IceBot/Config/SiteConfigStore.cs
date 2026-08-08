@@ -47,6 +47,8 @@ namespace IceBot.Config
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
                     case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
                     case "BE_REFRESH_TOKEN": settings.OperatorRefreshToken = value; break;
+                    case "KIOSK_ID": Guid.TryParse(value, out var kioskId); settings.KioskId = kioskId; break;
+                    case "MACHINE_DEVICE_IDS": settings.MachineDeviceIds = ParseMachineDeviceIds(value); break;
                     case "EXECUTION_ENDPOINT_ID": Guid.TryParse(value, out var endpointId); settings.ExecutionEndpointId = endpointId; break;
                     case "EXECUTION_CLIENT_CERT_PATH": settings.ExecutionClientCertificatePath = value; break;
                     case "ACTIVE_CONFIGURATION_DEPLOYMENT_ID": Guid.TryParse(value, out var deploymentId); settings.ActiveConfigurationDeploymentId = deploymentId; break;
@@ -79,6 +81,8 @@ namespace IceBot.Config
                 $"STORE_PASSWORD={settings.StorePassword}",
                 $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
                 $"BE_REFRESH_TOKEN={settings.OperatorRefreshToken}",
+                $"KIOSK_ID={settings.KioskId:D}",
+                $"MACHINE_DEVICE_IDS={SerializeMachineDeviceIds(settings.MachineDeviceIds)}",
                 $"EXECUTION_ENDPOINT_ID={settings.ExecutionEndpointId:D}",
                 $"EXECUTION_CLIENT_CERT_PATH={settings.ExecutionClientCertificatePath}",
                 $"ACTIVE_CONFIGURATION_DEPLOYMENT_ID={settings.ActiveConfigurationDeploymentId:D}",
@@ -105,6 +109,7 @@ namespace IceBot.Config
             SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
             SetEnv("ICEBOT_BE_ACCESS_TOKEN", settings.OperatorAccessToken);
             SetEnv("ICEBOT_BE_REFRESH_TOKEN", settings.OperatorRefreshToken);
+            SetEnv("ICEBOT_KIOSK_ID", settings.KioskId == Guid.Empty ? string.Empty : settings.KioskId.ToString("D"));
             SetEnv("ICEBOT_EXECUTION_ENDPOINT_ID", settings.ExecutionEndpointId == Guid.Empty ? string.Empty : settings.ExecutionEndpointId.ToString("D"));
             SetEnv("ICEBOT_EXECUTION_CLIENT_CERT_PATH", settings.ExecutionClientCertificatePath);
         }
@@ -148,6 +153,40 @@ namespace IceBot.Config
             foreach (var kvp in machinePorts)
             {
                 parts.Add($"{kvp.Key}:{kvp.Value}");
+            }
+
+            return string.Join(",", parts);
+        }
+
+        // Encoded as "machine_type:device-guid,...". MachineType cannot contain ':' or ','.
+        internal static Dictionary<string, Guid> ParseMachineDeviceIds(string value)
+        {
+            var result = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(value)) return result;
+
+            foreach (var entry in value.Split(','))
+            {
+                var idx = entry.IndexOf(':');
+                if (idx <= 0) continue;
+                var machineType = entry.Substring(0, idx).Trim();
+                if (machineType.Length > 0 && Guid.TryParse(entry.Substring(idx + 1).Trim(), out var deviceId) && deviceId != Guid.Empty)
+                {
+                    result[machineType] = deviceId;
+                }
+            }
+
+            return result;
+        }
+
+        internal static string SerializeMachineDeviceIds(Dictionary<string, Guid> machineDeviceIds)
+        {
+            var parts = new List<string>();
+            foreach (var item in machineDeviceIds)
+            {
+                if (!string.IsNullOrWhiteSpace(item.Key) && item.Value != Guid.Empty)
+                {
+                    parts.Add($"{item.Key}:{item.Value:D}");
+                }
             }
 
             return string.Join(",", parts);

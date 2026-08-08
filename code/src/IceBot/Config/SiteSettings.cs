@@ -20,6 +20,16 @@ namespace IceBot.Config
         public string OperatorAccessToken { get; set; } = string.Empty;
         public string OperatorRefreshToken { get; set; } = string.Empty;
 
+        // Device catalog identity. KioskId is required only by the current operator-authorized
+        // BE registration route. Once a peripheral is created, keep the returned BE DeviceId
+        // keyed by the stable local MachineType so telemetry can reuse it after a restart.
+        public Guid KioskId { get; set; }
+        public Dictionary<string, Guid> MachineDeviceIds { get; set; } =
+            new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        public Guid GetMachineDeviceId(string machineType) =>
+            MachineDeviceIds.TryGetValue(machineType, out var deviceId) ? deviceId : Guid.Empty;
+
         // Full Edge execution identity. BE_API_URL must later be set to the private HTTPS URL
         // reachable through NetBird. The PFX password is environment-only and is never persisted.
         public Guid ExecutionEndpointId { get; set; }
