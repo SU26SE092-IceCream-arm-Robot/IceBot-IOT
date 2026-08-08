@@ -4,9 +4,8 @@ using IceBot.Config;
 namespace IceBot.Api
 {
     /// <summary>
-    /// Logs this store into BE using the account/password saved via the config wizard (menu
-    /// Cau hinh, item 2 "Cau hinh he thong"), and persists the key BE returns
-    /// (SiteSettings.BeSessionKey) for future outbound BE requests.
+    /// Logs an operator into BE and persists user tokens for operator-authorized requests.
+    /// These tokens are not the Edge device identity.
     /// </summary>
     internal static class StoreAuth
     {
@@ -23,24 +22,25 @@ namespace IceBot.Api
         public static void RunInteractive()
         {
             Console.WriteLine();
-            Console.WriteLine("=== Dang nhap tai khoan cua hang (mock BeApi.Login) ===");
+            Console.WriteLine("=== Dang nhap tai khoan cua hang ===");
 
             var settings = SiteConfigStore.Load();
-            if (string.IsNullOrWhiteSpace(settings.StoreAccount) || string.IsNullOrWhiteSpace(settings.StorePassword))
+            if (string.IsNullOrWhiteSpace(settings.StoreAccount))
             {
-                Console.WriteLine("[WARN] Chua cau hinh tai khoan/mat khau cua hang. Vao menu Cau hinh -> muc 2 de nhap.");
+                Console.WriteLine("[WARN] Chua cau hinh tai khoan cua hang. Vao menu Cau hinh -> muc 2 de nhap.");
                 return;
             }
 
             Console.WriteLine($"Tai khoan: {settings.StoreAccount}");
-            var result = BeApi.Login(settings.StoreAccount, settings.StorePassword);
+            var password = PromptSecret("Mat khau", string.Empty);
+            var result = BeApi.Login(settings.StoreAccount, password);
             if (!result.Success)
             {
                 Console.WriteLine($"[ERROR] {result.Message}");
                 return;
             }
 
-            settings.BeSessionKey = result.Key;
+            SaveAuthentication(settings, result);
             SiteConfigStore.Save(settings);
 
             Console.WriteLine($"[OK] {result.Message}");
@@ -57,6 +57,20 @@ namespace IceBot.Api
             if (_loggedInThisRun)
             {
                 return;
+            }
+
+            var existingSettings = SiteConfigStore.Load();
+            if (!string.IsNullOrWhiteSpace(existingSettings.OperatorRefreshToken))
+            {
+                Console.WriteLine("Dang khoi phuc phien dang nhap BE...");
+                if (TryRefresh(out _))
+                {
+                    Console.WriteLine("[OK] Da khoi phuc phien dang nhap BE.");
+                    _loggedInThisRun = true;
+                    return;
+                }
+
+                Console.WriteLine("[WARN] Phien BE da het han. Vui long dang nhap lai.");
             }
 
             Console.WriteLine();
@@ -77,8 +91,7 @@ namespace IceBot.Api
                 if (result.Success)
                 {
                     settings.StoreAccount = account;
-                    settings.StorePassword = password;
-                    settings.BeSessionKey = result.Key;
+                    SaveAuthentication(settings, result);
                     SiteConfigStore.Save(settings);
 
                     Console.WriteLine($"[OK] {result.Message}");
@@ -88,6 +101,34 @@ namespace IceBot.Api
 
                 Console.WriteLine($"[ERROR] {result.Message} Thu lai.");
             }
+        }
+
+        // Rotates both tokens. Call this after an operator-authorized API request returns 401,
+        // then retry that request at most once.
+        public static bool TryRefresh(out string message)
+        {
+            var settings = SiteConfigStore.Load();
+            var result = BeApi.Refresh(settings.OperatorRefreshToken);
+            message = result.Message;
+            if (!result.Success)
+            {
+                settings.OperatorAccessToken = string.Empty;
+                settings.OperatorRefreshToken = string.Empty;
+                SiteConfigStore.Save(settings);
+                _loggedInThisRun = false;
+                return false;
+            }
+
+            SaveAuthentication(settings, result);
+            SiteConfigStore.Save(settings);
+            return true;
+        }
+
+        private static void SaveAuthentication(SiteSettings settings, LoginResult result)
+        {
+            settings.StorePassword = string.Empty;
+            settings.OperatorAccessToken = result.AccessToken;
+            settings.OperatorRefreshToken = result.RefreshToken;
         }
 
         private static string Prompt(string label, string current)

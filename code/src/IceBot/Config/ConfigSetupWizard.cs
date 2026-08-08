@@ -40,7 +40,12 @@ namespace IceBot.Config
             PrintSummary(settings);
         }
 
-        // Everything that is NOT NetBird: API key, robot IP, store account/password, COM ports.
+        // Everything that is NOT NetBird and NOT a secret better left to its own dedicated
+        // prompt: robot IP, store account (identity only), COM ports. API key and the store
+        // password are deliberately NOT prompted here — API key has no other entry point yet
+        // (set it via ICEBOT_API_KEY or by editing icebot.site.env directly if needed), and the
+        // store password is only ever entered at the actual login gate (StoreAuth.RequireLogin
+        // / `IceBot.exe login`), not duplicated into a general settings screen.
         public static void RunSystemSettings()
         {
             Console.WriteLine();
@@ -55,23 +60,25 @@ namespace IceBot.Config
                 // Carried forward as-is — not this wizard's concern.
                 NetBirdSetupKey = current.NetBirdSetupKey,
                 PublicUrl = current.PublicUrl,
-                BeApiUrl = current.BeApiUrl,
+                ApiKey = current.ApiKey,
+                StorePassword = current.StorePassword,
                 ProvisionedSteps = new List<string>(current.ProvisionedSteps),
 
-                ApiKey = PromptSecret("API key chia se voi BE (X-Api-Key)", current.ApiKey),
+                BeApiUrl = Prompt("Backend API URL (vd: https://api.icebot.vn)", current.BeApiUrl),
                 RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
                 StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
-                StorePassword = PromptSecret("Mat khau cua hang", current.StorePassword),
                 MachinePorts = new Dictionary<string, string>(current.MachinePorts, StringComparer.OrdinalIgnoreCase),
             };
 
-            // A previously saved key was obtained for the old account/password — if either
-            // changed here, it's stale until the store logs in again (`IceBot.exe login`, or
-            // automatically next time the app starts).
-            settings.BeSessionKey =
-                settings.StoreAccount == current.StoreAccount && settings.StorePassword == current.StorePassword
-                    ? current.BeSessionKey
-                    : string.Empty;
+            // Store password isn't prompted here, but the account might still change — either
+            // way invalidates a previously saved session key (a key obtained under a different
+            // account no longer applies).
+            settings.OperatorAccessToken = settings.StoreAccount == current.StoreAccount
+                ? current.OperatorAccessToken
+                : string.Empty;
+            settings.OperatorRefreshToken = settings.StoreAccount == current.StoreAccount
+                ? current.OperatorRefreshToken
+                : string.Empty;
 
             // One COM-port prompt per registered machine that actually needs serial (IMachineTrigger)
             // — a plain arm-motion machine (IMachineModule only) has no port to configure.
@@ -101,10 +108,11 @@ namespace IceBot.Config
             Console.WriteLine("--- Cau hinh hien tai ---");
             Console.WriteLine($"  NetBird setup key : {(string.IsNullOrEmpty(settings.NetBirdSetupKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
+            Console.WriteLine($"  Backend API URL: {settings.BeApiUrl}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
             Console.WriteLine($"  Tai khoan cua hang : {(string.IsNullOrEmpty(settings.StoreAccount) ? "(chua dat)" : settings.StoreAccount)}");
-            Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.BeSessionKey) ? "CHUA (IceBot.exe login)" : "ROI")}");
+            Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.OperatorAccessToken) ? "CHUA (IceBot.exe login)" : "ROI")}");
             foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {
                 var port = settings.GetMachinePort(trigger.MachineType);

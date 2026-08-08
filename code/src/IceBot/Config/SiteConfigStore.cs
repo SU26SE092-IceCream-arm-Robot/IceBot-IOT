@@ -45,7 +45,8 @@ namespace IceBot.Config
                     case "ROBOT_IP": settings.RobotIp = value; break;
                     case "STORE_ACCOUNT": settings.StoreAccount = value; break;
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
-                    case "BE_SESSION_KEY": settings.BeSessionKey = value; break;
+                    case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
+                    case "BE_REFRESH_TOKEN": settings.OperatorRefreshToken = value; break;
                     case "MACHINE_PORTS": settings.MachinePorts = ParseMachinePorts(value); break;
                     case "PROVISIONED_STEPS": settings.ProvisionedSteps = ParseList(value); break;
                 }
@@ -70,7 +71,8 @@ namespace IceBot.Config
                 $"ROBOT_IP={settings.RobotIp}",
                 $"STORE_ACCOUNT={settings.StoreAccount}",
                 $"STORE_PASSWORD={settings.StorePassword}",
-                $"BE_SESSION_KEY={settings.BeSessionKey}",
+                $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
+                $"BE_REFRESH_TOKEN={settings.OperatorRefreshToken}",
                 $"MACHINE_PORTS={SerializeMachinePorts(settings.MachinePorts)}",
                 $"PROVISIONED_STEPS={string.Join(",", settings.ProvisionedSteps)}",
             };
@@ -89,7 +91,8 @@ namespace IceBot.Config
             SetEnv("ICEBOT_API_KEY", settings.ApiKey);
             SetEnv("ICEBOT_ROBOT_IP", settings.RobotIp);
             SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
-            SetEnv("ICEBOT_BE_SESSION_KEY", settings.BeSessionKey);
+            SetEnv("ICEBOT_BE_ACCESS_TOKEN", settings.OperatorAccessToken);
+            SetEnv("ICEBOT_BE_REFRESH_TOKEN", settings.OperatorRefreshToken);
         }
 
         private static void SetEnv(string name, string value)

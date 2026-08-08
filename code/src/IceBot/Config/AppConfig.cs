@@ -31,11 +31,13 @@ namespace IceBot.Config
         public static string StoreAccount =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_STORE_ACCOUNT"), SiteConfigStore.Load().StoreAccount);
 
-        // Key BE returned on successful store login (IceBot.Api.StoreAuth) — attach this to
-        // outbound Edge->BE requests once BeApi talks to a real BE over HTTP. Empty until the
-        // store has logged in at least once (mandatory at app startup, or `IceBot.exe login`).
-        public static string BeSessionKey =>
-            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_BE_SESSION_KEY"), SiteConfigStore.Load().BeSessionKey);
+        // Operator tokens are used only for requests made on behalf of the signed-in operator.
+        // Automatic Edge traffic uses its independently provisioned device credential.
+        public static string OperatorAccessToken =>
+            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_BE_ACCESS_TOKEN"), SiteConfigStore.Load().OperatorAccessToken);
+
+        public static string OperatorRefreshToken =>
+            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_BE_REFRESH_TOKEN"), SiteConfigStore.Load().OperatorRefreshToken);
 
         public static readonly string[] TestScriptQueue =
         {
@@ -88,7 +90,7 @@ namespace IceBot.Config
             {
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    return value;
+                    return value!;
                 }
             }
 

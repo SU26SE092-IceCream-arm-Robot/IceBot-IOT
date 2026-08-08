@@ -13,13 +13,12 @@ namespace IceBot.Config
         public string ApiKey { get; set; } = string.Empty;
         public string RobotIp { get; set; } = AppConfig.DefaultRobotIp;
 
-        // Per-store BE login (see IceBot.Api.StoreAuth). StoreAccount/StorePassword are the
-        // store's own credentials; BeSessionKey is the key BE returns on successful login —
-        // this is distinct from ApiKey above (ApiKey authenticates inbound BE->Edge requests;
-        // BeSessionKey is what Edge attaches to outbound Edge->BE requests once BE is real).
+        // Operator tokens are separate from the Edge device credential. StorePassword remains
+        // only for migration from older config and is cleared after a successful login.
         public string StoreAccount { get; set; } = string.Empty;
         public string StorePassword { get; set; } = string.Empty;
-        public string BeSessionKey { get; set; } = string.Empty;
+        public string OperatorAccessToken { get; set; } = string.Empty;
+        public string OperatorRefreshToken { get; set; } = string.Empty;
 
         // Peripheral machines wired directly to this PC over serial, keyed by machine type
         // (e.g. "cup_dropping" -> "COM3"). See IceBot.Machines.MachineRegistry.

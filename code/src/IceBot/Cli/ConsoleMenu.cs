@@ -73,7 +73,7 @@ namespace IceBot.Cli
                 Console.WriteLine();
                 Console.WriteLine("CAU HINH");
                 Console.WriteLine("1. Cau hinh NetBird");
-                Console.WriteLine("2. Cau hinh he thong (API key, robot IP, tai khoan, cong COM)");
+                Console.WriteLine("2. Cau hinh he thong (robot IP, tai khoan cua hang, cong COM)");
                 Console.WriteLine("3. Xem cau hinh hien tai");
                 Console.WriteLine("4. Tai file Lua tu BE (mock: BeApi.GetLua)");
                 Console.WriteLine("0. Quay lai");
@@ -355,7 +355,7 @@ namespace IceBot.Cli
             Console.WriteLine($"  Public URL     : {AppConfig.PublicUrl}");
             Console.WriteLine($"  Local API      : {AppConfig.ApiListenPrefix}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(AppConfig.ApiKey) ? "chua dat" : "da dat")}");
-            Console.WriteLine($"  Dang nhap BE   : {(string.IsNullOrEmpty(AppConfig.BeSessionKey) ? "CHUA (IceBot.exe login)" : "da dang nhap")}");
+            Console.WriteLine($"  Dang nhap BE   : {(string.IsNullOrEmpty(AppConfig.OperatorAccessToken) ? "CHUA (IceBot.exe login)" : "da dang nhap")}");
             Console.WriteLine();
             Console.WriteLine("BE endpoints:");
             Console.WriteLine($"  POST {AppConfig.PublicUrl.TrimEnd('/')}/api/orders");
