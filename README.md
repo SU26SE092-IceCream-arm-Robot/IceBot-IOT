@@ -277,6 +277,10 @@ Contract Order theo tên file Lua cũ và contract artifact ID/release manifest 
 
 Máy ngoại vi giao tiếp trực tiếp với Edge qua RS485. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ plugin DLL sau khi Lua hoàn tất.
 
+Core `code/src/IceBot/Machines/` hiện chỉ còn plugin loader và registry. Không có code giao thức
+hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục `drivers/` trống,
+`MachineRegistry.Modules` cũng trống.
+
 Driver máy thả cốc đã được tách hoàn toàn khỏi `IceBot.exe`. Package build sẵn nằm tại:
 
 ```text
@@ -302,6 +306,9 @@ Driver phải có public entry type, constructor không tham số và implement 
 `MachineType` là định danh ổn định dùng để giữ ánh xạ COM/DeviceId khi thay DLL. Khởi động lại
 IceBot sau khi cài hoặc thay plugin. Xem `driver-sdk/README.md`, template trong
 `driver-sdk/IceBot.Driver.Template` và driver thật trong `driver-sdk/IceBot.Driver.CupDropping`.
+
+Driver máy kem tích hợp cũ đã bị xóa khỏi core. Muốn điều khiển máy kem, cần build và nạp một
+plugin DLL riêng theo contract trên.
 
 Đăng ký máy với BE tại **InitIceBot → Cấu hình → Đăng ký máy ngoại vi với BE**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ và hiển thị máy nào chưa đăng ký.
 

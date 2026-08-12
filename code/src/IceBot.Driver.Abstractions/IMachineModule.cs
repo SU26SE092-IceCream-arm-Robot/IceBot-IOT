@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace IceBot.Machines
 {
-    /// <summary>Stable contract implemented by every built-in or external machine driver.</summary>
+    /// <summary>Stable contract implemented by every external machine driver DLL.</summary>
     public interface IMachineModule
     {
         string MachineType { get; }

@@ -1,19 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using IceBot.Machines.IceCream;
 
 namespace IceBot.Machines
 {
-    // Peripheral drivers are loaded from drivers/*/driver.json. IceCream remains temporarily
-    // built in until it is migrated; cup-dropping is plugin-only and is never compiled here.
+    // Plugin-only registry: every peripheral driver comes from drivers/*/driver.json.
+    // An empty drivers directory intentionally produces an empty machine list.
     internal static class MachineRegistry
     {
-        private static readonly IMachineModule[] BuiltInModules =
-        {
-            new IceCreamMachineModule(),
-        };
-
         private static readonly MachinePluginLoadResult PluginResult = MachinePluginLoader.Load(
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "drivers"));
 
@@ -31,7 +25,6 @@ namespace IceBot.Machines
         private static IReadOnlyList<IMachineModule> BuildModules()
         {
             var map = new Dictionary<string, IMachineModule>(StringComparer.OrdinalIgnoreCase);
-            foreach (var module in BuiltInModules) map[module.MachineType] = module;
             foreach (var plugin in PluginResult.Modules)
             {
                 MachinePluginLoader.ValidateModule(plugin);
