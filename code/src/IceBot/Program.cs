@@ -19,13 +19,19 @@ namespace IceBot
                 return;
             }
 
-            ConsoleMenu.Run();
+            // Production-first default: launching IceBot.exe starts the local server and BE
+            // order receiver immediately. Operators can still open the administration UI with
+            // `IceBot.exe menu` when configuration or diagnostics are needed.
+            ConsoleMenu.RunServeMode();
         }
 
         private static void RunCommand(string command)
         {
             switch (command.ToLowerInvariant())
             {
+                case "menu":
+                    ConsoleMenu.Run();
+                    break;
                 case "setup":
                 case "config":
                     ConfigSetupWizard.RunNetBird();
@@ -56,7 +62,7 @@ namespace IceBot
                     break;
                 default:
                     Console.WriteLine($"Unknown command: {command}");
-                    Console.WriteLine("Usage: IceBot [setup|login|serve|test|test-machine|provision|register-device]");
+                    Console.WriteLine("Usage: IceBot [menu|setup|login|serve|test|test-machine|provision|register-device]");
                     ConsoleMenu.Pause();
                     break;
             }

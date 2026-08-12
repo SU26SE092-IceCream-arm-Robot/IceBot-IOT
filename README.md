@@ -85,8 +85,11 @@ IceBot-IOT/
 # Build toàn bộ solution (IceBot + Fairino SDK)
 dotnet build code/IceBot-IOT.sln -c Debug
 
-# Chạy trực tiếp exe vừa build (menu tương tác)
+# Chạy trực tiếp exe vừa build (server + nhận order)
 code/src/IceBot/bin/Debug/net472/IceBot.exe
+
+# Mở menu quản trị
+code/src/IceBot/bin/Debug/net472/IceBot.exe menu
 
 # Hoặc build bản Release rồi chạy kèm lệnh CLI
 dotnet build code/IceBot-IOT.sln -c Release
@@ -97,7 +100,7 @@ code/src/IceBot/bin/Release/net472/IceBot.exe serve
 
 ## Menu & CLI
 
-Menu tương tác khi chạy `IceBot.exe` không tham số — menu chính chỉ có 4 dòng; chọn `1` hoặc `2` mở submenu riêng (đánh số lại từ 1 trong submenu đó, không phải mã ghép kiểu `1.1`); `0` luôn là "quay lại" (trong submenu) hoặc "thoát" (menu chính):
+Menu quản trị khi chạy `IceBot.exe menu` — menu chính chỉ có 4 dòng; chọn `1` hoặc `2` mở submenu riêng (đánh số lại từ 1 trong submenu đó, không phải mã ghép kiểu `1.1`); `0` luôn là "quay lại" (trong submenu) hoặc "thoát" (menu chính):
 
 ```
 Menu chinh                       Chon 1 -> CAU HINH                          Chon 2 -> TEST MAY
@@ -152,7 +155,8 @@ CLI tương ứng:
 
 | Lệnh | Mục đích |
 |------|----------|
-| `IceBot.exe` | Mở menu tương tác |
+| `IceBot.exe` | Mặc định chạy server và bộ nhận order ngay lập tức |
+| `IceBot.exe menu` | Mở menu quản trị để cấu hình, đăng ký và test máy |
 | `IceBot.exe setup` | Chạy cả 2 wizard (NetBird + hệ thống) liền nhau → `config/icebot.site.env` |
 | `IceBot.exe login` | Đăng nhập tài khoản cửa hàng → lưu key BE trả về |
 | `IceBot.exe provision` | Tải Lua từ BE (mock) → `workflow/` (+ ghi nhớ định danh máy) |
@@ -165,7 +169,7 @@ CLI tương ứng:
 Mỗi cửa hàng có **1 tài khoản riêng do BE cấp**. **Đăng nhập là bắt buộc** — không đăng nhập thành công thì **không vào được** menu tương tác lẫn `IceBot.exe serve`:
 
 ```
-Khoi dong IceBot.exe (menu) hoac IceBot.exe serve
+Khoi dong IceBot.exe (serve mac dinh), IceBot.exe serve, hoac IceBot.exe menu
     → CHAN o day: hoi tai khoan + mat khau (dung gia tri da luu neu co, hoac hoi moi neu chua co
       — KHONG bat buoc phai qua Cau hinh > 1 truoc)
     → BeApi.Login(account, password)

@@ -231,6 +231,12 @@ Payment OK on cloud
 Lua bundle installation; local API `serve` mode; RS485 peripheral triggers. Order execution still
 uses the legacy inbound filename contract and status POST-back remains TODO.
 
+**Startup behavior:** running `IceBot.exe` with no arguments now enters `serve` mode immediately:
+it performs the login/refresh gate, ensures NetBird connectivity, starts the local HTTP API, and
+starts the BE command/order receiver. The administration UI remains available explicitly through
+`IceBot.exe menu`. `IceBot.exe serve` is retained as an equivalent explicit service command for
+Task Scheduler and existing deployment scripts.
+
 ---
 
 ## Store login (operator account)
