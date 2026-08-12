@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Principal;
+using System.Windows.Forms;
 using Microsoft.Win32;
 
 namespace IceBot.Setup;
@@ -10,6 +11,7 @@ internal static class Program
     private const int NetFramework472Release = 461808;
     private const string NetBirdPackageId = "Netbird.Netbird";
 
+    [STAThread]
     private static int Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -23,8 +25,17 @@ internal static class Program
 
             var source = GetArgument(args, "--source")
                 ?? Path.Combine(AppContext.BaseDirectory, "payload");
-            var installDirectory = GetArgument(args, "--install-dir")
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IceBot");
+            var installDirectory = GetArgument(args, "--install-dir");
+            if (string.IsNullOrWhiteSpace(installDirectory))
+            {
+                installDirectory = SelectInstallDirectory();
+                if (installDirectory == null)
+                {
+                    Console.WriteLine("[CANCELLED] Người dùng đã hủy cài đặt. Không có file nào được thay đổi.");
+                    Pause();
+                    return 0;
+                }
+            }
 
             source = Path.GetFullPath(source);
             installDirectory = Path.GetFullPath(installDirectory);
@@ -77,6 +88,25 @@ internal static class Program
             if (!File.Exists(Path.Combine(source, file)))
                 throw new FileNotFoundException($"Payload thiếu {file}. Hãy tạo package bằng deploy/installer/build-package.ps1.");
         }
+    }
+
+    private static string? SelectInstallDirectory()
+    {
+        var defaultDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IceBot");
+
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Chọn chính xác thư mục sẽ cài IceBot",
+            SelectedPath = defaultDirectory,
+            ShowNewFolderButton = true,
+            UseDescriptionForTitle = true
+        };
+
+        Console.WriteLine("Chọn thư mục cài đặt trong cửa sổ vừa mở...");
+        return dialog.ShowDialog() == DialogResult.OK
+            ? dialog.SelectedPath
+            : null;
     }
 
     private static void EnsureNetFramework(string setupDirectory)

@@ -241,8 +241,10 @@ Setup.exe (machine environment, once)
 
 `Setup.exe` is a self-contained .NET 8 Windows bootstrapper. It requires Administrator, verifies
 .NET Framework 4.7.2+, installs NetBird (offline prerequisite first, winget fallback), copies the
-application payload to `C:\Program Files\IceBot`, creates the mutable runtime directories and
-their ACLs, and creates Desktop/Start Menu shortcuts. It never asks for store credentials,
+application payload to a user-selected directory (default `C:\Program Files\IceBot`), creates the
+mutable runtime directories and their ACLs, and creates Desktop/Start Menu shortcuts. The normal
+interactive flow uses a Windows folder picker; cancel exits before any installation mutation.
+Automation can bypass the picker with `Setup.exe --install-dir "D:\IceBot"`. It never asks for store credentials,
 Kiosk Code, or NetBird setup key, never registers an Edge, and never starts sales. System
 dependency installation was removed from `NetBirdSetup`; Init/runtime only connect an already
 installed NetBird client.

@@ -133,11 +133,13 @@ Chạy bằng quyền Administrator. Setup sẽ:
 
 1. Kiểm tra .NET Framework 4.7.2+; nếu thiếu, chạy bộ cài offline trong `prerequisites/`.
 2. Cài NetBird từ installer offline; nếu không có thì dùng `winget`.
-3. Copy ứng dụng vào `C:\Program Files\IceBot`.
+3. Mở hộp thoại để người dùng chọn thư mục cài đặt; mặc định là `C:\Program Files\IceBot`.
 4. Tạo `config/`, `certificates/`, `drivers/`, `workflow/`, `test-workflow/`, `data/` và chỉ cấp quyền ghi cho tài khoản Windows đang cài đặt.
 5. Tạo shortcut `IceBot` và `Init IceBot` trên Desktop/Start Menu.
 
 Setup không đăng nhập, không nhận Kiosk Code/NetBird key, không đăng ký Edge và không tự chạy hệ thống bán hàng.
+Nếu đóng hoặc hủy hộp thoại chọn thư mục, Setup dừng mà chưa thay đổi file. Khi triển khai tự động,
+có thể bỏ qua hộp thoại bằng `Setup.exe --install-dir "D:\IceBot"`.
 
 ### 2. `InitIceBot.exe` — khởi tạo Edge
 
