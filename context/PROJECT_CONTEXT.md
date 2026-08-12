@@ -290,10 +290,24 @@ certificate for mTLS runtime calls, use the BE's private **HTTPS** NetBird addre
    `POST /api/v1/management/kiosks/{kioskId}/execution-endpoints`.
 6. Persist the returned `EXECUTION_ENDPOINT_ID` and registered/recovered `KIOSK_ID` in the local gitignored
    `config/icebot.site.env`.
+7. Complete mTLS automatically while the endpoint is `Provisioning`:
+   - generate/reuse a five-year RSA-3072 client-auth certificate and private key locally at
+     `certificates/icebot-edge-client.pfx`;
+   - calculate its certificate SHA-256 fingerprint (the private key never leaves Edge);
+   - generate and persist one stable `FULL_EDGE_RUNTIME_ID`;
+   - satisfy the current BE provisioning prerequisite with the execution compatibility target
+     `FAIRINO_LUA_V1 / FR5` (this describes the workflow/device compatibility; Edge remains the
+     Execution Endpoint that receives and orchestrates Lua);
+   - call the management provision API with the runtime ID and fingerprint, then verify status is
+     `Active`;
+   - send a real authenticated heartbeat through the IoT endpoint to prove the certificate
+     reaches BE and its fingerprint matches.
 
-Creation leaves a new endpoint in `Provisioning`. Saving its ID does not yet make order polling
-ready: provision the endpoint with the Edge PFX certificate fingerprint, place the matching PFX
-on Edge, and configure `EXECUTION_CLIENT_CERT_PATH`. The private key is never uploaded to BE.
+Generated PFX files use `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` when that environment variable is
+set; otherwise they are passwordless so first-run setup stays non-interactive. Protect the Edge
+application directory with Windows filesystem permissions. For an endpoint already `Active`,
+InitIceBot never generates a replacement certificate: it requires the matching existing PFX,
+because a new key would not match BE's pinned fingerprint.
 
 ### Peripheral device registration with BE
 
@@ -346,8 +360,9 @@ Entry point: `InitIceBot.exe` menu **Cau hinh > 5**.
 | Setting | Purpose |
 |---------|---------|
 | `BE_API_URL` / `ICEBOT_BE_API_URL` | Defaults to `https://api.icebot.io.vn`; override with private NetBird HTTPS URL when direct mTLS access is required |
-| `EXECUTION_ENDPOINT_ID` / `ICEBOT_EXECUTION_ENDPOINT_ID` | Created/recovered by InitIceBot; it must subsequently be provisioned Active |
-| `EXECUTION_CLIENT_CERT_PATH` / `ICEBOT_EXECUTION_CLIENT_CERT_PATH` | Local PFX whose SHA-256 certificate fingerprint is pinned to the endpoint |
+| `EXECUTION_ENDPOINT_ID` / `ICEBOT_EXECUTION_ENDPOINT_ID` | Created/recovered and automatically provisioned Active by InitIceBot |
+| `FULL_EDGE_RUNTIME_ID` | Stable profile identity generated locally and sent during endpoint provisioning |
+| `EXECUTION_CLIENT_CERT_PATH` / `ICEBOT_EXECUTION_CLIENT_CERT_PATH` | Local PFX generated/reused by InitIceBot; its SHA-256 certificate fingerprint is pinned to the endpoint |
 | `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` | PFX password; environment-only, never written to `icebot.site.env` |
 
 The BE must listen on its NetBird-reachable HTTPS address. Object storage configuration
@@ -607,6 +622,7 @@ equivalent written yet (NetBird's actual deploy/setup mechanism isn't known to t
 | `ICEBOT_PUBLIC_URL` | Public URL BE calls into (assigned via NetBird) |
 | `ICEBOT_BE_API_URL` | Optional override for default `https://api.icebot.io.vn`; use a direct private NetBird HTTPS URL when mTLS requires it |
 | `ICEBOT_EXECUTION_ENDPOINT_ID` | Active Full Edge execution endpoint GUID provisioned in BE |
+| `FULL_EDGE_RUNTIME_ID` | Stable Full Edge profile identity generated during first provisioning |
 | `ICEBOT_EXECUTION_CLIENT_CERT_PATH` | Local mTLS client certificate PFX path |
 | `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` | PFX password; environment-only, never persisted |
 | `ICEBOT_API_KEY` | Shared secret; `X-Api-Key` header |
@@ -693,8 +709,8 @@ MoveJ(
 | Config wizard (NetBird setup key, public URL) | ✅ Done |
 | NetBird auto-install (winget, if missing) + auto-`up` at every app startup (`NetBirdSetup.cs`, `ConsoleMenu.EnsureNetBirdConnected`) | ✅ Done |
 | Real operator login + access/refresh rotation | ✅ Done |
-| New Edge initialization: login -> enter printed Kiosk Code -> NetBird -> reuse/register kiosk -> idempotent endpoint registration -> persist IDs | ✅ Done; mTLS provisioning remains a separate required step |
-| Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done; private BE URL and provisioned endpoint certificate are deployment inputs still to add |
+| New Edge initialization: login -> printed Kiosk Code -> NetBird -> kiosk/endpoint registration -> local PFX + runtime identity -> automatic mTLS provisioning + heartbeat verification | ✅ Done; direct private BE HTTPS override may still be required if the public proxy does not forward client certificates |
+| Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |
 | Background ExecuteOrder command pull in `serve` + schema validation + disk inbox + Received ACK | ✅ Done; receipt only, execution intentionally pending |
@@ -737,13 +753,12 @@ anymore; `IMachineModule` only carries identity (`MachineType`, `DisplayName`, `
 ### Site setup
 
 1. **Initialize the Edge** in `InitIceBot.exe` configuration item 1. This logs in, connects
-   NetBird, creates/recovers the Full Edge endpoint, and saves its ID.
-2. **Provision mTLS** in BE management and place the matching PFX on Edge; configure
-   `EXECUTION_CLIENT_CERT_PATH` (and its password environment variable when required).
-3. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
+   NetBird, creates/recovers the kiosk and Full Edge endpoint, generates its local PFX, provisions
+   mTLS, confirms `Active`, sends an authenticated heartbeat, and saves the identities.
+2. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
    direct private NetBird HTTPS URL when client-certificate forwarding requires it. The
    presigned object-storage host must also be Edge-reachable.
-4. **Synchronize Lua** — menu configuration item 5 pulls a pending deployment and installs only
+3. **Synchronize Lua** — menu configuration item 5 pulls a pending deployment and installs only
    fully verified artifacts.
 
 ### Runtime (orders)

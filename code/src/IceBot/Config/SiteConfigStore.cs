@@ -51,6 +51,7 @@ namespace IceBot.Config
                     case "KIOSK_ID": Guid.TryParse(value, out var kioskId); settings.KioskId = kioskId; break;
                     case "MACHINE_DEVICE_IDS": settings.MachineDeviceIds = ParseMachineDeviceIds(value); break;
                     case "EXECUTION_ENDPOINT_ID": Guid.TryParse(value, out var endpointId); settings.ExecutionEndpointId = endpointId; break;
+                    case "FULL_EDGE_RUNTIME_ID": Guid.TryParse(value, out var runtimeId); settings.FullEdgeRuntimeId = runtimeId; break;
                     case "EXECUTION_CLIENT_CERT_PATH": settings.ExecutionClientCertificatePath = value; break;
                     case "ACTIVE_CONFIGURATION_DEPLOYMENT_ID": Guid.TryParse(value, out var deploymentId); settings.ActiveConfigurationDeploymentId = deploymentId; break;
                     case "ACTIVE_CONFIGURATION_RELEASE_ID": Guid.TryParse(value, out var releaseId); settings.ActiveConfigurationReleaseId = releaseId; break;
@@ -86,6 +87,7 @@ namespace IceBot.Config
                 $"KIOSK_ID={settings.KioskId:D}",
                 $"MACHINE_DEVICE_IDS={SerializeMachineDeviceIds(settings.MachineDeviceIds)}",
                 $"EXECUTION_ENDPOINT_ID={settings.ExecutionEndpointId:D}",
+                $"FULL_EDGE_RUNTIME_ID={settings.FullEdgeRuntimeId:D}",
                 $"EXECUTION_CLIENT_CERT_PATH={settings.ExecutionClientCertificatePath}",
                 $"ACTIVE_CONFIGURATION_DEPLOYMENT_ID={settings.ActiveConfigurationDeploymentId:D}",
                 $"ACTIVE_CONFIGURATION_RELEASE_ID={settings.ActiveConfigurationReleaseId:D}",

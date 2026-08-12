@@ -9,12 +9,12 @@ namespace IceBot.Config
         {
             Console.WriteLine();
             Console.WriteLine("=== KHOI TAO MAY EDGE ===");
-            Console.WriteLine("Buoc 1/4: Xac dinh Kiosk Code");
+            Console.WriteLine("Buoc 1/5: Xac dinh Kiosk Code");
             var settings = SiteConfigStore.Load();
             if (!EnsureKioskCode(settings)) return;
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 2/4: Ket noi NetBird");
+            Console.WriteLine("Buoc 2/5: Ket noi NetBird");
             if (!ConfigSetupWizard.RunNetBird())
             {
                 Console.WriteLine("[ERROR] Chua the dang ky Edge vi NetBird chua ket noi.");
@@ -22,7 +22,7 @@ namespace IceBot.Config
             }
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 3/4: Kiem tra/dang ky Kiosk voi BE");
+            Console.WriteLine("Buoc 3/5: Kiem tra/dang ky Kiosk voi BE");
             RegisterExecutionEndpointIfMissing();
         }
 
@@ -33,32 +33,134 @@ namespace IceBot.Config
             var kioskId = ResolveOrRegisterKiosk(api, settings);
             if (kioskId == Guid.Empty) return;
 
+            Guid endpointId;
+            string endpointStatus;
+            Guid? backendProfileIdentity = null;
             if (settings.ExecutionEndpointId != Guid.Empty)
             {
-                Console.WriteLine("Buoc 4/4: Kiem tra Execution Endpoint");
+                Console.WriteLine("Buoc 4/5: Kiem tra Execution Endpoint");
                 Console.WriteLine($"[OK] Edge da co Execution Endpoint ID: {settings.ExecutionEndpointId:D}");
-                return;
+                var current = api.GetEndpoint(kioskId, settings.ExecutionEndpointId);
+                if (!current.Success)
+                {
+                    Console.WriteLine("[ERROR] " + current.Message);
+                    return;
+                }
+                endpointId = settings.ExecutionEndpointId;
+                endpointStatus = current.Status;
+                backendProfileIdentity = current.ProfileIdentity;
             }
-
-            Console.WriteLine("Buoc 4/4: Dang ky Execution Endpoint");
-            var endpointCode = ExecutionEndpointRegistrationApi.BuildEndpointCode(Environment.MachineName);
-            Console.WriteLine($"Dang ky ma Edge: {endpointCode}");
-            var result = api.FindOrCreate(kioskId, endpointCode);
-            if (!result.Success)
+            else
             {
-                Console.WriteLine("[ERROR] " + result.Message);
-                return;
+                Console.WriteLine("Buoc 4/5: Dang ky Execution Endpoint");
+                var endpointCode = ExecutionEndpointRegistrationApi.BuildEndpointCode(Environment.MachineName);
+                Console.WriteLine($"Dang ky ma Edge: {endpointCode}");
+                var result = api.FindOrCreate(kioskId, endpointCode);
+                if (!result.Success)
+                {
+                    Console.WriteLine("[ERROR] " + result.Message);
+                    return;
+                }
+                endpointId = result.EndpointId;
+                endpointStatus = result.Status;
+                backendProfileIdentity = result.ProfileIdentity;
+                settings.ExecutionEndpointId = endpointId;
+                SiteConfigStore.Save(settings);
+                Console.WriteLine("[OK] " + result.Message);
+                Console.WriteLine($"Execution Endpoint ID: {endpointId:D}");
             }
 
             settings.KioskId = kioskId;
-            settings.ExecutionEndpointId = result.EndpointId;
             SiteConfigStore.Save(settings);
-            Console.WriteLine("[OK] " + result.Message);
-            Console.WriteLine($"Execution Endpoint ID: {result.EndpointId:D}");
-            if (!string.Equals(result.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            Console.WriteLine();
+            Console.WriteLine("Buoc 5/5: Provision va kiem tra mTLS");
+            CompleteMutualTls(api, settings, endpointStatus, backendProfileIdentity);
+        }
+
+        private static void CompleteMutualTls(
+            ExecutionEndpointRegistrationApi api,
+            SiteSettings settings,
+            string endpointStatus,
+            Guid? backendProfileIdentity)
+        {
+            if (string.Equals(endpointStatus, "Active", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[WARN] Trang thai BE hien tai: {result.Status}. Can provision chung chi mTLS truoc khi nhan Order.");
+                if (backendProfileIdentity.HasValue && backendProfileIdentity.Value != Guid.Empty)
+                    settings.FullEdgeRuntimeId = backendProfileIdentity.Value;
+                if (string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) &&
+                    System.IO.File.Exists(EdgeClientCertificateProvisioner.DefaultCertificatePath))
+                    settings.ExecutionClientCertificatePath = EdgeClientCertificateProvisioner.DefaultCertificatePath;
+                SiteConfigStore.Save(settings);
+                if (string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) ||
+                    !System.IO.File.Exists(settings.ExecutionClientCertificatePath))
+                {
+                    Console.WriteLine("[ERROR] Endpoint da Active nhung Edge khong co PFX da duoc BE gan fingerprint; khong tu tao PFX thay the.");
+                    return;
+                }
+                PrintProbeResult();
+                return;
             }
+
+            if (!string.Equals(endpointStatus, "Provisioning", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[ERROR] Khong the provision endpoint o trang thai {endpointStatus}.");
+                return;
+            }
+
+            if (settings.FullEdgeRuntimeId == Guid.Empty)
+            {
+                settings.FullEdgeRuntimeId = Guid.NewGuid();
+                SiteConfigStore.Save(settings);
+            }
+
+            var certificate = EdgeClientCertificateProvisioner.Ensure(settings);
+            if (!certificate.Success)
+            {
+                Console.WriteLine("[ERROR] " + certificate.Message);
+                return;
+            }
+            settings.ExecutionClientCertificatePath = certificate.CertificatePath;
+            SiteConfigStore.Save(settings);
+            Console.WriteLine("[OK] " + certificate.Message);
+            Console.WriteLine("SHA-256 fingerprint: " + certificate.Sha256Fingerprint);
+
+            var target = api.SetDefaultRuntimeTarget(settings.KioskId, settings.ExecutionEndpointId);
+            if (!target.Success)
+            {
+                Console.WriteLine("[ERROR] Khong khai bao duoc runtime target: " + target.Message);
+                return;
+            }
+
+            var provision = api.ProvisionMutualTls(
+                settings.KioskId,
+                settings.ExecutionEndpointId,
+                settings.FullEdgeRuntimeId,
+                certificate.Sha256Fingerprint);
+            if (!provision.Success)
+            {
+                // A timeout after BE commit is recoverable: inspect current state before failing.
+                var current = api.GetEndpoint(settings.KioskId, settings.ExecutionEndpointId);
+                if (!current.Success || !string.Equals(current.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("[ERROR] Provision mTLS that bai: " + provision.Message);
+                    return;
+                }
+            }
+
+            var confirmed = api.GetEndpoint(settings.KioskId, settings.ExecutionEndpointId);
+            if (!confirmed.Success || !string.Equals(confirmed.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("[ERROR] BE chua xac nhan Execution Endpoint o trang thai Active.");
+                return;
+            }
+            Console.WriteLine("[OK] Execution Endpoint da Active tren BE.");
+            PrintProbeResult();
+        }
+
+        private static void PrintProbeResult()
+        {
+            var connected = EdgeMtlsProbe.SendHeartbeat(out var message);
+            Console.WriteLine(connected ? "[OK] " + message : "[ERROR] " + message);
         }
 
         private static Guid ResolveOrRegisterKiosk(ExecutionEndpointRegistrationApi api, SiteSettings settings)

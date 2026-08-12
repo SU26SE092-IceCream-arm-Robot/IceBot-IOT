@@ -36,6 +36,7 @@ namespace IceBot.Config
         // Full Edge execution identity. BE_API_URL must later be set to the private HTTPS URL
         // reachable through NetBird. The PFX password is environment-only and is never persisted.
         public Guid ExecutionEndpointId { get; set; }
+        public Guid FullEdgeRuntimeId { get; set; }
         public string ExecutionClientCertificatePath { get; set; } = string.Empty;
         public Guid ActiveConfigurationDeploymentId { get; set; }
         public Guid ActiveConfigurationReleaseId { get; set; }

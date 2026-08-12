@@ -69,6 +69,7 @@ namespace IceBot.Config
                 ActiveConfigurationReleaseId = current.ActiveConfigurationReleaseId,
                 ActiveConfigurationReleaseChecksum = current.ActiveConfigurationReleaseChecksum,
                 ExecutionReportSequence = current.ExecutionReportSequence,
+                FullEdgeRuntimeId = current.FullEdgeRuntimeId,
                 BeApiUrl = Prompt("Backend API URL (vd: https://api.icebot.vn)", current.BeApiUrl),
                 ExecutionEndpointId = PromptGuid("Execution endpoint ID (BE provision)", current.ExecutionEndpointId),
                 ExecutionClientCertificatePath = Prompt("Execution client certificate PFX path", current.ExecutionClientCertificatePath),
@@ -127,6 +128,7 @@ namespace IceBot.Config
             Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  Backend API URL: {settings.BeApiUrl}");
             Console.WriteLine($"  Execution endpoint: {(settings.ExecutionEndpointId == Guid.Empty ? "(chua dat)" : settings.ExecutionEndpointId.ToString("D"))}");
+            Console.WriteLine($"  Full Edge runtime : {(settings.FullEdgeRuntimeId == Guid.Empty ? "(chua dat)" : settings.FullEdgeRuntimeId.ToString("D"))}");
             Console.WriteLine($"  Client certificate: {(string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) ? "(chua dat)" : settings.ExecutionClientCertificatePath)}");
             Console.WriteLine($"  Active deployment: {(settings.ActiveConfigurationDeploymentId == Guid.Empty ? "(chua co)" : settings.ActiveConfigurationDeploymentId.ToString("D"))}");
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");

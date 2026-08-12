@@ -70,5 +70,18 @@ namespace IceBot.Harness.Tests
             Assert.False(result.Success);
             Assert.Contains("Access denied", result.Message);
         }
+
+        [Fact]
+        public void ParseManagementResponse_ReturnsActiveProfileIdentity()
+        {
+            var profileIdentity = Guid.NewGuid();
+            var result = ExecutionEndpointRegistrationApi.ParseManagementResponse(
+                HttpStatusCode.OK,
+                $"{{\"succeeded\":true,\"data\":{{\"status\":\"Active\",\"profileIdentity\":\"{profileIdentity:D}\"}}}}");
+
+            Assert.True(result.Success);
+            Assert.Equal("Active", result.Status);
+            Assert.Equal(profileIdentity, result.ProfileIdentity);
+        }
     }
 }

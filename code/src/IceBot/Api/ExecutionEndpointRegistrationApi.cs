@@ -40,6 +40,7 @@ namespace IceBot.Api
         public string EndpointCode { get; set; } = string.Empty;
         public string ExecutionProfile { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public Guid? ProfileIdentity { get; set; }
     }
 
     internal sealed class ExecutionEndpointRegistrationResult
@@ -47,7 +48,16 @@ namespace IceBot.Api
         public bool Success { get; set; }
         public Guid EndpointId { get; set; }
         public string Status { get; set; } = string.Empty;
+        public Guid? ProfileIdentity { get; set; }
         public bool Created { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    internal sealed class ExecutionEndpointManagementResult
+    {
+        public bool Success { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public Guid? ProfileIdentity { get; set; }
         public string Message { get; set; } = string.Empty;
     }
 
@@ -158,6 +168,7 @@ namespace IceBot.Api
                     Success = true,
                     EndpointId = existing.Id,
                     Status = existing.Status,
+                    ProfileIdentity = existing.ProfileIdentity,
                     Created = false,
                     Message = "Edge da duoc dang ky tren BE; da khoi phuc Execution Endpoint ID."
                 };
@@ -168,6 +179,45 @@ namespace IceBot.Api
                 $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints",
                 new { endpointCode, executionProfile = 1 });
             return ParseCreate(createResponse);
+        }
+
+        public ExecutionEndpointManagementResult GetEndpoint(Guid kioskId, Guid endpointId)
+        {
+            if (kioskId == Guid.Empty || endpointId == Guid.Empty)
+                return FailManagement("KioskId hoac ExecutionEndpointId khong hop le.");
+            return ParseManagement(SendWithRefresh(
+                HttpMethod.Get,
+                $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints/{endpointId:D}",
+                null));
+        }
+
+        public ExecutionEndpointManagementResult SetDefaultRuntimeTarget(Guid kioskId, Guid endpointId)
+        {
+            return ParseManagement(SendWithRefresh(
+                HttpMethod.Put,
+                $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints/{endpointId:D}/supported-robot-targets",
+                new
+                {
+                    targets = new[]
+                    {
+                        new { runtimeTargetCode = "FAIRINO_LUA_V1", machineModelCode = "FR5" }
+                    }
+                }));
+        }
+
+        public ExecutionEndpointManagementResult ProvisionMutualTls(
+            Guid kioskId, Guid endpointId, Guid profileIdentity, string certificateFingerprint)
+        {
+            if (profileIdentity == Guid.Empty)
+                return FailManagement("Full Edge Runtime ID khong hop le.");
+            return ParseManagement(SendWithRefresh(
+                HttpMethod.Post,
+                $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints/{endpointId:D}/provision",
+                new
+                {
+                    profileIdentity,
+                    clientCertificateSha256Fingerprint = certificateFingerprint
+                }));
         }
 
         internal static string BuildEndpointCode(string machineName)
@@ -313,6 +363,7 @@ namespace IceBot.Api
                     Success = true,
                     EndpointId = envelope.Data.Id,
                     Status = envelope.Data.Status,
+                    ProfileIdentity = envelope.Data.ProfileIdentity,
                     Created = true,
                     Message = envelope.Message ?? "Dang ky Edge thanh cong."
                 };
@@ -320,6 +371,33 @@ namespace IceBot.Api
             catch (JsonException)
             {
                 return Fail($"Response dang ky Edge tu BE khong hop le (HTTP {(int)response.StatusCode}).");
+            }
+        }
+
+        internal static ExecutionEndpointManagementResult ParseManagementResponse(HttpStatusCode statusCode, string json) =>
+            ParseManagement(new ApiResponse(statusCode, json, string.Empty));
+
+        private static ExecutionEndpointManagementResult ParseManagement(ApiResponse response)
+        {
+            if (!string.IsNullOrWhiteSpace(response.TransportError))
+                return FailManagement(response.TransportError);
+            try
+            {
+                var envelope = JsonSerializer.Deserialize<ApiEnvelope<BackendExecutionEndpoint>>(response.Body, JsonOptions);
+                if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300 ||
+                    envelope == null || !envelope.Succeeded || envelope.Data == null)
+                    return FailManagement(envelope?.Message ?? $"BE tu choi cau hinh Execution Endpoint (HTTP {(int)response.StatusCode}).");
+                return new ExecutionEndpointManagementResult
+                {
+                    Success = true,
+                    Status = envelope.Data.Status,
+                    ProfileIdentity = envelope.Data.ProfileIdentity,
+                    Message = envelope.Message ?? "Cau hinh Execution Endpoint thanh cong."
+                };
+            }
+            catch (JsonException)
+            {
+                return FailManagement($"Response Execution Endpoint tu BE khong hop le (HTTP {(int)response.StatusCode}).");
             }
         }
 
@@ -347,6 +425,9 @@ namespace IceBot.Api
 
         private static KioskRegistrationResult FailKiosk(string message) =>
             new KioskRegistrationResult { Success = false, Message = message };
+
+        private static ExecutionEndpointManagementResult FailManagement(string message) =>
+            new ExecutionEndpointManagementResult { Success = false, Message = message };
 
         private sealed class ApiEnvelope<T>
         {
