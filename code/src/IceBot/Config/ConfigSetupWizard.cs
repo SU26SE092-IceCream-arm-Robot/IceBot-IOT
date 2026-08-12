@@ -67,7 +67,6 @@ namespace IceBot.Config
                 ActiveConfigurationReleaseId = current.ActiveConfigurationReleaseId,
                 ActiveConfigurationReleaseChecksum = current.ActiveConfigurationReleaseChecksum,
                 ExecutionReportSequence = current.ExecutionReportSequence,
-
                 BeApiUrl = Prompt("Backend API URL (vd: https://api.icebot.vn)", current.BeApiUrl),
                 ExecutionEndpointId = PromptGuid("Execution endpoint ID (BE provision)", current.ExecutionEndpointId),
                 ExecutionClientCertificatePath = Prompt("Execution client certificate PFX path", current.ExecutionClientCertificatePath),
@@ -75,6 +74,7 @@ namespace IceBot.Config
                 StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
                 MachinePorts = new Dictionary<string, string>(current.MachinePorts, StringComparer.OrdinalIgnoreCase),
             };
+            PreserveBackendDeviceIdentities(current, settings);
 
             // Store password isn't prompted here, but the account might still change — either
             // way invalidates a previously saved session key (a key obtained under a different
@@ -107,6 +107,14 @@ namespace IceBot.Config
             Console.WriteLine("[OK] Da luu cau hinh: " + SiteConfigStore.SiteConfigPath);
             Console.WriteLine();
             PrintSummary(settings);
+        }
+
+        internal static void PreserveBackendDeviceIdentities(SiteSettings current, SiteSettings updated)
+        {
+            updated.KioskId = current.KioskId;
+            updated.MachineDeviceIds = new Dictionary<string, Guid>(
+                current.MachineDeviceIds,
+                StringComparer.OrdinalIgnoreCase);
         }
 
         public static void PrintSummary(SiteSettings settings)

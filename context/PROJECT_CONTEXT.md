@@ -282,6 +282,9 @@ Set it to the BE's private **HTTPS** base URL, without `/api`, through menu conf
 - After HTTP 201, IceBot persists the BE-generated identity as
   `MACHINE_DEVICE_IDS=<MachineType>:<DeviceId>,...`. Future status/device-event uplinks must
   resolve the BE identity through `SiteSettings.GetMachineDeviceId(machineType)`.
+- Re-running **InitIceBot > Cau hinh > Cau hinh he thong** preserves both `KIOSK_ID` and the
+  complete `MACHINE_DEVICE_IDS` dictionary. These BE identities must never be cleared merely
+  because a technician changes the BE URL, endpoint certificate, robot IP, account, or COM ports.
 - `KIOSK_ID` is stored only because this management API requires it. A future mTLS Edge-specific
   registration route should derive the kiosk from `ExecutionEndpointId` and remove this input.
 - **Deployment note:** `BE_API_URL` still needs the private HTTPS BE URL reachable through
