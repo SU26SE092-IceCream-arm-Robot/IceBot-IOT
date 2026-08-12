@@ -1,0 +1,8 @@
+﻿{
+    "schemaVersion":  1,
+    "machineType":  "cup_dropping",
+    "assembly":  "IceBot.Driver.CupDropping.dll",
+    "entryType":  "IceBot.Driver.CupDropping.CupDroppingDriver",
+    "driverVersion":  "1.0.0",
+    "sha256":  "e05fb14250bbfbc0c14b5cbe159cdf08167c5962b0c3478d5588cabd342d495a"
+}

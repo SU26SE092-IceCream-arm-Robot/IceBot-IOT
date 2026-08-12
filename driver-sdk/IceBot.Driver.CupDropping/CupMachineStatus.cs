@@ -1,4 +1,4 @@
-namespace IceBot.Machines.CupDropping
+namespace IceBot.Driver.CupDropping
 {
     internal enum CupMachineState : byte
     {

@@ -87,13 +87,17 @@ IceBot.Machines.<Machine>Client  (opens COM port, sends the machine's own signal
 Peripheral machine mainboard (e.g. cup-dropping machine, RS485 @ 115200)
 ```
 
-- **Implemented today**: cup-dropping machine (`docs/301 Cup-Dropping Machine Serial Communication Protocol V0.0.3.md`) and the ice cream dispenser (`docs/Ice Cream Machine (Custom STM32 Controller) Serial Communication Protocol V0.1.md`, RS485 via MAX485 to a custom STM32 board) — both under `code/src/IceBot/Machines/`, both reuse `SerialFrameCodec` since the two protocols share the same frame shape.
+- **Implemented today**: the cup-dropping machine is a standalone plugin project at
+  `driver-sdk/IceBot.Driver.CupDropping/`; its ready package is
+  `DRIVER-DLL/CupDropping/{driver.json, IceBot.Driver.CupDropping.dll}`. No cup-dropping protocol
+  implementation remains in IceBot core. The ice-cream STM32 driver is still temporarily in core
+  and is the next peripheral to migrate to plugin-only packaging.
 - COM port per machine type is site-configured (`MachinePorts` in `config/icebot.site.env`, menu 1.2).
-- Every workflow step (`.lua` file) belongs to exactly one machine identifier — there is no such thing as a step with no machine. `MachineRegistry.Modules` is assembled at startup from built-in modules plus valid external DLL plugins, including machines that are pure arm motion with no serial connection.
+- Every workflow step (`.lua` file) belongs to exactly one machine identifier — there is no such thing as a step with no machine. `MachineRegistry.Modules` loads valid external DLL plugins at startup. During the migration, only the ice-cream driver remains built in; cup-dropping is DLL-only.
 - `IMachineModule` (base, mandatory) carries identity: `MachineType`, `DisplayName`, `StepNames`. There is no ordering/position field — BE sends orders with the run order already decided (see "Order → queue example" below), so IceBot has no need to sort steps itself.
 - `IMachineTrigger : IMachineModule` (optional) is implemented only by machines that are also wired to this PC over RS485 and need a signal sent after their step's `.lua` runs. It requires **two** methods: `Trigger(comPort)` (fire the machine's action) and `TestConnection(comPort)` (open the port, do a real query round-trip, throw on failure — no business-specific parsing needed). `WorkflowRunner`, `ConfigSetupWizard` (COM-port prompts), and the console test menus only look at `MachineRegistry.Modules.OfType<IMachineTrigger>()` — a machine that's pure arm motion just implements `IMachineModule` and is left alone by all of them.
 - The `.lua` file itself cannot send this signal (Fairino Lua has no raw serial/UART primitive) — the real signal is always sent from IceBot (C#) over RS485 after the file finishes running.
-- To add or replace a machine driver without modifying IceBot source, build a `net472` plugin against `IceBot.Driver.Abstractions`, then install its DLL and matching `driver.json` under `drivers/<driver-name>/` and restart IceBot. The loader verifies schema, path containment, SHA-256, public entry type, parameterless constructor, interface contract, machine identity, and step names. A plugin with the same `MachineType` replaces the built-in driver; a new `MachineType` adds another machine. See `driver-sdk/README.md` and `driver-sdk/IceBot.Driver.Template`.
+- To add or replace a machine driver without modifying IceBot source, build a `net472` plugin against `IceBot.Driver.Abstractions`, then install its DLL and matching `driver.json` under `drivers/<driver-name>/` and restart IceBot. The loader verifies schema, path containment, SHA-256, public entry type, parameterless constructor, interface contract, machine identity, and step names. Setup creates `drivers/` empty and never installs packages from the repository's `DRIVER-DLL/` catalog automatically. See `driver-sdk/README.md` and `driver-sdk/IceBot.Driver.Template`.
 
 ### External machine driver packages
 
@@ -150,7 +154,10 @@ A custom **STM32F103C8T6 (Blue Pill)** board talks to the PC over **RS485** (MAX
 | Fairino Lua on control box | Yes (`MoveJ`, …) | No |
 | Custom board firmware | No | N/A (it's the slave being spoken to) |
 
-**Current IceBot status:** ✅ RS485 trigger implemented for the cup-dropping machine (`IceBot.Machines.CupDropping.CupDroppingMachineClient`, 115200 baud, framed protocol with checksum + retry) and the ice cream dispenser (`IceBot.Machines.IceCream.IceCreamMachineClient`, same frame shape) — `WorkflowRunner` always runs the step's `.lua` file on the arm first, then fires the RS485 trigger once the arm has finished.
+**Current IceBot status:** ✅ RS485 trigger implemented for the cup-dropping machine in
+`IceBot.Driver.CupDropping.dll` (115200 baud, framed protocol with checksum + retry) and for the
+ice-cream dispenser in the still-temporary core implementation. `WorkflowRunner` always runs the
+step's `.lua` file on the arm first, then fires the resolved plugin/driver trigger.
 
 **Safety / wiring:** 24V DO must match Fairino electrical specs; use optocoupler isolation between controller and custom MCU; define DO reset-on-stop behavior on the control box if needed (`SetOutputResetCtlBoxDO` per Fairino manual).
 
@@ -203,7 +210,7 @@ which `.lua` files and in what physical order they must run, so the `/api/orders
 no re-sorting of any kind (there used to be a `Position`-based `WorkflowQueueBuilder` for this;
 it was removed once BE took over ordering). `WorkflowRunner` runs each `.lua` file on the arm in
 that order (continuous motion, see chaining rule above); after `cup_s.lua` finishes, it
-additionally calls `Trigger()` on the module registered for that step (`CupDroppingMachineModule`,
+additionally calls `Trigger()` on the module registered for that step (`CupDroppingDriver`,
 resolved via `MachineRegistry.TryGetModule`).
 
 ### Execution model (production)
@@ -736,7 +743,7 @@ MoveJ(
 | `WorkflowRunner` — sequential step queue, each `.lua` file run in full (chaining is free — see script chaining rule) | ✅ Done |
 | Cup-dropping machine — RS485 serial client (`IceBot.Machines`) | ✅ Done |
 | Ice cream dispenser — RS485 serial client (`IceBot.Machines`) | ✅ Done |
-| Public `IceBot.Driver.Abstractions` contracts + validated DLL plugin loader + dynamic `MachineRegistry.Modules` — every step's machine registered, plugins install without editing/rebuilding IceBot, and a matching `MachineType` can replace a built-in driver | ✅ Done (built-in cup/ice-cream defaults remain; future drivers use `driver-sdk` and install as `DLL + driver.json`) |
+| Public `IceBot.Driver.Abstractions` contracts + validated DLL plugin loader + dynamic `MachineRegistry.Modules` | ✅ Done; cup-dropping is DLL-only, ice-cream remains temporarily built in and still needs migration |
 | Test may > 1 "Test tay Robot" — connect check + sample `.lua` run from `test-workflow/` (separate from `workflow/`) | ✅ Done (`ConsoleMenu.RunTestMode`; sample file itself not shipped, user-supplied) |
 | Test may > 2 "Test ket noi may ngoai vi" — connection check driven by `SiteSettings.ProvisionedSteps`, generic via `IMachineTrigger.TestConnection` | ✅ Done (`ConsoleMenu.RunPeripheralConnectionTestMode`) |
 | `WorkflowProvisioner` records provisioned step names (`SiteSettings.ProvisionedSteps`) after every successful fetch | ✅ Done |
@@ -831,9 +838,9 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 | `code/src/IceBot/Machines/IMachineTrigger.cs` | Optional interface for machines wired over RS485 — adds `Trigger(comPort)` and `TestConnection(comPort)` |
 | `code/src/IceBot/Machines/IMachineDiagnostics.cs` | Optional interface for a human-readable status query (`GetStatusText`) — implemented by both current modules but not currently wired into any menu (menu was simplified to connection-only checks); still callable from code |
 | `code/src/IceBot/Machines/MachineRegistry.cs` | `Modules` list (the one place to add a new machine) + step-name lookup |
-| `code/src/IceBot/Machines/SerialFrameCodec.cs` | Frame build/validate (checksum, length, end code) per `docs/301 ...md`, shared across machines |
-| `code/src/IceBot/Machines/CupDropping/CupDroppingMachineModule.cs` | `IMachineTrigger` + `IMachineDiagnostics` implementation for the cup-dropping machine — the "module" |
-| `code/src/IceBot/Machines/CupDropping/CupDroppingMachineClient.cs` | Raw serial protocol client for the cup-dropping machine — one subfolder per machine |
+| `code/src/IceBot/Machines/SerialFrameCodec.cs` | Temporary frame codec used only by the still-built-in ice-cream driver; cup-dropping owns an independent codec inside its plugin project |
+| `driver-sdk/IceBot.Driver.CupDropping/` | Source project for the standalone cup-dropping plugin; not compiled into IceBot core |
+| `DRIVER-DLL/CupDropping/` | Ready `DLL + driver.json` package; technician installs it explicitly into the Edge `drivers/` directory |
 | `code/src/IceBot/Networking/LocalApiServer.cs` | Inbound HTTP API (tunnel ingress) |
 | `code/src/IceBot/Config/` | `AppConfig` plus `Connectivity/`, `Setup/`, and `Storage/` functional groups |
 | `code/workflow/` | Lua scripts (gitignored, copied to output on build) |

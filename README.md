@@ -56,7 +56,7 @@ IceBot-IOT/
 │   │   │   │   ├── Connectivity/       NetBird
 │   │   │   │   ├── Setup/              wizard kỹ thuật viên
 │   │   │   │   └── Storage/            cấu hình cục bộ
-│   │   │   ├── Machines/               module và driver tích hợp sẵn
+│   │   │   ├── Machines/               plugin loader/registry; không chứa driver thả cốc
 │   │   │   ├── Networking/             local HTTP API
 │   │   │   ├── Robot/                  Fairino Lua executor
 │   │   │   └── Workflow/
@@ -68,6 +68,7 @@ IceBot-IOT/
 │   ├── test-workflow/                   Lua mẫu để test robot
 │   └── workflow/                        Lua production, site-local/gitignored
 ├── driver-sdk/                          hướng dẫn và template driver
+├── DRIVER-DLL/                          package driver build sẵn, không tự cài vào Edge
 ├── harness/                             test tự động
 ├── context/PROJECT_CONTEXT.md           nguồn sự thật chi tiết của dự án
 ├── deploy/installer/                    script đóng gói Setup + payload
@@ -274,12 +275,19 @@ Contract Order theo tên file Lua cũ và contract artifact ID/release manifest 
 
 ## Máy ngoại vi và plugin driver
 
-Máy ngoại vi giao tiếp trực tiếp với Edge qua RS485. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ C# sau khi Lua hoàn tất.
+Máy ngoại vi giao tiếp trực tiếp với Edge qua RS485. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ plugin DLL sau khi Lua hoàn tất.
 
-Đang có driver tích hợp cho:
+Driver máy thả cốc đã được tách hoàn toàn khỏi `IceBot.exe`. Package build sẵn nằm tại:
 
-- Máy thả cốc.
-- Máy kem dùng STM32.
+```text
+DRIVER-DLL/CupDropping/
+├── driver.json
+└── IceBot.Driver.CupDropping.dll
+```
+
+Muốn sử dụng máy thả cốc, kỹ thuật viên copy nguyên package trên vào
+`<thư mục cài IceBot>/drivers/cup-dropping/` rồi restart IceBot. Setup mới chỉ tạo thư mục
+`drivers/` trống và không tự cài bất kỳ driver máy ngoại vi nào.
 
 Để thêm hoặc thay máy mà không sửa source IceBot, tạo plugin target `net472` dựa trên `IceBot.Driver.Abstractions`, sau đó cài:
 
@@ -291,7 +299,9 @@ drivers/<driver-name>/
 
 Driver phải có public entry type, constructor không tham số và implement `IMachineModule`; thiết bị cần giao tiếp serial implement thêm `IMachineTrigger`. `driver.json` chứa schema, `machineType`, tên DLL, entry type, version và SHA-256.
 
-Plugin trùng `MachineType` sẽ thay driver built-in nhưng giữ ánh xạ COM/DeviceId. Plugin có `MachineType` mới sẽ thêm một máy mới. Khởi động lại IceBot sau khi cài hoặc thay DLL. Xem `driver-sdk/README.md` và template trong `driver-sdk/IceBot.Driver.Template`.
+`MachineType` là định danh ổn định dùng để giữ ánh xạ COM/DeviceId khi thay DLL. Khởi động lại
+IceBot sau khi cài hoặc thay plugin. Xem `driver-sdk/README.md`, template trong
+`driver-sdk/IceBot.Driver.Template` và driver thật trong `driver-sdk/IceBot.Driver.CupDropping`.
 
 Đăng ký máy với BE tại **InitIceBot → Cấu hình → Đăng ký máy ngoại vi với BE**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ và hiển thị máy nào chưa đăng ký.
 

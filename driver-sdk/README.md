@@ -32,5 +32,6 @@ Generate the checksum in PowerShell:
 ```
 
 Restart IceBot after installing or replacing a package. Install both the DLL and its matching
-`driver.json`; a checksum mismatch is rejected. A plugin with the same `MachineType` replaces
-the built-in driver, while a new `MachineType` adds another machine.
+`driver.json`; a checksum mismatch is rejected. The architecture is migrating every peripheral
+machine to a plugin. IceBot core no longer provides a cup-dropping fallback; its ready-to-install
+package is built into `DRIVER-DLL/CupDropping/`.

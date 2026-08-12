@@ -1,18 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using IceBot.Machines.CupDropping;
 using IceBot.Machines.IceCream;
 
 namespace IceBot.Machines
 {
-    // Built-ins are defaults. A valid DLL plugin under drivers/*/driver.json replaces the
-    // built-in with the same MachineType, without changing or rebuilding IceBot.exe.
+    // Peripheral drivers are loaded from drivers/*/driver.json. IceCream remains temporarily
+    // built in until it is migrated; cup-dropping is plugin-only and is never compiled here.
     internal static class MachineRegistry
     {
         private static readonly IMachineModule[] BuiltInModules =
         {
-            new CupDroppingMachineModule(),
             new IceCreamMachineModule(),
         };
 

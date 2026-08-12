@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>IceBot.Driver.CupDropping</AssemblyName>
+    <RootNamespace>IceBot.Driver.CupDropping</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\code\src\IceBot.Driver.Abstractions\IceBot.Driver.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

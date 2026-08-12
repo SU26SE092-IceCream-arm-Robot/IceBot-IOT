@@ -76,6 +76,24 @@ namespace IceBot.Harness.Tests
                 if (Directory.Exists(directory)) Directory.Delete(directory, true);
             }
         }
+
+        [Fact]
+        public void Load_PackagedCupDroppingDriver_IsValidAndLoadable()
+        {
+            var root = new DirectoryInfo(AppContext.BaseDirectory);
+            while (root != null && !Directory.Exists(Path.Combine(root.FullName, "DRIVER-DLL")))
+                root = root.Parent;
+
+            Assert.NotNull(root);
+            var package = Path.Combine(root!.FullName, "DRIVER-DLL", "CupDropping");
+            var result = MachinePluginLoader.Load(package);
+
+            Assert.Empty(result.Errors);
+            var driver = Assert.Single(result.Modules);
+            Assert.Equal("cup_dropping", driver.MachineType);
+            Assert.Contains("cup_s", driver.StepNames);
+            Assert.IsAssignableFrom<IMachineTrigger>(driver);
+        }
     }
 
     public sealed class HarnessMachineDriver : IMachineModule

@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using IceBot.Machines;
 
-namespace IceBot.Machines.CupDropping
+namespace IceBot.Driver.CupDropping
 {
     // Plugs the cup-dropping machine into the system. This is the whole "module" for this
     // machine: which steps trigger it, and what signal to send. See CupDroppingMachineClient
     // for the actual serial protocol.
-    internal sealed class CupDroppingMachineModule : IMachineTrigger, IMachineDiagnostics
+    public sealed class CupDroppingDriver : IMachineTrigger, IMachineDiagnostics
     {
         public string MachineType => "cup_dropping";
 
