@@ -9,7 +9,9 @@ namespace IceBot.Config
         // only needs the setup key; NetBird handles opening the path in and assigning PublicUrl.
         public string NetBirdSetupKey { get; set; } = string.Empty;
         public string PublicUrl { get; set; } = string.Empty;
-        public string BeApiUrl { get; set; } = string.Empty;
+        // Public management API used by a fresh Edge during login/registration. A deployment may
+        // still override this with a private HTTPS NetBird address when mTLS must bypass a proxy.
+        public string BeApiUrl { get; set; } = "https://api.icebot.io.vn";
         public string ApiKey { get; set; } = string.Empty;
         public string RobotIp { get; set; } = AppConfig.DefaultRobotIp;
 

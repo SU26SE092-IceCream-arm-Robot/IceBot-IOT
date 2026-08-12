@@ -10,7 +10,7 @@ namespace IceBot.Config
         // Only the two fields NetBird itself actually needs. Everything else in SiteSettings
         // (API key, robot IP, store account, COM ports, ProvisionedSteps, BeApiUrl) is left
         // untouched — see RunSystemSettings() for those.
-        public static void RunNetBird()
+        public static bool RunNetBird()
         {
             Console.WriteLine();
             Console.WriteLine("=== Cau hinh NetBird ===");
@@ -20,12 +20,13 @@ namespace IceBot.Config
             var settings = SiteConfigStore.Load();
 
             var netBirdSetupKey = PromptSecret("NetBird setup key", settings.NetBirdSetupKey);
-            if (!string.IsNullOrWhiteSpace(netBirdSetupKey) && netBirdSetupKey != settings.NetBirdSetupKey)
+            var connected = false;
+            if (!string.IsNullOrWhiteSpace(netBirdSetupKey))
             {
                 Console.WriteLine();
                 Console.WriteLine("Dang chay 'netbird up --setup-key ...' ...");
-                var ok = NetBirdSetup.RunUp(netBirdSetupKey, out var netBirdMessage);
-                Console.WriteLine(ok ? $"[OK] {netBirdMessage}" : $"[ERROR] {netBirdMessage}");
+                connected = NetBirdSetup.RunUp(netBirdSetupKey, out var netBirdMessage);
+                Console.WriteLine(connected ? $"[OK] {netBirdMessage}" : $"[ERROR] {netBirdMessage}");
                 Console.WriteLine();
             }
 
@@ -38,6 +39,7 @@ namespace IceBot.Config
             Console.WriteLine("[OK] Da luu cau hinh: " + SiteConfigStore.SiteConfigPath);
             Console.WriteLine();
             PrintSummary(settings);
+            return connected;
         }
 
         // Everything that is NOT NetBird and NOT a secret better left to its own dedicated
@@ -129,7 +131,7 @@ namespace IceBot.Config
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
             Console.WriteLine($"  Tai khoan cua hang : {(string.IsNullOrEmpty(settings.StoreAccount) ? "(chua dat)" : settings.StoreAccount)}");
-            Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.OperatorAccessToken) ? "CHUA (IceBot.exe login)" : "ROI")}");
+            Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.OperatorAccessToken) ? "CHUA (dung Khoi tao Edge trong InitIceBot.exe)" : "ROI")}");
             foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {
                 var port = settings.GetMachinePort(trigger.MachineType);

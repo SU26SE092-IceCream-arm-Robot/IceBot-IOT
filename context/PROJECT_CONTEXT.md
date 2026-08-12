@@ -118,7 +118,7 @@ drivers/<driver-name>/
 driver version, and SHA-256. A driver class must have a public parameterless constructor. IceBot
 loads verified DLL bytes without locking the package file, but registry discovery occurs once at
 process startup, so installing or replacing a package still requires an IceBot restart. Invalid
-plugins do not stop valid machines from loading; their errors appear under **Cau hinh > 6. Danh
+plugins do not stop valid machines from loading; their errors appear under **Cau hinh > 7. Danh
 sach may ngoai vi**. Installing a different physical model that uses the same logical machine slot
 means deploying a plugin with the same stable `MachineType`; its existing COM configuration and BE
 `DeviceId` mapping are therefore retained. Use a new `MachineType` when both machines must coexist.
@@ -259,19 +259,39 @@ Operator login is implemented against the real BE contract:
   refresh clears stale tokens and prompts for login for that action only.
 - Operator JWTs are for human-authorized operations only. They are deliberately not used for
   execution command pull, artifact download, heartbeat, ACK, or execution reports.
-- Neither server nor menu startup requires login. `StoreAuth.RequireLogin()` runs only when the
-  technician selects **Cau hinh > 5. Dang ky may ngoai vi voi BE** in `InitIceBot.exe`; failure
-  blocks only device registration.
+- Neither server nor menu startup requires login. `StoreAuth.RequireLogin()` runs only for a
+  protected setup action in `InitIceBot.exe`: initial Edge registration or peripheral-device
+  registration. Failure blocks configuration only and never blocks the production server.
 
-`BE_API_URL` is still a deployment placeholder until the BE private NetBird address is known.
-Set it to the BE's private **HTTPS** base URL, without `/api`, through menu configuration,
-`BE_API_URL` in `icebot.site.env`, or `ICEBOT_BE_API_URL`.
+`BE_API_URL` defaults to `https://api.icebot.io.vn` so a completely new Edge can log in and
+register. It can be overridden (without `/api`) through menu configuration, `BE_API_URL` in
+`icebot.site.env`, or `ICEBOT_BE_API_URL`. If a reverse proxy does not forward the client
+certificate for mTLS runtime calls, use the BE's private **HTTPS** NetBird address instead.
+
+### New Edge self-registration
+
+`InitIceBot.exe` > **Cau hinh > 1. Khoi tao Edge moi** performs this ordered workflow:
+
+1. Require operator login with an account authorized for the target kiosk.
+2. Prompt for the NetBird setup key and run `netbird up --setup-key ...`; stop registration if
+   NetBird cannot connect.
+3. List the kiosks visible to the account. Select the sole kiosk automatically; if several are
+   visible, ask the technician to choose.
+4. Build the stable code `EDGE-{WINDOWS_MACHINE_NAME}`, reuse the matching endpoint when it
+   already exists, or create a `FullEdge` endpoint through
+   `POST /api/v1/management/kiosks/{kioskId}/execution-endpoints`.
+5. Persist the returned `EXECUTION_ENDPOINT_ID` and selected `KIOSK_ID` in the local gitignored
+   `config/icebot.site.env`.
+
+Creation leaves a new endpoint in `Provisioning`. Saving its ID does not yet make order polling
+ready: provision the endpoint with the Edge PFX certificate fingerprint, place the matching PFX
+on Edge, and configure `EXECUTION_CLIENT_CERT_PATH`. The private key is never uploaded to BE.
 
 ### Peripheral device registration with BE
 
 - The Edge operator can register a machine implemented in `MachineRegistry` through
-  **Cau hinh > 5. Dang ky may ngoai vi voi BE** in `InitIceBot.exe`.
-- **Cau hinh > 6. Danh sach may ngoai vi** prints every machine in `MachineRegistry`, its stable
+  **Cau hinh > 6. Dang ky may ngoai vi voi BE** in `InitIceBot.exe`.
+- **Cau hinh > 7. Danh sach may ngoai vi** prints every machine in `MachineRegistry`, its stable
   local `MachineType`, and the BE `DeviceId` saved after registration. Missing mappings are shown
   as `CHUA DANG KY`; this view is local/read-only and does not call BE.
 - Registration calls the current operator-authorized BE route
@@ -287,8 +307,9 @@ Set it to the BE's private **HTTPS** base URL, without `/api`, through menu conf
   because a technician changes the BE URL, endpoint certificate, robot IP, account, or COM ports.
 - `KIOSK_ID` is stored only because this management API requires it. A future mTLS Edge-specific
   registration route should derive the kiosk from `ExecutionEndpointId` and remove this input.
-- **Deployment note:** `BE_API_URL` still needs the private HTTPS BE URL reachable through
-  NetBird. Never commit that environment-specific URL, operator tokens, or device credentials.
+- **Deployment note:** management calls default to `https://api.icebot.io.vn`; a private HTTPS
+  NetBird override may still be required for direct mTLS. Never commit environment-specific
+  overrides, operator tokens, or device credentials.
 
 ---
 
@@ -310,14 +331,14 @@ Management creates a Full Edge deployment
     → ACK Accepted, then report Installed and Active
 ```
 
-Entry point: `InitIceBot.exe` menu **Cau hinh > 4**.
+Entry point: `InitIceBot.exe` menu **Cau hinh > 5**.
 
 ### Required site configuration
 
 | Setting | Purpose |
 |---------|---------|
-| `BE_API_URL` / `ICEBOT_BE_API_URL` | **TODO when discovered:** private HTTPS BE URL reachable through NetBird |
-| `EXECUTION_ENDPOINT_ID` / `ICEBOT_EXECUTION_ENDPOINT_ID` | Active Full Edge execution endpoint provisioned by BE management |
+| `BE_API_URL` / `ICEBOT_BE_API_URL` | Defaults to `https://api.icebot.io.vn`; override with private NetBird HTTPS URL when direct mTLS access is required |
+| `EXECUTION_ENDPOINT_ID` / `ICEBOT_EXECUTION_ENDPOINT_ID` | Created/recovered by InitIceBot; it must subsequently be provisioned Active |
 | `EXECUTION_CLIENT_CERT_PATH` / `ICEBOT_EXECUTION_CLIENT_CERT_PATH` | Local PFX whose SHA-256 certificate fingerprint is pinned to the endpoint |
 | `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` | PFX password; environment-only, never written to `icebot.site.env` |
 
@@ -432,7 +453,7 @@ Simple command-line interface — robot arm control utility, not an end-user pro
 ### Main menu (`IceBot.exe`)
 
 The technician menu starts without login. Login is requested lazily only for protected BE
-management operations such as peripheral registration.
+management operations such as initial Edge registration and peripheral registration.
 
 Main menu belongs exclusively to `InitIceBot.exe`; items `1` and `2` open their own submenu, which **renumbers from 1** (not
 a literal `1.1` keystroke — this doc uses "1.1" style dotted notation purely to describe nested
@@ -450,10 +471,13 @@ NetBird's own config doesn't get bundled with unrelated settings:
 
 | # | Action |
 |---|--------|
-| 1 | Cau hinh NetBird — ONLY `NetBirdSetupKey` + `PublicUrl` (`ConfigSetupWizard.RunNetBird`) |
-| 2 | Cau hinh he thong — API key, robot IP, tai khoan cua hang, cong COM may ngoai vi (`ConfigSetupWizard.RunSystemSettings`) |
-| 3 | Xem cau hinh hien tai |
-| 4 | Đồng bộ Full Edge deployment từ BE qua mTLS; tải và xác minh Lua bundle |
+| 1 | Khoi tao Edge moi — login BE, connect NetBird, find-or-create Full Edge endpoint, save its ID |
+| 2 | Cau hinh NetBird — ONLY `NetBirdSetupKey` + `PublicUrl` (`ConfigSetupWizard.RunNetBird`) |
+| 3 | Cau hinh he thong — API key, robot IP, tai khoan cua hang, cong COM may ngoai vi (`ConfigSetupWizard.RunSystemSettings`) |
+| 4 | Xem cau hinh hien tai |
+| 5 | Dong bo Full Edge deployment tu BE qua mTLS; tai va xac minh Lua bundle |
+| 6 | Dang ky may ngoai vi voi BE |
+| 7 | Danh sach may ngoai vi va DeviceId BE da luu |
 | 0 | Quay lai (main menu) |
 
 Submenu "Test may" (enter via main `2`; header prints `TEST MAY`) — deliberately just 2 items,
@@ -572,7 +596,7 @@ equivalent written yet (NetBird's actual deploy/setup mechanism isn't known to t
 |----------|---------|
 | `ICEBOT_NETBIRD_SETUP_KEY` | NetBird setup key for this store |
 | `ICEBOT_PUBLIC_URL` | Public URL BE calls into (assigned via NetBird) |
-| `ICEBOT_BE_API_URL` | **Private HTTPS BE base URL through NetBird — value still pending discovery** |
+| `ICEBOT_BE_API_URL` | Optional override for default `https://api.icebot.io.vn`; use a direct private NetBird HTTPS URL when mTLS requires it |
 | `ICEBOT_EXECUTION_ENDPOINT_ID` | Active Full Edge execution endpoint GUID provisioned in BE |
 | `ICEBOT_EXECUTION_CLIENT_CERT_PATH` | Local mTLS client certificate PFX path |
 | `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` | PFX password; environment-only, never persisted |
@@ -660,6 +684,7 @@ MoveJ(
 | Config wizard (NetBird setup key, public URL) | ✅ Done |
 | NetBird auto-install (winget, if missing) + auto-`up` at every app startup (`NetBirdSetup.cs`, `ConsoleMenu.EnsureNetBirdConnected`) | ✅ Done |
 | Real operator login + access/refresh rotation | ✅ Done |
+| New Edge initialization: login -> NetBird -> kiosk selection -> idempotent endpoint registration -> persist Execution Endpoint ID | ✅ Done; mTLS provisioning remains a separate required step |
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done; private BE URL and provisioned endpoint certificate are deployment inputs still to add |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |
@@ -702,9 +727,15 @@ anymore; `IMachineModule` only carries identity (`MachineType`, `DisplayName`, `
 
 ### Site setup
 
-1. **Provision endpoint** in BE management and place its PFX on Edge.
-2. **Set private connectivity** — add the private NetBird HTTPS BE URL and ensure the presigned object-storage host is Edge-reachable.
-3. **Synchronize Lua** — menu configuration item 4 or `IceBot.exe provision` pulls a pending deployment and installs only fully verified artifacts.
+1. **Initialize the Edge** in `InitIceBot.exe` configuration item 1. This logs in, connects
+   NetBird, creates/recovers the Full Edge endpoint, and saves its ID.
+2. **Provision mTLS** in BE management and place the matching PFX on Edge; configure
+   `EXECUTION_CLIENT_CERT_PATH` (and its password environment variable when required).
+3. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
+   direct private NetBird HTTPS URL when client-certificate forwarding requires it. The
+   presigned object-storage host must also be Edge-reachable.
+4. **Synchronize Lua** — menu configuration item 5 pulls a pending deployment and installs only
+   fully verified artifacts.
 
 ### Runtime (orders)
 

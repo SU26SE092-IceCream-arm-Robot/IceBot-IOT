@@ -68,12 +68,13 @@ namespace IceBot.Cli
                     : "Trang thai cau hinh: CHUA DU");
                 Console.WriteLine();
                 Console.WriteLine("CAU HINH");
-                Console.WriteLine("1. Cau hinh NetBird");
-                Console.WriteLine("2. Cau hinh he thong (robot IP, tai khoan cua hang, cong COM)");
-                Console.WriteLine("3. Xem cau hinh hien tai");
-                Console.WriteLine("4. Dong bo deployment Lua tu BE (mTLS)");
-                Console.WriteLine("5. Dang ky may ngoai vi voi BE");
-                Console.WriteLine("6. Danh sach may ngoai vi");
+                Console.WriteLine("1. Khoi tao Edge moi (login, NetBird, dang ky BE)");
+                Console.WriteLine("2. Cau hinh NetBird");
+                Console.WriteLine("3. Cau hinh he thong (robot IP, tai khoan cua hang, cong COM)");
+                Console.WriteLine("4. Xem cau hinh hien tai");
+                Console.WriteLine("5. Dong bo deployment Lua tu BE (mTLS)");
+                Console.WriteLine("6. Dang ky may ngoai vi voi BE");
+                Console.WriteLine("7. Danh sach may ngoai vi");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -84,27 +85,31 @@ namespace IceBot.Cli
                 switch (choice)
                 {
                     case "1":
-                        ConfigSetupWizard.RunNetBird();
+                        EdgeInitializationWizard.Run();
                         Pause();
                         break;
                     case "2":
-                        ConfigSetupWizard.RunSystemSettings();
+                        ConfigSetupWizard.RunNetBird();
                         Pause();
                         break;
                     case "3":
-                        ConfigSetupWizard.PrintSummary(settings);
+                        ConfigSetupWizard.RunSystemSettings();
                         Pause();
                         break;
                     case "4":
-                        WorkflowProvisioner.RunInteractive();
+                        ConfigSetupWizard.PrintSummary(settings);
                         Pause();
                         break;
                     case "5":
+                        WorkflowProvisioner.RunInteractive();
+                        Pause();
+                        break;
+                    case "6":
                         StoreAuth.RequireLogin();
                         PeripheralDeviceRegistrationWizard.Run();
                         Pause();
                         break;
-                    case "6":
+                    case "7":
                         PeripheralDeviceRegistrationWizard.PrintDeviceList();
                         Pause();
                         break;
