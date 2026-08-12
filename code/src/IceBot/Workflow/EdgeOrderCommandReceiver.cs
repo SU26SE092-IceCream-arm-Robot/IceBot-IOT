@@ -10,6 +10,8 @@ namespace IceBot.Workflow
         private readonly ManualResetEvent _stop = new ManualResetEvent(false);
         private Thread? _worker;
 
+        public bool IsRunning => _worker != null && _worker.IsAlive;
+
         public void Start()
         {
             if (_worker != null) return;

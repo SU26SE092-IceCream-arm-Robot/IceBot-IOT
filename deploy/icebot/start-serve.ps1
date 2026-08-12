@@ -1,4 +1,4 @@
-# Start IceBot in serve mode (local API for Cloudflare Tunnel)
+# Start IceBot in visible serve mode. Keep this window open to see status and logs.
 
 $ErrorActionPreference = "Stop"
 $exe = Join-Path $PSScriptRoot "..\..\code\src\IceBot\bin\Release\net472\IceBot.exe"
@@ -9,7 +9,7 @@ if (-not (Test-Path $exe)) {
 }
 
 # Optional env vars — set before run or in System Environment
-# $env:ICEBOT_DUCKDNS_DOMAIN = "ice-shop-01.duckdns.org"
+# $env:ICEBOT_NETBIRD_SETUP_KEY = "your-netbird-setup-key"
 # $env:ICEBOT_PUBLIC_URL = "https://ice-shop.example.com"
 # $env:ICEBOT_API_KEY = "your-shared-secret"
 

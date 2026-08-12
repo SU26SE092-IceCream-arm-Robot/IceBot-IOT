@@ -206,7 +206,31 @@ namespace IceBot.Cli
 
         public static void RunServeMode()
         {
+            try
+            {
+                RunServeModeCore();
+            }
+            catch (Exception ex)
+            {
+                TrySetConsoleTitle("IceBot - SERVER ERROR");
+                Console.WriteLine();
+                Console.WriteLine("========================================");
+                Console.WriteLine("[FATAL] SERVER KHONG THE KHOI DONG");
+                Console.WriteLine($"Thoi gian : {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+                Console.WriteLine($"Loi       : {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine("========================================");
+                Console.WriteLine("Cua so nay se giu nguyen de nguoi van hanh doc loi.");
+                Console.WriteLine("Nhan ENTER de dong.");
+                Console.ReadLine();
+            }
+        }
+
+        private static void RunServeModeCore()
+        {
+            TrySetConsoleTitle("IceBot - STARTING");
             PrintBanner();
+            Console.WriteLine($"Process ID : {System.Diagnostics.Process.GetCurrentProcess().Id}");
+            Console.WriteLine($"Khoi dong  : {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
             EnsureNetBirdConnected();
             Console.WriteLine();
 
@@ -224,47 +248,68 @@ namespace IceBot.Cli
             {
                 orderReceiver.Start();
                 api.Start();
+                TrySetConsoleTitle("IceBot - SERVER RUNNING");
                 Console.WriteLine();
-                Console.WriteLine("Server dang chay. Cho don tu BE qua NetBird.");
+                Console.WriteLine("========================================");
+                Console.WriteLine("[RUNNING] ICEBOT SERVER DANG HOAT DONG");
+                Console.WriteLine($"API        : {(api.IsRunning ? "RUNNING" : "STOPPED")} - {AppConfig.ApiListenPrefix}");
+                Console.WriteLine($"Order pull : {(orderReceiver.IsRunning ? "RUNNING" : "DISABLED - KIEM TRA CAU HINH mTLS")}");
+                Console.WriteLine($"Health     : {AppConfig.ApiListenPrefix.TrimEnd('/')}/health");
+                Console.WriteLine("========================================");
                 Console.WriteLine("Lenh: test = chay lua | exit = thoat");
                 Console.WriteLine();
 
-                while (true)
+                using (var statusTimer = new Timer(_ =>
+                    Console.WriteLine($"\n[STATUS {DateTime.Now:HH:mm:ss}] Server=RUNNING | API={(api.IsRunning ? "RUNNING" : "STOPPED")} | OrderPull={(orderReceiver.IsRunning ? "RUNNING" : "DISABLED")}"),
+                    null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30)))
                 {
-                    Console.Write("> ");
-                    var line = Console.ReadLine();
-                    if (line == null)
-                    {
-                        Thread.Sleep(500);
-                        continue;
-                    }
 
-                    if (string.Equals(line, "exit", StringComparison.OrdinalIgnoreCase))
+                    while (true)
                     {
-                        break;
-                    }
+                        Console.Write("> ");
+                        var line = Console.ReadLine();
+                        if (line == null)
+                        {
+                            Thread.Sleep(500);
+                            continue;
+                        }
 
-                    if (string.IsNullOrWhiteSpace(line))
-                    {
-                        continue;
-                    }
+                        if (string.Equals(line, "exit", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
 
-                    if (!string.Equals(line, "test", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Console.WriteLine("Lenh khong hop le. Dung: test | exit");
-                        continue;
-                    }
+                        if (string.IsNullOrWhiteSpace(line))
+                        {
+                            continue;
+                        }
 
-                    try
-                    {
-                        WorkflowRunner.RunQueue(AppConfig.TestScriptQueue, AppConfig.RobotIp);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[ERROR] {ex.Message}");
+                        if (!string.Equals(line, "test", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Console.WriteLine("Lenh khong hop le. Dung: test | exit");
+                            continue;
+                        }
+
+                        try
+                        {
+                            WorkflowRunner.RunQueue(AppConfig.TestScriptQueue, AppConfig.RobotIp);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[ERROR] {ex.Message}");
+                        }
                     }
                 }
             }
+            TrySetConsoleTitle("IceBot - SERVER STOPPED");
+            Console.WriteLine("[STOPPED] IceBot server da dung.");
+        }
+
+        private static void TrySetConsoleTitle(string title)
+        {
+            try { Console.Title = title; }
+            catch (IOException) { }
+            catch (PlatformNotSupportedException) { }
         }
 
         // Test may > 1: two independent checks on the robot arm only —

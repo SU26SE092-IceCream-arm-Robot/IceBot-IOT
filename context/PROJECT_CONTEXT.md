@@ -238,6 +238,13 @@ or an unavailable login API therefore cannot stop order intake or sales. The adm
 remains available through `IceBot.exe menu`; `IceBot.exe serve` remains an equivalent explicit
 service command for Task Scheduler and existing deployment scripts.
 
+**Visible server console:** `IceBot.exe` is a console executable and must be launched normally,
+not with a hidden-window flag. Serve mode sets the CMD title to `IceBot - SERVER RUNNING`, prints
+PID/start time, API URL, health URL, and whether mTLS order polling is `RUNNING` or `DISABLED`, then
+emits a status line every 30 seconds. Order/API errors stream into the same window. A startup
+failure is rendered as a prominent `[FATAL]` block and waits for ENTER so the window does not
+disappear before the operator can read it. `exit` performs a normal shutdown.
+
 ---
 
 ## Store login (operator account)

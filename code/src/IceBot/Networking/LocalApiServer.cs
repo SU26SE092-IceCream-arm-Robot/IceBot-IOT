@@ -17,6 +17,8 @@ namespace IceBot.Networking
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private Thread _thread = null!;
 
+        public bool IsRunning => _listener.IsListening && _thread != null && _thread.IsAlive;
+
         public LocalApiServer()
         {
             _listener = new HttpListener();

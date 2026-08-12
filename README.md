@@ -274,6 +274,10 @@ Yêu cầu: máy Edge cần có `winget` (có sẵn trên Windows 10/11 bản m�
 |--------|---------|
 | `deploy/icebot/start-serve.ps1` | Build (nếu cần) rồi chạy `IceBot.exe serve` |
 
+Khi server chạy, cửa sổ CMD phải được giữ hiển thị. Nó in PID, API/health URL, trạng thái nhận
+order và một dòng `[STATUS]` mỗi 30 giây; lỗi khởi động được giữ trên màn hình thay vì đóng ngay.
+Không khởi chạy IceBot bằng tùy chọn ẩn cửa sổ nếu nhân viên cần theo dõi trạng thái trực tiếp.
+
 ⚠️ `deploy/duckdns/` và `deploy/cloudflare/` vẫn còn trong repo nhưng **đã lỗi thời** — thuộc stack ingress cũ, chưa có script tương ứng cho NetBird (đang chờ xác định cơ chế deploy thật của NetBird).
 
 ## Xử lý sự cố thường gặp
