@@ -18,7 +18,6 @@ namespace IceBot.Cli
         public static void Run()
         {
             PrintBanner();
-            StoreAuth.RequireLogin();
             EnsureNetBirdConnected();
             Pause();
 
@@ -102,6 +101,7 @@ namespace IceBot.Cli
                         Pause();
                         break;
                     case "5":
+                        StoreAuth.RequireLogin();
                         PeripheralDeviceRegistrationWizard.Run();
                         Pause();
                         break;
@@ -207,7 +207,6 @@ namespace IceBot.Cli
         public static void RunServeMode()
         {
             PrintBanner();
-            StoreAuth.RequireLogin();
             EnsureNetBirdConnected();
             Console.WriteLine();
 

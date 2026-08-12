@@ -79,14 +79,9 @@ submenu item than NetBird's own config (1.1, "Cau hinh NetBird") — `ConfigSetu
 into `RunNetBird()` (NetBird setup key + Public URL only) and `RunSystemSettings()` (API key,
 robot IP, store account/password, COM ports) precisely so these two concerns don't live in one
 combined prompt anymore.
-**Login is mandatory to reach the menu or `serve` mode** — `ConsoleMenu.Run()` and
-`ConsoleMenu.RunServeMode()` both call `StoreAuth.RequireLogin()` first thing on startup, which
-**loops, blocking, until `BeApi.Login` succeeds** (mock — `Api/BeApi.cs`); prompts inline for
-account/password if not already configured (1.2 is not a prerequisite), typing `exit` quits the
-app instead of retrying.
-`RequireLogin()` only actually gates once per process (`StoreAuth._loggedInThisRun`) — entering
-the menu logs in once, and picking "3. Chay he thong" from inside the menu does not ask again;
-running `IceBot.exe serve` directly (a fresh process, no menu) still gates normally. On
+**Login is not a startup gate.** Menu and `serve` start without operator tokens because order
+delivery authenticates with mTLS. `StoreAuth.RequireLogin()` runs lazily only for device
+registration, where it loops until login succeeds; failure blocks that action only. On
 success the key is saved as `BE_SESSION_KEY` (`Api/StoreAuth.cs`, read back via
 `AppConfig.BeSessionKey`). `IceBot.exe login` (CLI-only — not a menu item) is a separate
 **non-blocking, single-attempt** re-login for mid-session use (e.g. after changing the account
@@ -139,7 +134,7 @@ real installed CLI and IceBot **actively shells out to it** via `Config/NetBirdS
 - Called from **two places**, both non-blocking (report `[OK]`/`[WARN]`/`[ERROR]`, never abort):
   `ConfigSetupWizard.RunNetBird()` (right after the key prompt, only if the key is new/changed), and
   `ConsoleMenu.EnsureNetBirdConnected()` (called at the top of both `ConsoleMenu.Run()` and
-  `ConsoleMenu.RunServeMode()`, right after `StoreAuth.RequireLogin()`, whenever a setup key is
+  `ConsoleMenu.RunServeMode()`, at startup before serving, whenever a setup key is
   already saved) — the second one is what makes a *fresh* Edge PC image work: the key was
   provisioned before, NetBird wasn't installed yet, first `IceBot.exe` launch installs it with
   no wizard re-entry needed.

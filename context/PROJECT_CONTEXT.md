@@ -232,10 +232,11 @@ Lua bundle installation; local API `serve` mode; RS485 peripheral triggers. Orde
 uses the legacy inbound filename contract and status POST-back remains TODO.
 
 **Startup behavior:** running `IceBot.exe` with no arguments now enters `serve` mode immediately:
-it performs the login/refresh gate, ensures NetBird connectivity, starts the local HTTP API, and
-starts the BE command/order receiver. The administration UI remains available explicitly through
-`IceBot.exe menu`. `IceBot.exe serve` is retained as an equivalent explicit service command for
-Task Scheduler and existing deployment scripts.
+it does **not** perform operator login or token refresh. It ensures NetBird connectivity, starts
+the local HTTP API, and starts the mTLS BE command/order receiver. Missing/expired operator tokens
+or an unavailable login API therefore cannot stop order intake or sales. The administration UI
+remains available through `IceBot.exe menu`; `IceBot.exe serve` remains an equivalent explicit
+service command for Task Scheduler and existing deployment scripts.
 
 ---
 
@@ -246,10 +247,13 @@ Operator login is implemented against the real BE contract:
 - `POST {BE_API_URL}/api/v1/authentication/login` with `emailOrUsername` and `password`.
 - IceBot stores `BE_ACCESS_TOKEN` and the rotated `BE_REFRESH_TOKEN`; it does not retain the
   plaintext password after successful login.
-- Startup attempts `POST /api/v1/authentication/refresh`; failure clears both tokens and returns
-  to the blocking login prompt.
+- Token refresh is attempted lazily when an operator-authorized action needs a session; a failed
+  refresh clears stale tokens and prompts for login for that action only.
 - Operator JWTs are for human-authorized operations only. They are deliberately not used for
   execution command pull, artifact download, heartbeat, ACK, or execution reports.
+- Neither server nor menu startup requires login. `StoreAuth.RequireLogin()` runs only when the
+  operator selects **Cau hinh > 5. Dang ky may ngoai vi voi BE** or invokes
+  `IceBot.exe register-device`; failure blocks only device registration.
 
 `BE_API_URL` is still a deployment placeholder until the BE private NetBird address is known.
 Set it to the BE's private **HTTPS** base URL, without `/api`, through menu configuration,
@@ -524,12 +528,12 @@ including installing it:
   the fix is running `IceBot.exe` elevated.
 
 **Two call sites, both non-blocking** (report and continue, matching the "warn, don't gate"
-pattern used for other missing config — login is the one exception that blocks):
+pattern used for other missing config):
 1. `ConfigSetupWizard.RunNetBird()` — right after prompting for the setup key, only if it's new/changed
    from what was already saved.
 2. `ConsoleMenu.EnsureNetBirdConnected()` — called at the top of **both** `ConsoleMenu.Run()`
-   (interactive menu) and `ConsoleMenu.RunServeMode()` (`serve`), immediately after
-   `StoreAuth.RequireLogin()`, whenever a setup key is already saved. This is what makes a
+   (interactive menu) and `ConsoleMenu.RunServeMode()` (`serve`) at startup, whenever a setup
+   key is already saved. This is what makes a
    **fresh Edge PC image** work correctly: the key can be provisioned ahead of time (e.g. baked
    into the image or entered once), and the very first `IceBot.exe` launch on that machine
    installs NetBird and connects — no wizard re-entry required.

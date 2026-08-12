@@ -9,11 +9,8 @@ namespace IceBot.Api
     /// </summary>
     internal static class StoreAuth
     {
-        // Set once RequireLogin() succeeds, for the lifetime of this process. Both
-        // ConsoleMenu.Run() (menu entry) and ConsoleMenu.RunServeMode() (serve entry) call
-        // RequireLogin() — when serve is reached via the menu (already gated), this flag skips
-        // asking a second time; when serve is reached directly (`IceBot.exe serve`, no menu),
-        // it still gates normally.
+        // Set once a protected management action authenticates successfully, avoiding another
+        // prompt for later protected actions during the same process.
         private static bool _loggedInThisRun;
 
         // Manual re-login (CLI-only: `IceBot.exe login`) — one attempt, does not block. Useful
@@ -47,11 +44,9 @@ namespace IceBot.Api
             Console.WriteLine("Da luu key, se dung cho cac request gui len BE sau nay.");
         }
 
-        // Gate before the menu/server can start — loops until login succeeds, so the app cannot
-        // be used at all without a valid session. Prompts for account/password inline if not
-        // already configured (the config wizard is not a prerequisite). Type "exit" at the
-        // account prompt to quit instead. Token expiry/refresh is a later concern (TODO:
-        // access+refresh token); for now a successful mock login is enough to proceed.
+        // Gate only operator-authorized management actions such as device registration. The
+        // server/order receiver deliberately does not call this method: its identity is mTLS and
+        // sales must continue even when operator login or the authentication API fails.
         public static void RequireLogin()
         {
             if (_loggedInThisRun)
@@ -74,7 +69,7 @@ namespace IceBot.Api
             }
 
             Console.WriteLine();
-            Console.WriteLine("=== Dang nhap tai khoan cua hang (bat buoc de vao he thong) ===");
+            Console.WriteLine("=== Dang nhap tai khoan cua hang (bat buoc cho thao tac nay) ===");
 
             while (true)
             {

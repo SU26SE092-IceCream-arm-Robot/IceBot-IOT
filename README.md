@@ -166,18 +166,18 @@ CLI tương ứng:
 
 ### Đăng nhập cửa hàng (`IceBot.exe login`)
 
-Mỗi cửa hàng có **1 tài khoản riêng do BE cấp**. **Đăng nhập là bắt buộc** — không đăng nhập thành công thì **không vào được** menu tương tác lẫn `IceBot.exe serve`:
+Mỗi cửa hàng có **1 tài khoản riêng do BE cấp**. Đăng nhập chỉ bắt buộc cho thao tác quản trị dùng JWT như đăng ký máy ngoại vi. Server nhận order dùng mTLS nên vẫn khởi động và bán hàng nếu login lỗi:
 
 ```
-Khoi dong IceBot.exe (serve mac dinh), IceBot.exe serve, hoac IceBot.exe menu
-    → CHAN o day: hoi tai khoan + mat khau (dung gia tri da luu neu co, hoac hoi moi neu chua co
-      — KHONG bat buoc phai qua Cau hinh > 1 truoc)
-    → BeApi.Login(account, password)
-    → that bai → bao loi, hoi lai (go "exit" de thoat han ung dung)
-    → thanh cong → luu tai khoan/mat khau/key vao config/icebot.site.env, moi cho vao menu/serve
+Khoi dong IceBot.exe / IceBot.exe serve
+    → khoi dong NetBird + server + bo nhan order mTLS, khong doi login
+
+Chon dang ky may ngoai vi (hoac IceBot.exe register-device)
+    → luc nay moi refresh token hoac yeu cau login
+    → login that bai chi chan thao tac dang ky, khong chan server nhan order
 ```
 
-Mục "Cấu hình" > 1 vẫn có prompt tài khoản/mật khẩu (để đổi tài khoản mà không cần gõ lại mỗi lần khởi động). `IceBot.exe login` (chỉ có ở CLI, không phải 1 mục trong menu) là đăng nhập lại **thủ công, không chặn** giữa phiên (vd sau khi đổi tài khoản ở đó) — khác với cổng bắt buộc lúc khởi động. Việc key hết hạn (access/refresh token) sẽ tính sau; hiện tại chỉ cần login mock thành công là đủ để vào hệ thống. Nếu đổi `STORE_ACCOUNT`/`STORE_PASSWORD`, key cũ sẽ tự bị xoá — cần đăng nhập lại. `BE_SESSION_KEY` **khác** với `API_KEY`: `API_KEY` xác thực chiều BE → IceBot (request `POST /api/orders` gửi vào), còn `BE_SESSION_KEY` dùng cho chiều ngược lại (IceBot → BE) khi có endpoint thật để gọi.
+`IceBot.exe login` cho phép đăng nhập lại thủ công. Khi đăng ký máy, Edge thử refresh access token một lần trước khi yêu cầu đăng nhập lại. Operator token chỉ dùng cho API quản trị; mTLS certificate là danh tính riêng của Edge cho nhận order, ACK và deployment.
 
 ## Cấu hình site
 
