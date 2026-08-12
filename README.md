@@ -50,9 +50,15 @@ IceBot-IOT/
 │   ├── lib/fairino-csharp-sdk/     # Fairino Robot C# SDK (vendored)
 │   └── src/IceBot/
 │       ├── Program.cs              # Entry point mỏng: parse args, giao cho Cli/
-│       ├── Api/BeApi.cs            # Client gọi BE lấy Lua (hiện là mock)
+│       ├── Api/                    # Giao tiếp Backend
+│       │   ├── Authentication/     # Đăng nhập và token cửa hàng
+│       │   ├── Management/         # Kiosk, execution endpoint, máy ngoại vi
+│       │   └── IoT/                # Kiểm tra kết nối mTLS của Edge
 │       ├── Cli/ConsoleMenu.cs      # Toàn bộ UI console: menu, serve/test/test-machine mode
-│       ├── Config/                 # AppConfig, SiteConfigStore, SiteSettings, ConfigSetupWizard
+│       ├── Config/                 # Cấu hình ứng dụng
+│       │   ├── Connectivity/       # Kết nối NetBird
+│       │   ├── Setup/              # Các wizard dành cho kỹ thuật viên
+│       │   └── Storage/            # SiteSettings và lưu cấu hình cục bộ
 │       ├── Machines/                       # Định danh + điều khiển RS485 cho máy ngoại vi
 │       │   ├── IMachineModule.cs           #   interface MỌI máy phải implement (định danh)
 │       │   ├── IMachineTrigger.cs          #   interface tuỳ chọn: máy có cổng COM thật mới cần
@@ -65,7 +71,9 @@ IceBot-IOT/
 │       │       └── CupMachineStatus.cs
 │       ├── Networking/LocalApiServer.cs  # HTTP API nội bộ (ingress cho NetBird)
 │       ├── Robot/FairinoLuaExecutor.cs   # Upload/chạy .lua + MoveToTeachingPoint (Home) trên Fairino
-│       └── Workflow/               # WorkflowProvisioner, WorkflowRunner, OrderRequest, OrderQueue
+│       └── Workflow/               # Điều phối luồng bán hàng
+│           ├── Orders/             # Nhận, kiểm tra, lưu và xếp hàng Order
+│           └── Provisioning/       # Đồng bộ/cài đặt deployment từ BE
 ├── workflow/                       # File .lua theo từng bước (gitignored, tải từ BE)
 ├── test-workflow/                  # File .lua mẫu để test tay robot (KHÔNG phải từ BE, xem README trong đó)
 ├── deploy/                         # Script cài đặt ingress (DuckDNS+Cloudflare cũ — cho NetBird xem ghi chú Deploy)

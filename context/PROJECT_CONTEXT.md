@@ -374,6 +374,11 @@ a Docker-only hostname such as `minio:9000` is invalid outside the BE host.
 
 ### Installation guarantees and current boundary
 
+> **Deferred (2026-08-12):** keep the Full Edge synchronization implementation in the project,
+> but do not treat Lua/device-configuration synchronization as an installation prerequisite yet.
+> The current BE has no production Lua artifacts to deliver. Resume and validate this flow only
+> after Lua artifacts and a deployment have been published on BE.
+
 - Maximum accepted bundle size is 100 MiB, matching BE.
 - Nothing is written to the active workflow until the complete bundle and every Lua entry pass
   descriptor validation.
@@ -762,8 +767,8 @@ anymore; `IMachineModule` only carries identity (`MachineType`, `DisplayName`, `
 2. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
    direct private NetBird HTTPS URL when client-certificate forwarding requires it. The
    presigned object-storage host must also be Edge-reachable.
-3. **Synchronize Lua** — menu configuration item 5 pulls a pending deployment and installs only
-   fully verified artifacts.
+3. **Synchronize Lua (deferred)** — menu configuration item 5 remains available, but this step is
+   postponed until BE contains production Lua artifacts and a deployment to pull.
 
 ### Runtime (orders)
 
@@ -794,17 +799,19 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 |---------------|------|
 | `code/src/IceBot/Program.cs` | Entry point (thin) — parses CLI args, delegates to `Cli.ConsoleMenu` |
 | `code/src/IceBot/Cli/ConsoleMenu.cs` | Interactive menu + `serve`/`test`/`test-machine` modes — all Console I/O lives here |
-| `code/src/IceBot/Api/BeApi.cs` | Operator login/refresh client (legacy mock `GetLua` helpers remain unused by menu/CLI) |
+| `code/src/IceBot/Api/Authentication/BeApi.cs` | Operator login/refresh client (legacy mock `GetLua` helpers remain unused by menu/CLI) |
 | `code/src/IceBot/Api/EdgeDeploymentApi.cs` | Full Edge mTLS command pull, download, ACK, and execution-report client |
-| `code/src/IceBot/Api/StoreAuth.cs` | Interactive operator login and refresh-token rotation |
-| `code/src/IceBot/Workflow/WorkflowProvisioner.cs` | Menu/CLI entry point for deployment synchronization |
-| `code/src/IceBot/Workflow/FullEdgeConfigurationInstaller.cs` | Verify and install Full Edge bundle, persist active release, ACK/report |
+| `code/src/IceBot/Api/Authentication/StoreAuth.cs` | Interactive operator login and refresh-token rotation |
+| `code/src/IceBot/Api/IoT/EdgeMtlsProbe.cs` | mTLS heartbeat/probe used after endpoint provisioning |
+| `code/src/IceBot/Api/Management/` | Management APIs for execution endpoints and peripheral devices |
+| `code/src/IceBot/Workflow/Provisioning/WorkflowProvisioner.cs` | Menu/CLI entry point for deployment synchronization |
+| `code/src/IceBot/Workflow/Provisioning/FullEdgeConfigurationInstaller.cs` | Verify and install Full Edge bundle, persist active release, ACK/report |
 | `code/test-workflow/` | Sample `.lua` for "Test tay Robot" (`robot_test.lua`, user-supplied) — separate from `workflow/`, tracked in git |
 | `code/src/IceBot/Workflow/WorkflowRunner.cs` | Run script queue on robot |
-| `code/src/IceBot/Workflow/OrderRequest.cs` | `POST /api/orders` payload DTO (`orderId` + BE-ordered `steps`) + JSON parse/validate |
-| `code/src/IceBot/Workflow/OrderQueue.cs` | Single background worker that runs accepted orders through `WorkflowRunner.RunQueue` one at a time |
-| `code/src/IceBot/Workflow/EdgeOrderCommandReceiver.cs` | Five-second mTLS command-pull loop for ExecuteOrder; stores and ACKs received commands |
-| `code/src/IceBot/Workflow/EdgeOrderInbox.cs` | Schema-4 receipt validation and durable CommandId-keyed JSON inbox |
+| `code/src/IceBot/Workflow/Orders/OrderRequest.cs` | `POST /api/orders` payload DTO (`orderId` + BE-ordered `steps`) + JSON parse/validate |
+| `code/src/IceBot/Workflow/Orders/OrderQueue.cs` | Single background worker that runs accepted orders through `WorkflowRunner.RunQueue` one at a time |
+| `code/src/IceBot/Workflow/Orders/EdgeOrderCommandReceiver.cs` | Five-second mTLS command-pull loop for ExecuteOrder; stores and ACKs received commands |
+| `code/src/IceBot/Workflow/Orders/EdgeOrderInbox.cs` | Schema-4 receipt validation and durable CommandId-keyed JSON inbox |
 | `code/src/IceBot/Robot/FairinoLuaExecutor.cs` | Upload + run Lua on Fairino; `MoveToTeachingPoint` (home) via `GetRobotTeachingPoint` + `MoveJ` |
 | `code/src/IceBot/Machines/IMachineModule.cs` | Interface every machine implements (MachineType, DisplayName, StepNames) — no step is machine-less |
 | `code/src/IceBot/Machines/IMachineTrigger.cs` | Optional interface for machines wired over RS485 — adds `Trigger(comPort)` and `TestConnection(comPort)` |
@@ -814,7 +821,7 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 | `code/src/IceBot/Machines/CupDropping/CupDroppingMachineModule.cs` | `IMachineTrigger` + `IMachineDiagnostics` implementation for the cup-dropping machine — the "module" |
 | `code/src/IceBot/Machines/CupDropping/CupDroppingMachineClient.cs` | Raw serial protocol client for the cup-dropping machine — one subfolder per machine |
 | `code/src/IceBot/Networking/LocalApiServer.cs` | Inbound HTTP API (tunnel ingress) |
-| `code/src/IceBot/Config/` | `AppConfig`, `SiteConfigStore`, setup wizard |
+| `code/src/IceBot/Config/` | `AppConfig` plus `Connectivity/`, `Setup/`, and `Storage/` functional groups |
 | `code/workflow/` | Lua scripts (gitignored, copied to output on build) |
 | `workflow/lay_coc.lua` | Example step script (cup pickup) |
 | `deploy/duckdns/`, `deploy/cloudflare/` | Old DuckDNS + Cloudflare Tunnel scripts — stale, replaced by NetBird (no equivalent script yet) |
