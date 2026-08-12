@@ -231,6 +231,22 @@ Payment OK on cloud
 Lua bundle installation; local API `serve` mode; RS485 peripheral triggers. Order execution still
 uses the legacy inbound filename contract and status POST-back remains TODO.
 
+**Canonical installation/operation flow (2026-08-12):**
+
+```text
+Setup.exe (machine environment, once)
+    → InitIceBot.exe (site identity/configuration, once or when serviced)
+    → IceBot.exe (production sales runtime, every operation session)
+```
+
+`Setup.exe` is a self-contained .NET 8 Windows bootstrapper. It requires Administrator, verifies
+.NET Framework 4.7.2+, installs NetBird (offline prerequisite first, winget fallback), copies the
+application payload to `C:\Program Files\IceBot`, creates the mutable runtime directories and
+their ACLs, and creates Desktop/Start Menu shortcuts. It never asks for store credentials,
+Kiosk Code, or NetBird setup key, never registers an Edge, and never starts sales. System
+dependency installation was removed from `NetBirdSetup`; Init/runtime only connect an already
+installed NetBird client.
+
 **Startup behavior:** running `IceBot.exe` with no arguments now enters `serve` mode immediately:
 it does **not** perform operator login or token refresh. It ensures NetBird connectivity, starts
 the local HTTP API, and starts the mTLS BE command/order receiver. Missing/expired operator tokens
@@ -471,6 +487,7 @@ but are **not fully implemented** by the receipt-only worker.
 | Item | Choice |
 |------|--------|
 | Language | **C#** (.NET Framework **4.7.2**) |
+| Installer | Self-contained **.NET 8 Windows x64** bootstrapper (`Setup.exe`) |
 | UI | **Console / CMD** — no GUI required |
 | Robot SDK | Fairino C# SDK (`code/lib/fairino-csharp-sdk/`) |
 | Ingress | NetBird (`deploy/` still has the old DuckDNS + Cloudflare Tunnel scripts, stale) |
@@ -481,7 +498,7 @@ but are **not fully implemented** by the receipt-only worker.
 
 Simple command-line interface — robot arm control utility, not an end-user product.
 
-### Main menu (`IceBot.exe`)
+### Technician menu (`InitIceBot.exe`)
 
 The technician must log in with the store account when `InitIceBot.exe` starts. The menu is shown
 only after authentication succeeds. This does not affect `IceBot.exe`, whose mTLS order receiver
@@ -528,11 +545,12 @@ Implementation: `ConsoleMenu.Run()` (main), `ConsoleMenu.RunConfigMenu()`, `Cons
 
 | Command | Purpose |
 |---------|---------|
+| `Setup.exe` | Administrator-only machine bootstrapper: prerequisites, payload, runtime folders/ACLs, shortcuts; no store configuration and no sales server |
 | `IceBot.exe` | Production runtime: start local API and mTLS order receiver immediately |
 | `IceBot.exe serve` | Explicit alias for the same production runtime |
 | `InitIceBot.exe` | Technician-only menu for configuration, device registration, Lua deployment synchronization, and hardware tests; it never starts the sales server |
 
-Both executables are deployed in the same directory. `InitIceBot.csproj` deliberately outputs
+Both operational executables are deployed in the same directory. `InitIceBot.csproj` deliberately outputs
 `InitIceBot.exe` beside `IceBot.exe`, so they share the same base-directory resources:
 `config/icebot.site.env`, `drivers/`, `workflow/`, `test-workflow/`, and `data/`. Do not deploy the
 technician executable into a separate directory unless these paths are explicitly centralized.
@@ -573,37 +591,23 @@ Robot controller (edge PC) and Fairino arm must be on the same LAN (`192.168.58.
 mesh network, not a project-specific API) — replaces the earlier DuckDNS + Cloudflare Tunnel
 stack (dynamic DNS *and* the tunnel itself, both in one). IceBot's side of this is a setup key
 (`NetBirdSetupKey` / `NETBIRD_SETUP_KEY`, entered at menu Cau hinh > 1 as "NetBird setup key")
-that NetBird uses to identify this store and open the path in. Unlike the rest of the BE-facing
-surface (mock-only for now), **NetBird is real and IceBot actively drives its CLI end to end**,
-including installing it:
+that NetBird uses to identify this store and open the path in.
 
-`Config/NetBirdSetup.cs`:
+`Config/Connectivity/NetBirdSetup.cs`:
 - `ResolveExecutable()` — tries bare `"netbird"` (works if it resolves via this process's
   PATH), else checks the known install path `%ProgramFiles%\Netbird\netbird.exe` directly on
-  disk. The disk check matters: a Windows process that was already running when NetBird's
-  installer updated the system PATH never sees that update (inherited env is a snapshot from
-  process start) — checking the file's existence on disk sidesteps that entirely.
-- If neither resolves → **auto-installs NetBird** via `winget install --id Netbird.Netbird
-  --silent --accept-package-agreements --accept-source-agreements` (3 min timeout), then
-  resolves again. This is the concrete implementation of "may Edge tu dong cai NetBird cho
-  nguoi dung" — no manual install step, no separate terminal.
+  disk.
+- If neither resolves, it reports that `Setup.exe` must be run. Init/runtime never install
+  Windows software.
 - Then runs `netbird up --setup-key <key>` (1 min timeout) and surfaces NetBird's own
   stdout/stderr as the result message (`[OK]`/`[WARN]`/`[ERROR]`, never throws past the caller).
-- Both winget install and the driver setup NetBird performs typically need **Administrator**
-  rights; a non-interactive process can't answer a UAC prompt, so instead of hanging forever
-  each child process has a timeout and is killed, reporting "may dang cho quyen admin (UAC)" —
-  the fix is running `IceBot.exe` elevated.
 
-**Two call sites, both non-blocking** (report and continue, matching the "warn, don't gate"
-pattern used for other missing config):
+**Two connection call sites:**
 1. `ConfigSetupWizard.RunNetBird()` — right after prompting for the setup key, only if it's new/changed
    from what was already saved.
 2. `ConsoleMenu.EnsureNetBirdConnected()` — called at the top of **both** `ConsoleMenu.Run()`
    (interactive menu) and `ConsoleMenu.RunServeMode()` (`serve`) at startup, whenever a setup
-   key is already saved. This is what makes a
-   **fresh Edge PC image** work correctly: the key can be provisioned ahead of time (e.g. baked
-   into the image or entered once), and the very first `IceBot.exe` launch on that machine
-   installs NetBird and connects — no wizard re-entry required.
+   key is already saved. Runtime reconnection is non-blocking and never installs dependencies.
 
 | Component | Role |
 |-----------|------|
@@ -618,9 +622,11 @@ Cloud BE
     → workflow/ → Fairino arm @ 192.168.58.2
 ```
 
-**Deploy files:** `deploy/icebot/start-serve.ps1`. `deploy/duckdns/` and `deploy/cloudflare/`
-are still in the repo but **stale** — leftover from the old ingress stack, no NetBird
-equivalent written yet (NetBird's actual deploy/setup mechanism isn't known to this codebase).
+**Installer packaging:** `deploy/installer/build-package.ps1` builds the Release application,
+publishes `Setup.exe` self-contained for `win-x64`, and creates `artifacts/installer/IceBot-win-x64/`
+with a `payload/` directory. Optional offline .NET Framework and NetBird installers are copied
+to `prerequisites/`. The complete package directory must be distributed. `deploy/duckdns/` and
+`deploy/cloudflare/` remain legacy references and are not part of the canonical flow.
 
 **Env vars (robot controller):**
 
@@ -713,9 +719,10 @@ MoveJ(
 
 | Feature | Status |
 |---------|--------|
+| Self-contained `Setup.exe`: prerequisite checks/install, application copy, runtime folders/ACLs and shortcuts | ✅ Done |
 | Console menu + CLI | ✅ Done |
 | Config wizard (NetBird setup key, public URL) | ✅ Done |
-| NetBird auto-install (winget, if missing) + auto-`up` at every app startup (`NetBirdSetup.cs`, `ConsoleMenu.EnsureNetBirdConnected`) | ✅ Done |
+| NetBird installation in `Setup.exe`; Init/runtime only perform idempotent `netbird up` | ✅ Done |
 | Real operator login + access/refresh rotation | ✅ Done |
 | New Edge initialization: login -> printed Kiosk Code -> NetBird -> kiosk/endpoint registration -> local PFX + runtime identity -> mTLS provision -> kiosk activation -> heartbeat | ✅ Done; direct private BE HTTPS override may still be required if the public proxy does not forward client certificates |
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done |
@@ -760,15 +767,18 @@ anymore; `IMachineModule` only carries identity (`MachineType`, `DisplayName`, `
 
 ### Site setup
 
-1. **Initialize the Edge** in `InitIceBot.exe` configuration item 1. This logs in, connects
+1. **Install the machine environment** by running the packaged `Setup.exe` as Administrator.
+   This installs/checks prerequisites and deploys the application, but stores no site identity.
+2. **Initialize the Edge** in `InitIceBot.exe` configuration item 1. This logs in, connects
    NetBird, creates/recovers the kiosk and Full Edge endpoint, generates its local PFX, provisions
    mTLS, activates the kiosk, verifies `Operational`, sends an authenticated heartbeat, and saves
    the identities. Store and organization parents must already be Active.
-2. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
+3. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
    direct private NetBird HTTPS URL when client-certificate forwarding requires it. The
    presigned object-storage host must also be Edge-reachable.
-3. **Synchronize Lua (deferred)** — menu configuration item 5 remains available, but this step is
+4. **Synchronize Lua (deferred)** — menu configuration item 5 remains available, but this step is
    postponed until BE contains production Lua artifacts and a deployment to pull.
+5. **Start production** with `IceBot.exe`. It does not perform installer or technician work.
 
 ### Runtime (orders)
 
@@ -797,6 +807,8 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 
 | File / folder | Role |
 |---------------|------|
+| `code/src/IceBot.Setup/` | Self-contained Windows Setup bootstrapper source |
+| `deploy/installer/build-package.ps1` | Build/publish the distributable Setup + payload package |
 | `code/src/IceBot/Program.cs` | Entry point (thin) — parses CLI args, delegates to `Cli.ConsoleMenu` |
 | `code/src/IceBot/Cli/ConsoleMenu.cs` | Interactive menu + `serve`/`test`/`test-machine` modes — all Console I/O lives here |
 | `code/src/IceBot/Api/Authentication/BeApi.cs` | Operator login/refresh client (legacy mock `GetLua` helpers remain unused by menu/CLI) |
@@ -824,7 +836,7 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 | `code/src/IceBot/Config/` | `AppConfig` plus `Connectivity/`, `Setup/`, and `Storage/` functional groups |
 | `code/workflow/` | Lua scripts (gitignored, copied to output on build) |
 | `workflow/lay_coc.lua` | Example step script (cup pickup) |
-| `deploy/duckdns/`, `deploy/cloudflare/` | Old DuckDNS + Cloudflare Tunnel scripts — stale, replaced by NetBird (no equivalent script yet) |
+| `deploy/duckdns/`, `deploy/cloudflare/` | Legacy DuckDNS + Cloudflare scripts; not used by the canonical Setup → Init → Runtime flow |
 | `.env/GLOBAL_WORKING_CONTEXT.md` | Universal working standards for all projects |
 
 ---

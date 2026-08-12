@@ -6,6 +6,7 @@ IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng
 
 ## Trạng thái quan trọng
 
+- `Setup.exe` là bootstrapper cài đặt: kiểm tra .NET Framework, cài NetBird, copy ứng dụng, tạo thư mục/quyền và shortcut.
 - `IceBot.exe` là runtime sản xuất: tự mở server, kết nối NetBird và bắt đầu pull Order từ BE bằng mTLS. Không cần đăng nhập tài khoản cửa hàng để chạy.
 - `InitIceBot.exe` dành cho kỹ thuật viên: đăng nhập, khởi tạo Edge, cấu hình, đăng ký máy ngoại vi và kiểm tra phần cứng.
 - Đăng nhập thật với BE, đăng ký Kiosk/Execution Endpoint, cấp mTLS, kích hoạt Kiosk và heartbeat đã được triển khai.
@@ -19,7 +20,7 @@ IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng
 Dự án dùng **Modular Monolith theo nhóm chức năng**. Toàn bộ runtime vẫn được triển khai thành một ứng dụng Edge, nhưng code được chia theo trách nhiệm:
 
 ```text
-IceBot.exe / InitIceBot.exe
+Setup.exe → InitIceBot.exe → IceBot.exe
         │
         ├── Api             đăng nhập, API quản trị và mTLS
         ├── Config          kết nối, khởi tạo và lưu cấu hình
@@ -62,13 +63,15 @@ IceBot-IOT/
 │   │   │       ├── Orders/             receiver, inbox và queue
 │   │   │       └── Provisioning/       cài Full Edge bundle
 │   │   ├── IceBot.Driver.Abstractions/ contract công khai cho plugin
-│   │   └── InitIceBot/                  entry point công cụ kỹ thuật
+│   │   ├── InitIceBot/                  entry point công cụ kỹ thuật
+│   │   └── IceBot.Setup/                bootstrapper tạo Setup.exe
 │   ├── test-workflow/                   Lua mẫu để test robot
 │   └── workflow/                        Lua production, site-local/gitignored
 ├── driver-sdk/                          hướng dẫn và template driver
 ├── harness/                             test tự động
 ├── context/PROJECT_CONTEXT.md           nguồn sự thật chi tiết của dự án
-├── deploy/                              script deploy; Cloudflare/DuckDNS đã cũ
+├── deploy/installer/                    script đóng gói Setup + payload
+├── deploy/cloudflare/, deploy/duckdns/  legacy, không dùng trong flow mới
 ├── docs/                                tài liệu giao thức phần cứng
 └── firmware/                            firmware liên quan
 ```
@@ -76,8 +79,8 @@ IceBot-IOT/
 ## Yêu cầu
 
 - Windows 10/11.
-- .NET SDK có thể build target `.NET Framework 4.7.2`.
-- NetBird CLI; ứng dụng có thể tự cài bằng `winget` khi khởi tạo.
+- Máy build cần .NET SDK hỗ trợ `.NET Framework 4.7.2` và `.NET 8`.
+- Máy Edge không cần SDK; `Setup.exe` tự kiểm tra .NET Framework runtime và cài NetBird.
 - Edge và Fairino FR5 cùng LAN; IP mặc định của Fairino là `192.168.58.2`.
 - USB-RS485/cổng COM và driver tương ứng cho các máy ngoại vi.
 - Tài khoản cửa hàng do BE cấp và Kiosk Code riêng được in trên vỏ máy.
@@ -100,19 +103,54 @@ code/src/IceBot/bin/Debug/net472/InitIceBot.exe
 
 `IceBot.exe serve` là alias tường minh của chế độ runtime. Hai file EXE phải nằm cùng thư mục để dùng chung `config/`, `certificates/`, `drivers/`, `workflow/`, `test-workflow/` và `data/`.
 
+### Tạo package cài đặt
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\installer\build-package.ps1
+```
+
+Package được tạo tại `artifacts/installer/IceBot-win-x64/`, gồm `Setup.exe` self-contained và thư mục `payload/`. Phải phân phối **cả thư mục**, không chỉ copy riêng `Setup.exe`.
+
+Máy Windows đã có .NET Framework 4.7.2+ thì không cần bộ cài framework. Để tạo package offline đầy đủ, truyền thêm đường dẫn bộ cài .NET Framework và NetBird:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\installer\build-package.ps1 `
+  -DotNetFrameworkInstaller "D:\Installers\ndp48-x86-x64-allos-enu.exe" `
+  -NetBirdInstaller "D:\Installers\netbird-installer.msi"
+```
+
 ## Lần đầu cài một Edge mới
+
+Flow chuẩn:
+
+```text
+Setup.exe → InitIceBot.exe → IceBot.exe
+```
+
+### 1. `Setup.exe` — cài môi trường
+
+Chạy bằng quyền Administrator. Setup sẽ:
+
+1. Kiểm tra .NET Framework 4.7.2+; nếu thiếu, chạy bộ cài offline trong `prerequisites/`.
+2. Cài NetBird từ installer offline; nếu không có thì dùng `winget`.
+3. Copy ứng dụng vào `C:\Program Files\IceBot`.
+4. Tạo `config/`, `certificates/`, `drivers/`, `workflow/`, `test-workflow/`, `data/` và chỉ cấp quyền ghi cho tài khoản Windows đang cài đặt.
+5. Tạo shortcut `IceBot` và `Init IceBot` trên Desktop/Start Menu.
+
+Setup không đăng nhập, không nhận Kiosk Code/NetBird key, không đăng ký Edge và không tự chạy hệ thống bán hàng.
+
+### 2. `InitIceBot.exe` — khởi tạo Edge
 
 Kỹ thuật viên thực hiện:
 
-1. Chạy `InitIceBot.exe`.
-2. Đăng nhập bằng tài khoản cửa hàng.
-3. Chọn **Cấu hình → Khởi tạo Edge mới**.
-4. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code.
-5. Nhập NetBird setup key.
+1. Đăng nhập bằng tài khoản cửa hàng.
+2. Chọn **Cấu hình → Khởi tạo Edge mới**.
+3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code.
+4. Nhập NetBird setup key.
 
 Các bước còn lại chạy tự động:
 
-1. Cài NetBird nếu cần và chạy `netbird up`.
+1. Kiểm tra NetBird đã được Setup cài và chạy `netbird up`.
 2. Nếu máy đã lưu `KIOSK_ID`, tái sử dụng ID đó.
 3. Nếu chưa có, tìm Kiosk theo đúng Kiosk Code; không tìm thấy thì tự đăng ký Kiosk dưới cửa hàng duy nhất mà tài khoản được truy cập.
 4. Tìm hoặc tạo Full Edge Execution Endpoint với code `EDGE-{WINDOWS_MACHINE_NAME}`.
@@ -123,7 +161,18 @@ Các bước còn lại chạy tự động:
 
 Nếu endpoint đã `Active`, InitIceBot yêu cầu đúng PFX hiện có; không tự tạo certificate mới vì fingerprint sẽ không khớp với BE.
 
-## Hai chương trình
+### 3. `IceBot.exe` — vận hành bán hàng
+
+Sau khi khởi tạo thành công, chạy `IceBot.exe`. Runtime không cài dependency và không yêu cầu tài khoản cửa hàng; nó chỉ kết nối lại NetBird, mở server và bắt đầu nhận Order.
+
+## Trách nhiệm của từng chương trình
+
+### `Setup.exe`
+
+- Chỉ cài môi trường và application payload.
+- Có manifest yêu cầu quyền Administrator.
+- Có thể chạy lại để nâng cấp file chương trình mà vẫn giữ `config`, certificate, workflow và dữ liệu runtime.
+- Không chứa nghiệp vụ cửa hàng và không chạy server bán hàng.
 
 ### `IceBot.exe`
 

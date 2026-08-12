@@ -382,10 +382,9 @@ namespace IceBot.Cli
 
         // Runs once at the top of both entry points (interactive menu and `serve`), right after
         // the login gate. If a NetBird setup key is already saved but this particular machine
-        // doesn't have the NetBird CLI yet (fresh Edge PC image, first run), NetBirdSetup.RunUp
-        // installs it automatically before connecting — the operator never has to do this by
-        // hand. Non-blocking: a failure here only warns, it does not stop the app from starting
-        // (matches the "warn and continue" pattern used for other missing config).
+        // doesn't have the NetBird CLI, the operator is directed back to Setup.exe. Runtime only
+        // reconnects NetBird; it never installs system dependencies. Non-blocking: a failure
+        // here only warns, it does not stop the app from starting.
         private static void EnsureNetBirdConnected()
         {
             var setupKey = AppConfig.NetBirdSetupKey;
