@@ -9,12 +9,12 @@ namespace IceBot.Config
         {
             Console.WriteLine();
             Console.WriteLine("=== KHOI TAO MAY EDGE ===");
-            Console.WriteLine("Buoc 1/5: Xac dinh Kiosk Code");
+            Console.WriteLine("Buoc 1/6: Xac dinh Kiosk Code");
             var settings = SiteConfigStore.Load();
             if (!EnsureKioskCode(settings)) return;
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 2/5: Ket noi NetBird");
+            Console.WriteLine("Buoc 2/6: Ket noi NetBird");
             if (!ConfigSetupWizard.RunNetBird())
             {
                 Console.WriteLine("[ERROR] Chua the dang ky Edge vi NetBird chua ket noi.");
@@ -22,7 +22,7 @@ namespace IceBot.Config
             }
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 3/5: Kiem tra/dang ky Kiosk voi BE");
+            Console.WriteLine("Buoc 3/6: Kiem tra/dang ky Kiosk voi BE");
             RegisterExecutionEndpointIfMissing();
         }
 
@@ -38,7 +38,7 @@ namespace IceBot.Config
             Guid? backendProfileIdentity = null;
             if (settings.ExecutionEndpointId != Guid.Empty)
             {
-                Console.WriteLine("Buoc 4/5: Kiem tra Execution Endpoint");
+                Console.WriteLine("Buoc 4/6: Kiem tra Execution Endpoint");
                 Console.WriteLine($"[OK] Edge da co Execution Endpoint ID: {settings.ExecutionEndpointId:D}");
                 var current = api.GetEndpoint(kioskId, settings.ExecutionEndpointId);
                 if (!current.Success)
@@ -52,7 +52,7 @@ namespace IceBot.Config
             }
             else
             {
-                Console.WriteLine("Buoc 4/5: Dang ky Execution Endpoint");
+                Console.WriteLine("Buoc 4/6: Dang ky Execution Endpoint");
                 var endpointCode = ExecutionEndpointRegistrationApi.BuildEndpointCode(Environment.MachineName);
                 Console.WriteLine($"Dang ky ma Edge: {endpointCode}");
                 var result = api.FindOrCreate(kioskId, endpointCode);
@@ -73,7 +73,7 @@ namespace IceBot.Config
             settings.KioskId = kioskId;
             SiteConfigStore.Save(settings);
             Console.WriteLine();
-            Console.WriteLine("Buoc 5/5: Provision va kiem tra mTLS");
+            Console.WriteLine("Buoc 5/6: Provision mTLS");
             CompleteMutualTls(api, settings, endpointStatus, backendProfileIdentity);
         }
 
@@ -97,7 +97,7 @@ namespace IceBot.Config
                     Console.WriteLine("[ERROR] Endpoint da Active nhung Edge khong co PFX da duoc BE gan fingerprint; khong tu tao PFX thay the.");
                     return;
                 }
-                PrintProbeResult();
+                ActivateKioskAndProbe(api, settings);
                 return;
             }
 
@@ -154,11 +154,30 @@ namespace IceBot.Config
                 return;
             }
             Console.WriteLine("[OK] Execution Endpoint da Active tren BE.");
-            PrintProbeResult();
+            ActivateKioskAndProbe(api, settings);
         }
 
-        private static void PrintProbeResult()
+        private static void ActivateKioskAndProbe(ExecutionEndpointRegistrationApi api, SiteSettings settings)
         {
+            Console.WriteLine();
+            Console.WriteLine("Buoc 6/6: Kich hoat kiosk va kiem tra ket noi");
+            var activation = api.ActivateKiosk(settings.KioskId);
+            if (!activation.Success)
+            {
+                Console.WriteLine("[ERROR] Kich hoat kiosk that bai: " + activation.Message);
+                return;
+            }
+            if (!string.Equals(activation.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[ERROR] Kiosk chua Active (trang thai: {activation.Status}).");
+                return;
+            }
+            if (!string.Equals(activation.OperationalState, "Operational", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"[ERROR] Kiosk Active nhung operational state la {activation.OperationalState}, chua the nhan don online.");
+                return;
+            }
+            Console.WriteLine("[OK] Kiosk da Active va Operational.");
             var connected = EdgeMtlsProbe.SendHeartbeat(out var message);
             Console.WriteLine(connected ? "[OK] " + message : "[ERROR] " + message);
         }

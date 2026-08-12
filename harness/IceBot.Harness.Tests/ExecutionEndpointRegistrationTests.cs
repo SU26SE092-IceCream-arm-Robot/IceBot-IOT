@@ -83,5 +83,17 @@ namespace IceBot.Harness.Tests
             Assert.Equal("Active", result.Status);
             Assert.Equal(profileIdentity, result.ProfileIdentity);
         }
+
+        [Fact]
+        public void ParseKioskManagementResponse_RequiresActiveOperationalKioskData()
+        {
+            var result = ExecutionEndpointRegistrationApi.ParseKioskManagementResponse(
+                HttpStatusCode.OK,
+                "{\"succeeded\":true,\"data\":{\"status\":\"Active\",\"operationalState\":\"Operational\"}}");
+
+            Assert.True(result.Success);
+            Assert.Equal("Active", result.Status);
+            Assert.Equal("Operational", result.OperationalState);
+        }
     }
 }

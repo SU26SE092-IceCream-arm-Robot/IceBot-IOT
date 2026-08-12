@@ -16,6 +16,8 @@ namespace IceBot.Api
         public Guid StoreId { get; set; }
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string OperationalState { get; set; } = string.Empty;
     }
 
     internal sealed class BackendStore
@@ -30,6 +32,14 @@ namespace IceBot.Api
         public bool Success { get; set; }
         public Guid KioskId { get; set; }
         public bool Created { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    internal sealed class KioskManagementResult
+    {
+        public bool Success { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string OperationalState { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
     }
 
@@ -142,6 +152,15 @@ namespace IceBot.Api
                     Created = false,
                     Message = "Kiosk da ton tai; da khoi phuc KioskId theo dinh danh Edge."
                 };
+        }
+
+        public KioskManagementResult ActivateKiosk(Guid kioskId)
+        {
+            if (kioskId == Guid.Empty) return FailKioskManagement("KioskId khong hop le.");
+            return ParseKioskManagement(SendWithRefresh(
+                new HttpMethod("PATCH"),
+                $"api/v1/management/kiosks/{kioskId:D}/status",
+                new { status = 2 }));
         }
 
         public ExecutionEndpointRegistrationResult FindOrCreate(Guid kioskId, string endpointCode)
@@ -348,6 +367,33 @@ namespace IceBot.Api
             }
         }
 
+        internal static KioskManagementResult ParseKioskManagementResponse(HttpStatusCode statusCode, string json) =>
+            ParseKioskManagement(new ApiResponse(statusCode, json, string.Empty));
+
+        private static KioskManagementResult ParseKioskManagement(ApiResponse response)
+        {
+            if (!string.IsNullOrWhiteSpace(response.TransportError))
+                return FailKioskManagement(response.TransportError);
+            try
+            {
+                var envelope = JsonSerializer.Deserialize<ApiEnvelope<BackendKiosk>>(response.Body, JsonOptions);
+                if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300 ||
+                    envelope == null || !envelope.Succeeded || envelope.Data == null)
+                    return FailKioskManagement(envelope?.Message ?? $"BE tu choi kich hoat kiosk (HTTP {(int)response.StatusCode}).");
+                return new KioskManagementResult
+                {
+                    Success = true,
+                    Status = envelope.Data.Status,
+                    OperationalState = envelope.Data.OperationalState,
+                    Message = envelope.Message ?? "Kich hoat kiosk thanh cong."
+                };
+            }
+            catch (JsonException)
+            {
+                return FailKioskManagement($"Response kich hoat kiosk tu BE khong hop le (HTTP {(int)response.StatusCode}).");
+            }
+        }
+
         private static ExecutionEndpointRegistrationResult ParseCreate(ApiResponse response)
         {
             if (!string.IsNullOrWhiteSpace(response.TransportError)) return Fail(response.TransportError);
@@ -425,6 +471,9 @@ namespace IceBot.Api
 
         private static KioskRegistrationResult FailKiosk(string message) =>
             new KioskRegistrationResult { Success = false, Message = message };
+
+        private static KioskManagementResult FailKioskManagement(string message) =>
+            new KioskManagementResult { Success = false, Message = message };
 
         private static ExecutionEndpointManagementResult FailManagement(string message) =>
             new ExecutionEndpointManagementResult { Success = false, Message = message };

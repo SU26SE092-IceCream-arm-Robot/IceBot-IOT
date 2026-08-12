@@ -299,9 +299,12 @@ certificate for mTLS runtime calls, use the BE's private **HTTPS** NetBird addre
      `FAIRINO_LUA_V1 / FR5` (this describes the workflow/device compatibility; Edge remains the
      Execution Endpoint that receives and orchestrates Lua);
    - call the management provision API with the runtime ID and fingerprint, then verify status is
-     `Active`;
-   - send a real authenticated heartbeat through the IoT endpoint to prove the certificate
-     reaches BE and its fingerprint matches.
+     `Active`.
+8. Activate the kiosk through `PATCH /api/v1/management/kiosks/{kioskId}/status` (`status = 2`),
+   verify both lifecycle `Active` and operational state `Operational`, then send a real
+   authenticated heartbeat through the IoT endpoint. This proves the certificate reaches BE,
+   makes connectivity `Online`, and completes the BE conditions for online-sales admission.
+   Activation is rejected cleanly when the parent store or organization is not Active.
 
 Generated PFX files use `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` when that environment variable is
 set; otherwise they are passwordless so first-run setup stays non-interactive. Protect the Edge
@@ -709,7 +712,7 @@ MoveJ(
 | Config wizard (NetBird setup key, public URL) | ✅ Done |
 | NetBird auto-install (winget, if missing) + auto-`up` at every app startup (`NetBirdSetup.cs`, `ConsoleMenu.EnsureNetBirdConnected`) | ✅ Done |
 | Real operator login + access/refresh rotation | ✅ Done |
-| New Edge initialization: login -> printed Kiosk Code -> NetBird -> kiosk/endpoint registration -> local PFX + runtime identity -> automatic mTLS provisioning + heartbeat verification | ✅ Done; direct private BE HTTPS override may still be required if the public proxy does not forward client certificates |
+| New Edge initialization: login -> printed Kiosk Code -> NetBird -> kiosk/endpoint registration -> local PFX + runtime identity -> mTLS provision -> kiosk activation -> heartbeat | ✅ Done; direct private BE HTTPS override may still be required if the public proxy does not forward client certificates |
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |
@@ -754,7 +757,8 @@ anymore; `IMachineModule` only carries identity (`MachineType`, `DisplayName`, `
 
 1. **Initialize the Edge** in `InitIceBot.exe` configuration item 1. This logs in, connects
    NetBird, creates/recovers the kiosk and Full Edge endpoint, generates its local PFX, provisions
-   mTLS, confirms `Active`, sends an authenticated heartbeat, and saves the identities.
+   mTLS, activates the kiosk, verifies `Operational`, sends an authenticated heartbeat, and saves
+   the identities. Store and organization parents must already be Active.
 2. **Confirm connectivity** — use the default `https://api.icebot.io.vn`, or override it with the
    direct private NetBird HTTPS URL when client-certificate forwarding requires it. The
    presigned object-storage host must also be Edge-reachable.
