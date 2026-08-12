@@ -1,8 +1,6 @@
 using System;
-using IceBot.Api;
 using IceBot.Cli;
 using IceBot.Config;
-using IceBot.Workflow;
 
 namespace IceBot
 {
@@ -29,40 +27,13 @@ namespace IceBot
         {
             switch (command.ToLowerInvariant())
             {
-                case "menu":
-                    ConsoleMenu.Run();
-                    break;
-                case "setup":
-                case "config":
-                    ConfigSetupWizard.RunNetBird();
-                    ConfigSetupWizard.RunSystemSettings();
-                    ConsoleMenu.Pause();
-                    break;
-                case "login":
-                    StoreAuth.RunInteractive();
-                    ConsoleMenu.Pause();
-                    break;
                 case "serve":
                     ConsoleMenu.RunServeMode();
                     break;
-                case "test":
-                    ConsoleMenu.RunTestMode();
-                    break;
-                case "test-machine":
-                    ConsoleMenu.RunPeripheralConnectionTestMode();
-                    break;
-                case "provision":
-                    WorkflowProvisioner.RunInteractive();
-                    ConsoleMenu.Pause();
-                    break;
-                case "register-device":
-                    StoreAuth.RequireLogin();
-                    PeripheralDeviceRegistrationWizard.Run();
-                    ConsoleMenu.Pause();
-                    break;
                 default:
                     Console.WriteLine($"Unknown command: {command}");
-                    Console.WriteLine("Usage: IceBot [menu|setup|login|serve|test|test-machine|provision|register-device]");
+                    Console.WriteLine("Usage: IceBot [serve]");
+                    Console.WriteLine("Dung InitIceBot.exe de cau hinh, dang ky va test may.");
                     ConsoleMenu.Pause();
                     break;
             }

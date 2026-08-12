@@ -19,7 +19,6 @@ namespace IceBot.Cli
         {
             PrintBanner();
             EnsureNetBirdConnected();
-            Pause();
 
             while (true)
             {
@@ -32,11 +31,12 @@ namespace IceBot.Cli
                 Console.WriteLine();
                 Console.WriteLine("1. Cau hinh");
                 Console.WriteLine("2. Test may");
-                Console.WriteLine("3. Chay he thong");
                 Console.WriteLine("0. Thoat");
                 Console.WriteLine();
                 Console.Write("Chon: ");
-                var choice = Console.ReadLine()?.Trim();
+                var input = Console.ReadLine();
+                if (input == null) return;
+                var choice = input.Trim();
 
                 switch (choice)
                 {
@@ -45,9 +45,6 @@ namespace IceBot.Cli
                         break;
                     case "2":
                         RunTestMenu();
-                        break;
-                    case "3":
-                        RunServeMode();
                         break;
                     case "0":
                         return;
@@ -80,7 +77,9 @@ namespace IceBot.Cli
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
-                var choice = Console.ReadLine()?.Trim();
+                var input = Console.ReadLine();
+                if (input == null) return;
+                var choice = input.Trim();
 
                 switch (choice)
                 {
@@ -131,7 +130,9 @@ namespace IceBot.Cli
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
-                var choice = Console.ReadLine()?.Trim();
+                var input = Console.ReadLine();
+                if (input == null) return;
+                var choice = input.Trim();
 
                 switch (choice)
                 {

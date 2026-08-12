@@ -14,15 +14,15 @@ topping) that makes ice cream to order. Runs on a Windows edge PC at the store.
 ```bash
 dotnet build code/IceBot-IOT.sln -c Debug          # build (Fairino SDK builds too)
 code/src/IceBot/bin/Debug/net472/IceBot.exe        # default: serve mode
-code/src/IceBot/bin/Debug/net472/IceBot.exe menu   # interactive administration menu
+code/src/IceBot/bin/Debug/net472/InitIceBot.exe     # technician administration menu
 code/src/IceBot/bin/Debug/net472/IceBot.exe serve  # local HTTP API on :5080 (headless)
 dotnet test harness/IceBot.Harness.Tests           # unit tests for pure logic (xunit, net472)
 ```
 
 - Real robot/serial runs need hardware (arm @ `192.168.58.2`, COM ports). Without it you can
   still: build, `dotnet test`, and `serve` (`GET /health`, `POST /api/orders`).
-- The interactive menu (`IceBot.exe menu`) calls `Console.Clear()` — wrapped in `SafeClear()` so piped/redirected runs
-  don't crash. Drive the menu by piping choices to `IceBot.exe menu`.
+- The technician menu (`InitIceBot.exe`) calls `Console.Clear()` — wrapped in `SafeClear()` so piped/redirected runs
+  don't crash. Drive the menu by piping choices to `InitIceBot.exe`.
   (Login is required first — pipe account/password lines before menu choices when scripting.)
 
 ## Key invariants (don't break these)

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>InitIceBot</AssemblyName>
+    <RootNamespace>InitIceBot</RootNamespace>
+    <!-- Deploy beside IceBot.exe so both executables share config/, drivers/, workflow/ and data/. -->
+    <OutputPath>..\IceBot\bin\$(Configuration)\net472\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\IceBot\IceBot.csproj" />
+  </ItemGroup>
+</Project>

@@ -235,8 +235,9 @@ uses the legacy inbound filename contract and status POST-back remains TODO.
 it does **not** perform operator login or token refresh. It ensures NetBird connectivity, starts
 the local HTTP API, and starts the mTLS BE command/order receiver. Missing/expired operator tokens
 or an unavailable login API therefore cannot stop order intake or sales. The administration UI
-remains available through `IceBot.exe menu`; `IceBot.exe serve` remains an equivalent explicit
-service command for Task Scheduler and existing deployment scripts.
+The separate `InitIceBot.exe` technician tool owns all configuration and diagnostics menus.
+`IceBot.exe serve` remains an equivalent explicit service command for Task Scheduler and existing
+deployment scripts.
 
 **Visible server console:** `IceBot.exe` is a console executable and must be launched normally,
 not with a hidden-window flag. Serve mode sets the CMD title to `IceBot - SERVER RUNNING`, prints
@@ -259,8 +260,8 @@ Operator login is implemented against the real BE contract:
 - Operator JWTs are for human-authorized operations only. They are deliberately not used for
   execution command pull, artifact download, heartbeat, ACK, or execution reports.
 - Neither server nor menu startup requires login. `StoreAuth.RequireLogin()` runs only when the
-  operator selects **Cau hinh > 5. Dang ky may ngoai vi voi BE** or invokes
-  `IceBot.exe register-device`; failure blocks only device registration.
+  technician selects **Cau hinh > 5. Dang ky may ngoai vi voi BE** in `InitIceBot.exe`; failure
+  blocks only device registration.
 
 `BE_API_URL` is still a deployment placeholder until the BE private NetBird address is known.
 Set it to the BE's private **HTTPS** base URL, without `/api`, through menu configuration,
@@ -269,7 +270,7 @@ Set it to the BE's private **HTTPS** base URL, without `/api`, through menu conf
 ### Peripheral device registration with BE
 
 - The Edge operator can register a machine implemented in `MachineRegistry` through
-  **Cau hinh > 5. Dang ky may ngoai vi voi BE**, or `IceBot.exe register-device`.
+  **Cau hinh > 5. Dang ky may ngoai vi voi BE** in `InitIceBot.exe`.
 - **Cau hinh > 6. Danh sach may ngoai vi** prints every machine in `MachineRegistry`, its stable
   local `MachineType`, and the BE `DeviceId` saved after registration. Missing mappings are shown
   as `CHUA DANG KY`; this view is local/read-only and does not call BE.
@@ -306,7 +307,7 @@ Management creates a Full Edge deployment
     → ACK Accepted, then report Installed and Active
 ```
 
-Entry points: menu `Cau hinh > 4` or `IceBot.exe provision`.
+Entry point: `InitIceBot.exe` menu **Cau hinh > 4**.
 
 ### Required site configuration
 
@@ -427,10 +428,10 @@ Simple command-line interface — robot arm control utility, not an end-user pro
 
 ### Main menu (`IceBot.exe`)
 
-A **login gate runs before the menu** (see "Store login" above) — blocking, loops until
-`BeApi.Login` succeeds. Only after that does the menu below appear.
+The technician menu starts without login. Login is requested lazily only for protected BE
+management operations such as peripheral registration.
 
-Main menu is 4 lines; items `1` and `2` open their own submenu, which **renumbers from 1** (not
+Main menu belongs exclusively to `InitIceBot.exe`; items `1` and `2` open their own submenu, which **renumbers from 1** (not
 a literal `1.1` keystroke — this doc uses "1.1" style dotted notation purely to describe nested
 location in prose, e.g. "1.2" = main item 1 ("Cau hinh") → submenu item 2 ("Cau hinh he thong")).
 
@@ -438,7 +439,6 @@ location in prose, e.g. "1.2" = main item 1 ("Cau hinh") → submenu item 2 ("Ca
 |---|--------|
 | 1 | **Cau hinh** — opens submenu |
 | 2 | **Test may** — opens submenu |
-| 3 | Chay he thong — `serve` mode (nhan don tu BE) |
 | 0 | Thoat |
 
 Submenu "Cau hinh" (enter via main `1`; header prints `CAU HINH`) — split into two separate
@@ -465,17 +465,18 @@ removed):
 
 Implementation: `ConsoleMenu.Run()` (main), `ConsoleMenu.RunConfigMenu()`, `ConsoleMenu.RunTestMenu()`, `ConsoleMenu.RunTestMode()` (item 1), `ConsoleMenu.RunPeripheralConnectionTestMode()` (item 2).
 
-### CLI commands
+### Executables
 
 | Command | Purpose |
 |---------|---------|
-| `IceBot.exe` | Interactive menu (login gate first) |
-| `IceBot.exe setup` | Config wizard → `config/icebot.site.env` |
-| `IceBot.exe login` | Manual re-login, non-blocking (see Store login) |
-| `IceBot.exe provision` | Pull pending Full Edge deployment, verify/install Lua bundle, ACK/report deployment |
-| `IceBot.exe serve` | Start local HTTP API on port **5080** (login gate first) |
-| `IceBot.exe test` | Test tay Robot — connection check + sample `.lua` run (`ConsoleMenu.RunTestMode`) |
-| `IceBot.exe test-machine` | Test ket noi may ngoai vi — connection check for provisioned RS485 machines (`ConsoleMenu.RunPeripheralConnectionTestMode`) |
+| `IceBot.exe` | Production runtime: start local API and mTLS order receiver immediately |
+| `IceBot.exe serve` | Explicit alias for the same production runtime |
+| `InitIceBot.exe` | Technician-only menu for configuration, device registration, Lua deployment synchronization, and hardware tests; it never starts the sales server |
+
+Both executables are deployed in the same directory. `InitIceBot.csproj` deliberately outputs
+`InitIceBot.exe` beside `IceBot.exe`, so they share the same base-directory resources:
+`config/icebot.site.env`, `drivers/`, `workflow/`, `test-workflow/`, and `data/`. Do not deploy the
+technician executable into a separate directory unless these paths are explicitly centralized.
 
 Print status to stdout: provision progress, queue, step N/M, errors, completion. No web UI unless explicitly requested later.
 

@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IceBot.Driver.Abstractions"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IceBot.Driver.Template", "..\driver-sdk\IceBot.Driver.Template\IceBot.Driver.Template.csproj", "{C6069099-6A32-4473-AEE2-F051FBF3FE5C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InitIceBot", "src\InitIceBot\InitIceBot.csproj", "{E0B93B25-2CF7-430F-A433-D7D5752D66E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,11 +87,24 @@ Global
 		{C6069099-6A32-4473-AEE2-F051FBF3FE5C}.Release|x64.Build.0 = Release|Any CPU
 		{C6069099-6A32-4473-AEE2-F051FBF3FE5C}.Release|x86.ActiveCfg = Release|Any CPU
 		{C6069099-6A32-4473-AEE2-F051FBF3FE5C}.Release|x86.Build.0 = Release|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Debug|x64.Build.0 = Debug|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Debug|x86.Build.0 = Debug|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Release|x64.ActiveCfg = Release|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Release|x64.Build.0 = Release|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Release|x86.ActiveCfg = Release|Any CPU
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{43AE6D8D-D907-4BC3-A599-D83BF3F648B4} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{E0B93B25-2CF7-430F-A433-D7D5752D66E0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

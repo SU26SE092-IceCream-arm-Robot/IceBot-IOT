@@ -88,8 +88,8 @@ dotnet build code/IceBot-IOT.sln -c Debug
 # Chạy trực tiếp exe vừa build (server + nhận order)
 code/src/IceBot/bin/Debug/net472/IceBot.exe
 
-# Mở menu quản trị
-code/src/IceBot/bin/Debug/net472/IceBot.exe menu
+# Mở công cụ khởi tạo dành cho kỹ thuật viên
+code/src/IceBot/bin/Debug/net472/InitIceBot.exe
 
 # Hoặc build bản Release rồi chạy kèm lệnh CLI
 dotnet build code/IceBot-IOT.sln -c Release
@@ -100,13 +100,12 @@ code/src/IceBot/bin/Release/net472/IceBot.exe serve
 
 ## Menu & CLI
 
-Menu quản trị khi chạy `IceBot.exe menu` — menu chính chỉ có 4 dòng; chọn `1` hoặc `2` mở submenu riêng (đánh số lại từ 1 trong submenu đó, không phải mã ghép kiểu `1.1`); `0` luôn là "quay lại" (trong submenu) hoặc "thoát" (menu chính):
+Menu kỹ thuật khi chạy `InitIceBot.exe`; `IceBot.exe` không chứa menu và chỉ vận hành server:
 
 ```
 Menu chinh                       Chon 1 -> CAU HINH                          Chon 2 -> TEST MAY
 1. Cau hinh                      1. Cau hinh NetBird                         1. Test tay Robot
 2. Test may                      2. Cau hinh he thong (API key, robot IP,    2. Test ket noi may ngoai vi (Serial)
-3. Chay he thong                    tai khoan, cong COM)                     0. Quay lai
 0. Thoat                         3. Xem cau hinh hien tai
                                   4. Tai file Lua tu BE (mock)
                                   0. Quay lai
@@ -116,7 +115,6 @@ Menu chinh                       Chon 1 -> CAU HINH                          Cho
 |------|-----|-----------|
 | Chính | 1 | Cấu hình — mở submenu |
 | Chính | 2 | Test máy — mở submenu |
-| Chính | 3 | Chạy hệ thống — nhận đơn từ BE (`serve` mode, cổng 5080) |
 | Chính | 0 | Thoát |
 | Cấu hình | 1 | **Cấu hình NetBird** — chỉ 2 thứ NetBird thực sự cần: setup key + Public URL |
 | Cấu hình | 2 | **Cấu hình hệ thống** — mọi thứ còn lại: API key chia sẻ với BE, IP robot, tài khoản cửa hàng, cổng COM máy ngoại vi |
@@ -149,22 +147,15 @@ cup_s : connect
 ice_chocolate_s : disconnect (chua cau hinh cong COM)
 ```
 
-Không có mục "đăng nhập lại" ở đâu trong menu — đăng nhập là **cổng bắt buộc trước khi menu hiện ra** (xem bên dưới), không phải 1 lựa chọn giữa các mục khác. Muốn đăng nhập lại giữa phiên (không chặn), dùng CLI `IceBot.exe login`.
-
-CLI tương ứng:
+Hai executable có trách nhiệm tách biệt:
 
 | Lệnh | Mục đích |
 |------|----------|
 | `IceBot.exe` | Mặc định chạy server và bộ nhận order ngay lập tức |
-| `IceBot.exe menu` | Mở menu quản trị để cấu hình, đăng ký và test máy |
-| `IceBot.exe setup` | Chạy cả 2 wizard (NetBird + hệ thống) liền nhau → `config/icebot.site.env` |
-| `IceBot.exe login` | Đăng nhập tài khoản cửa hàng → lưu key BE trả về |
-| `IceBot.exe provision` | Tải Lua từ BE (mock) → `workflow/` (+ ghi nhớ định danh máy) |
 | `IceBot.exe serve` | Chạy HTTP API nội bộ trên cổng `5080` |
-| `IceBot.exe test` | Test tay Robot (kết nối + chạy file mẫu) |
-| `IceBot.exe test-machine` | Test kết nối máy ngoại vi (Serial) |
+| `InitIceBot.exe` | Mở menu kỹ thuật: cấu hình, đăng ký, đồng bộ Lua và test máy |
 
-### Đăng nhập cửa hàng (`IceBot.exe login`)
+### Đăng nhập cửa hàng (`InitIceBot.exe`)
 
 Mỗi cửa hàng có **1 tài khoản riêng do BE cấp**. Đăng nhập chỉ bắt buộc cho thao tác quản trị dùng JWT như đăng ký máy ngoại vi. Server nhận order dùng mTLS nên vẫn khởi động và bán hàng nếu login lỗi:
 
@@ -172,16 +163,16 @@ Mỗi cửa hàng có **1 tài khoản riêng do BE cấp**. Đăng nhập chỉ
 Khoi dong IceBot.exe / IceBot.exe serve
     → khoi dong NetBird + server + bo nhan order mTLS, khong doi login
 
-Chon dang ky may ngoai vi (hoac IceBot.exe register-device)
+Chon dang ky may ngoai vi trong InitIceBot.exe
     → luc nay moi refresh token hoac yeu cau login
     → login that bai chi chan thao tac dang ky, khong chan server nhan order
 ```
 
-`IceBot.exe login` cho phép đăng nhập lại thủ công. Khi đăng ký máy, Edge thử refresh access token một lần trước khi yêu cầu đăng nhập lại. Operator token chỉ dùng cho API quản trị; mTLS certificate là danh tính riêng của Edge cho nhận order, ACK và deployment.
+Khi đăng ký máy, Edge thử refresh access token một lần trước khi yêu cầu đăng nhập lại. Operator token chỉ dùng cho API quản trị; mTLS certificate là danh tính riêng của Edge cho nhận order, ACK và deployment.
 
 ## Cấu hình site
 
-Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitignored, tạo qua Cấu hình > 1 / > 2 hoặc `IceBot.exe setup`):
+Cấu hình theo từng cửa hàng lưu tại `config/icebot.site.env` (gitignored, tạo qua menu `InitIceBot.exe`):
 
 | Biến | Ý nghĩa |
 |------|---------|
