@@ -13,8 +13,25 @@ namespace IceBot.Api
     internal sealed class BackendKiosk
     {
         public Guid Id { get; set; }
+        public Guid StoreId { get; set; }
         public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public string? SerialNumber { get; set; }
+    }
+
+    internal sealed class BackendStore
+    {
+        public Guid Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+
+    internal sealed class KioskRegistrationResult
+    {
+        public bool Success { get; set; }
+        public Guid KioskId { get; set; }
+        public bool Created { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     internal sealed class BackendExecutionEndpoint
@@ -51,10 +68,72 @@ namespace IceBot.Api
             _http = http;
         }
 
-        public IReadOnlyList<BackendKiosk> ListKiosks(out string error)
+        public KioskRegistrationResult FindOrCreateKiosk(Guid installationId, string machineName)
         {
-            var response = SendWithRefresh(HttpMethod.Get, "api/v1/management/kiosks", null);
-            return ParseList<BackendKiosk>(response, "danh sach kiosk", out error);
+            if (installationId == Guid.Empty) return FailKiosk("EdgeInstallationId khong hop le.");
+
+            var serial = installationId.ToString("D");
+            var lookupResponse = SendWithRefresh(
+                HttpMethod.Get,
+                $"api/v1/management/kiosks?search={Uri.EscapeDataString(serial)}",
+                null);
+            var kiosks = ParseList<BackendKiosk>(lookupResponse, "kiosk theo dinh danh Edge", out var lookupError);
+            if (!string.IsNullOrWhiteSpace(lookupError)) return FailKiosk(lookupError);
+
+            var existing = kiosks.FirstOrDefault(kiosk =>
+                string.Equals(kiosk.SerialNumber, serial, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                return new KioskRegistrationResult
+                {
+                    Success = true,
+                    KioskId = existing.Id,
+                    Created = false,
+                    Message = "Da tim lai KioskId cua Edge tren BE."
+                };
+            }
+
+            var storesResponse = SendWithRefresh(HttpMethod.Get, "api/v1/management/stores", null);
+            var stores = ParseList<BackendStore>(storesResponse, "cua hang cua tai khoan", out var storesError);
+            if (!string.IsNullOrWhiteSpace(storesError)) return FailKiosk(storesError);
+            if (stores.Count == 0)
+                return FailKiosk("Tai khoan chua duoc gan voi cua hang nao.");
+            if (stores.Count != 1)
+                return FailKiosk("Tai khoan truy cap nhieu cua hang; BE phai cap tai khoan dung pham vi mot cua hang de tu dang ky Edge an toan.");
+
+            var code = BuildKioskCode(installationId);
+            var createResponse = SendWithRefresh(
+                HttpMethod.Post,
+                $"api/v1/management/stores/{stores[0].Id:D}/kiosks",
+                new
+                {
+                    code,
+                    name = "IceBot " + NormalizeMachineName(machineName),
+                    kioskType = "RoboticVending",
+                    serialNumber = serial,
+                    timeZone = "Asia/Ho_Chi_Minh"
+                });
+            var created = ParseKioskCreate(createResponse);
+            if (created.Success || createResponse.StatusCode != HttpStatusCode.Conflict) return created;
+
+            // Handles a retry/race where BE committed the first request but Edge did not receive
+            // its response: recover by the unique serial instead of creating a second kiosk.
+            lookupResponse = SendWithRefresh(
+                HttpMethod.Get,
+                $"api/v1/management/kiosks?search={Uri.EscapeDataString(serial)}",
+                null);
+            kiosks = ParseList<BackendKiosk>(lookupResponse, "kiosk sau xung dot dang ky", out lookupError);
+            existing = kiosks.FirstOrDefault(kiosk =>
+                string.Equals(kiosk.SerialNumber, serial, StringComparison.OrdinalIgnoreCase));
+            return existing == null
+                ? created
+                : new KioskRegistrationResult
+                {
+                    Success = true,
+                    KioskId = existing.Id,
+                    Created = false,
+                    Message = "Kiosk da ton tai; da khoi phuc KioskId theo dinh danh Edge."
+                };
         }
 
         public ExecutionEndpointRegistrationResult FindOrCreate(Guid kioskId, string endpointCode)
@@ -105,6 +184,12 @@ namespace IceBot.Api
             var value = builder.ToString().TrimEnd('-');
             return value.Length <= 100 ? value : value.Substring(0, 100);
         }
+
+        internal static string BuildKioskCode(Guid installationId) =>
+            "KIOSK-" + installationId.ToString("N").Substring(0, 12).ToUpperInvariant();
+
+        private static string NormalizeMachineName(string machineName) =>
+            string.IsNullOrWhiteSpace(machineName) ? "Edge" : machineName.Trim();
 
         private ApiResponse SendWithRefresh(HttpMethod method, string relativePath, object? body)
         {
@@ -174,6 +259,33 @@ namespace IceBot.Api
         internal static ExecutionEndpointRegistrationResult ParseCreateResponse(HttpStatusCode statusCode, string json) =>
             ParseCreate(new ApiResponse(statusCode, json, string.Empty));
 
+        internal static KioskRegistrationResult ParseKioskCreateResponse(HttpStatusCode statusCode, string json) =>
+            ParseKioskCreate(new ApiResponse(statusCode, json, string.Empty));
+
+        private static KioskRegistrationResult ParseKioskCreate(ApiResponse response)
+        {
+            if (!string.IsNullOrWhiteSpace(response.TransportError)) return FailKiosk(response.TransportError);
+            try
+            {
+                var envelope = JsonSerializer.Deserialize<ApiEnvelope<BackendKiosk>>(response.Body, JsonOptions);
+                if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300 ||
+                    envelope == null || !envelope.Succeeded || envelope.Data == null)
+                    return FailKiosk(envelope?.Message ?? $"BE tu choi dang ky kiosk (HTTP {(int)response.StatusCode}).");
+                if (envelope.Data.Id == Guid.Empty) return FailKiosk("BE tao kiosk nhung khong tra KioskId.");
+                return new KioskRegistrationResult
+                {
+                    Success = true,
+                    KioskId = envelope.Data.Id,
+                    Created = true,
+                    Message = envelope.Message ?? "Dang ky kiosk thanh cong."
+                };
+            }
+            catch (JsonException)
+            {
+                return FailKiosk($"Response dang ky kiosk tu BE khong hop le (HTTP {(int)response.StatusCode}).");
+            }
+        }
+
         private static ExecutionEndpointRegistrationResult ParseCreate(ApiResponse response)
         {
             if (!string.IsNullOrWhiteSpace(response.TransportError)) return Fail(response.TransportError);
@@ -220,6 +332,9 @@ namespace IceBot.Api
 
         private static ExecutionEndpointRegistrationResult Fail(string message) =>
             new ExecutionEndpointRegistrationResult { Success = false, Message = message };
+
+        private static KioskRegistrationResult FailKiosk(string message) =>
+            new KioskRegistrationResult { Success = false, Message = message };
 
         private sealed class ApiEnvelope<T>
         {

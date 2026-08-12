@@ -1,3 +1,4 @@
+using IceBot.Api;
 using IceBot.Cli;
 using IceBot.Config;
 
@@ -9,6 +10,7 @@ namespace IceBot
         public static void Run()
         {
             SiteConfigStore.Load();
+            StoreAuth.RequireLogin();
             ConsoleMenu.Run();
         }
     }

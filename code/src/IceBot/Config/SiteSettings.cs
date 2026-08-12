@@ -22,9 +22,10 @@ namespace IceBot.Config
         public string OperatorAccessToken { get; set; } = string.Empty;
         public string OperatorRefreshToken { get; set; } = string.Empty;
 
-        // Device catalog identity. KioskId is required only by the current operator-authorized
-        // BE registration route. Once a peripheral is created, keep the returned BE DeviceId
-        // keyed by the stable local MachineType so telemetry can reuse it after a restart.
+        // Stable local installation identity is created once before kiosk registration. BE stores
+        // it as the kiosk serial so a rerun can recover the same KioskId instead of creating a
+        // duplicate if KIOSK_ID was not saved successfully after the first HTTP response.
+        public Guid EdgeInstallationId { get; set; }
         public Guid KioskId { get; set; }
         public Dictionary<string, Guid> MachineDeviceIds { get; set; } =
             new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);

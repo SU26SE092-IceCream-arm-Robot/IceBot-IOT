@@ -113,6 +113,7 @@ namespace IceBot.Config
 
         internal static void PreserveBackendDeviceIdentities(SiteSettings current, SiteSettings updated)
         {
+            updated.EdgeInstallationId = current.EdgeInstallationId;
             updated.KioskId = current.KioskId;
             updated.MachineDeviceIds = new Dictionary<string, Guid>(
                 current.MachineDeviceIds,

@@ -14,6 +14,27 @@ namespace IceBot.Harness.Tests
         }
 
         [Fact]
+        public void BuildKioskCode_IsStableAndDoesNotDependOnKioskListOrder()
+        {
+            var installationId = Guid.Parse("12345678-90ab-cdef-1234-567890abcdef");
+
+            Assert.Equal("KIOSK-1234567890AB", ExecutionEndpointRegistrationApi.BuildKioskCode(installationId));
+        }
+
+        [Fact]
+        public void ParseKioskCreateResponse_ReturnsBackendKioskId()
+        {
+            var kioskId = Guid.NewGuid();
+            var result = ExecutionEndpointRegistrationApi.ParseKioskCreateResponse(
+                HttpStatusCode.Created,
+                $"{{\"succeeded\":true,\"message\":\"created\",\"data\":{{\"id\":\"{kioskId:D}\",\"code\":\"KIOSK-ABC\"}}}}");
+
+            Assert.True(result.Success);
+            Assert.True(result.Created);
+            Assert.Equal(kioskId, result.KioskId);
+        }
+
+        [Fact]
         public void ParseCreateResponse_ReturnsExecutionEndpointId()
         {
             var endpointId = Guid.NewGuid();

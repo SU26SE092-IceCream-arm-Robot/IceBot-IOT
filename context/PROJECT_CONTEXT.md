@@ -259,9 +259,9 @@ Operator login is implemented against the real BE contract:
   refresh clears stale tokens and prompts for login for that action only.
 - Operator JWTs are for human-authorized operations only. They are deliberately not used for
   execution command pull, artifact download, heartbeat, ACK, or execution reports.
-- Neither server nor menu startup requires login. `StoreAuth.RequireLogin()` runs only for a
-  protected setup action in `InitIceBot.exe`: initial Edge registration or peripheral-device
-  registration. Failure blocks configuration only and never blocks the production server.
+- `IceBot.exe` never requires operator login, so authentication failure cannot block sales.
+  `InitIceBot.exe`, however, requires the store account login before showing its technician menu;
+  the resulting JWT is reused by Edge/kiosk and peripheral registration actions.
 
 `BE_API_URL` defaults to `https://api.icebot.io.vn` so a completely new Edge can log in and
 register. It can be overridden (without `/api`) through menu configuration, `BE_API_URL` in
@@ -272,15 +272,20 @@ certificate for mTLS runtime calls, use the BE's private **HTTPS** NetBird addre
 
 `InitIceBot.exe` > **Cau hinh > 1. Khoi tao Edge moi** performs this ordered workflow:
 
-1. Require operator login with an account authorized for the target kiosk.
+1. `InitIceBot.exe` has already required the store-account login before displaying the menu.
 2. Prompt for the NetBird setup key and run `netbird up --setup-key ...`; stop registration if
    NetBird cannot connect.
-3. List the kiosks visible to the account. Select the sole kiosk automatically; if several are
-   visible, ask the technician to choose.
+3. If local `KIOSK_ID` exists, reuse it immediately. Otherwise generate and durably save one
+   `EDGE_INSTALLATION_ID`, search BE for a kiosk whose `SerialNumber` exactly equals that ID, and
+   recover its `KioskId` when found. If none exists, the account must resolve to exactly one
+   accessible store; create this Edge itself as a `RoboticVending` kiosk under that store via
+   `POST /api/v1/management/stores/{storeId}/kiosks` and save the returned `KIOSK_ID`. There is
+   never a kiosk list or kiosk-selection prompt. More than one accessible store is treated as an
+   account-scope error instead of asking the technician to guess.
 4. Build the stable code `EDGE-{WINDOWS_MACHINE_NAME}`, reuse the matching endpoint when it
    already exists, or create a `FullEdge` endpoint through
    `POST /api/v1/management/kiosks/{kioskId}/execution-endpoints`.
-5. Persist the returned `EXECUTION_ENDPOINT_ID` and selected `KIOSK_ID` in the local gitignored
+5. Persist the returned `EXECUTION_ENDPOINT_ID` and registered/recovered `KIOSK_ID` in the local gitignored
    `config/icebot.site.env`.
 
 Creation leaves a new endpoint in `Provisioning`. Saving its ID does not yet make order polling
@@ -302,7 +307,8 @@ on Edge, and configure `EXECUTION_CLIENT_CERT_PATH`. The private key is never up
 - After HTTP 201, IceBot persists the BE-generated identity as
   `MACHINE_DEVICE_IDS=<MachineType>:<DeviceId>,...`. Future status/device-event uplinks must
   resolve the BE identity through `SiteSettings.GetMachineDeviceId(machineType)`.
-- Re-running **InitIceBot > Cau hinh > Cau hinh he thong** preserves both `KIOSK_ID` and the
+- Re-running **InitIceBot > Cau hinh > Cau hinh he thong** preserves `EDGE_INSTALLATION_ID`,
+  `KIOSK_ID`, and the
   complete `MACHINE_DEVICE_IDS` dictionary. These BE identities must never be cleared merely
   because a technician changes the BE URL, endpoint certificate, robot IP, account, or COM ports.
 - `KIOSK_ID` is stored only because this management API requires it. A future mTLS Edge-specific
@@ -452,8 +458,9 @@ Simple command-line interface — robot arm control utility, not an end-user pro
 
 ### Main menu (`IceBot.exe`)
 
-The technician menu starts without login. Login is requested lazily only for protected BE
-management operations such as initial Edge registration and peripheral registration.
+The technician must log in with the store account when `InitIceBot.exe` starts. The menu is shown
+only after authentication succeeds. This does not affect `IceBot.exe`, whose mTLS order receiver
+remains independent of operator JWT availability.
 
 Main menu belongs exclusively to `InitIceBot.exe`; items `1` and `2` open their own submenu, which **renumbers from 1** (not
 a literal `1.1` keystroke — this doc uses "1.1" style dotted notation purely to describe nested
@@ -471,7 +478,7 @@ NetBird's own config doesn't get bundled with unrelated settings:
 
 | # | Action |
 |---|--------|
-| 1 | Khoi tao Edge moi — login BE, connect NetBird, find-or-create Full Edge endpoint, save its ID |
+| 1 | Khoi tao Edge moi — connect NetBird, reuse/register KioskId, find-or-create Full Edge endpoint, save its ID |
 | 2 | Cau hinh NetBird — ONLY `NetBirdSetupKey` + `PublicUrl` (`ConfigSetupWizard.RunNetBird`) |
 | 3 | Cau hinh he thong — API key, robot IP, tai khoan cua hang, cong COM may ngoai vi (`ConfigSetupWizard.RunSystemSettings`) |
 | 4 | Xem cau hinh hien tai |
@@ -684,7 +691,7 @@ MoveJ(
 | Config wizard (NetBird setup key, public URL) | ✅ Done |
 | NetBird auto-install (winget, if missing) + auto-`up` at every app startup (`NetBirdSetup.cs`, `ConsoleMenu.EnsureNetBirdConnected`) | ✅ Done |
 | Real operator login + access/refresh rotation | ✅ Done |
-| New Edge initialization: login -> NetBird -> kiosk selection -> idempotent endpoint registration -> persist Execution Endpoint ID | ✅ Done; mTLS provisioning remains a separate required step |
+| New Edge initialization: login -> NetBird -> reuse/register kiosk by stable installation ID -> idempotent endpoint registration -> persist IDs | ✅ Done; mTLS provisioning remains a separate required step |
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done; private BE URL and provisioned endpoint certificate are deployment inputs still to add |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |

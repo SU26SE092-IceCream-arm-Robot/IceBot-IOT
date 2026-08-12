@@ -47,6 +47,7 @@ namespace IceBot.Config
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
                     case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
                     case "BE_REFRESH_TOKEN": settings.OperatorRefreshToken = value; break;
+                    case "EDGE_INSTALLATION_ID": Guid.TryParse(value, out var installationId); settings.EdgeInstallationId = installationId; break;
                     case "KIOSK_ID": Guid.TryParse(value, out var kioskId); settings.KioskId = kioskId; break;
                     case "MACHINE_DEVICE_IDS": settings.MachineDeviceIds = ParseMachineDeviceIds(value); break;
                     case "EXECUTION_ENDPOINT_ID": Guid.TryParse(value, out var endpointId); settings.ExecutionEndpointId = endpointId; break;
@@ -81,6 +82,7 @@ namespace IceBot.Config
                 $"STORE_PASSWORD={settings.StorePassword}",
                 $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
                 $"BE_REFRESH_TOKEN={settings.OperatorRefreshToken}",
+                $"EDGE_INSTALLATION_ID={settings.EdgeInstallationId:D}",
                 $"KIOSK_ID={settings.KioskId:D}",
                 $"MACHINE_DEVICE_IDS={SerializeMachineDeviceIds(settings.MachineDeviceIds)}",
                 $"EXECUTION_ENDPOINT_ID={settings.ExecutionEndpointId:D}",

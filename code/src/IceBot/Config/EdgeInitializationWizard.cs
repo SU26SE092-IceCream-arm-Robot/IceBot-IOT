@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using IceBot.Api;
 
 namespace IceBot.Config
@@ -10,11 +9,7 @@ namespace IceBot.Config
         {
             Console.WriteLine();
             Console.WriteLine("=== KHOI TAO MAY EDGE ===");
-            Console.WriteLine("Buoc 1/3: Dang nhap BE");
-            StoreAuth.RequireLogin();
-
-            Console.WriteLine();
-            Console.WriteLine("Buoc 2/3: Ket noi NetBird");
+            Console.WriteLine("Buoc 1/3: Ket noi NetBird");
             if (!ConfigSetupWizard.RunNetBird())
             {
                 Console.WriteLine("[ERROR] Chua the dang ky Edge vi NetBird chua ket noi.");
@@ -22,23 +17,25 @@ namespace IceBot.Config
             }
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 3/3: Kiem tra dang ky Edge voi BE");
+            Console.WriteLine("Buoc 2/3: Kiem tra/dang ky Kiosk voi BE");
             RegisterExecutionEndpointIfMissing();
         }
 
         internal static void RegisterExecutionEndpointIfMissing()
         {
             var settings = SiteConfigStore.Load();
+            var api = new ExecutionEndpointRegistrationApi();
+            var kioskId = ResolveOrRegisterKiosk(api, settings);
+            if (kioskId == Guid.Empty) return;
+
             if (settings.ExecutionEndpointId != Guid.Empty)
             {
+                Console.WriteLine("Buoc 3/3: Kiem tra Execution Endpoint");
                 Console.WriteLine($"[OK] Edge da co Execution Endpoint ID: {settings.ExecutionEndpointId:D}");
                 return;
             }
 
-            var api = new ExecutionEndpointRegistrationApi();
-            var kioskId = ResolveKiosk(api, settings.KioskId);
-            if (kioskId == Guid.Empty) return;
-
+            Console.WriteLine("Buoc 3/3: Dang ky Execution Endpoint");
             var endpointCode = ExecutionEndpointRegistrationApi.BuildEndpointCode(Environment.MachineName);
             Console.WriteLine($"Dang ky ma Edge: {endpointCode}");
             var result = api.FindOrCreate(kioskId, endpointCode);
@@ -59,38 +56,33 @@ namespace IceBot.Config
             }
         }
 
-        private static Guid ResolveKiosk(ExecutionEndpointRegistrationApi api, Guid savedKioskId)
+        private static Guid ResolveOrRegisterKiosk(ExecutionEndpointRegistrationApi api, SiteSettings settings)
         {
-            var kiosks = api.ListKiosks(out var error);
-            if (!string.IsNullOrWhiteSpace(error))
+            if (settings.KioskId != Guid.Empty)
             {
-                Console.WriteLine("[ERROR] " + error);
-                return Guid.Empty;
+                Console.WriteLine($"[OK] Tai su dung KioskId da luu: {settings.KioskId:D}");
+                return settings.KioskId;
             }
-            if (kiosks.Count == 0)
+
+            if (settings.EdgeInstallationId == Guid.Empty)
             {
-                Console.WriteLine("[ERROR] Tai khoan khong duoc gan voi kiosk nao.");
+                settings.EdgeInstallationId = Guid.NewGuid();
+                SiteConfigStore.Save(settings);
+                Console.WriteLine($"Da tao dinh danh cai dat Edge: {settings.EdgeInstallationId:D}");
+            }
+
+            var result = api.FindOrCreateKiosk(settings.EdgeInstallationId, Environment.MachineName);
+            if (!result.Success)
+            {
+                Console.WriteLine("[ERROR] " + result.Message);
                 return Guid.Empty;
             }
 
-            foreach (var kiosk in kiosks)
-                if (kiosk.Id == savedKioskId) return savedKioskId;
-            if (kiosks.Count == 1)
-            {
-                Console.WriteLine($"Tu dong chon kiosk: {kiosks[0].Name} ({kiosks[0].Code})");
-                return kiosks[0].Id;
-            }
-
-            Console.WriteLine("Tai khoan co nhieu kiosk. Chon kiosk gan voi Edge nay:");
-            for (var i = 0; i < kiosks.Count; i++)
-                Console.WriteLine($"{i + 1}. {kiosks[i].Name} ({kiosks[i].Code}) - {kiosks[i].Id:D}");
-            Console.Write("Chon: ");
-            if (!int.TryParse(Console.ReadLine()?.Trim(), out var selected) || selected < 1 || selected > kiosks.Count)
-            {
-                Console.WriteLine("[ERROR] Lua chon kiosk khong hop le.");
-                return Guid.Empty;
-            }
-            return kiosks[selected - 1].Id;
+            settings.KioskId = result.KioskId;
+            SiteConfigStore.Save(settings);
+            Console.WriteLine("[OK] " + result.Message);
+            Console.WriteLine($"KioskId: {result.KioskId:D}");
+            return result.KioskId;
         }
     }
 }
