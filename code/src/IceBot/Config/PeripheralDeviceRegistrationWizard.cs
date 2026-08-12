@@ -12,6 +12,10 @@ namespace IceBot.Config
             Console.WriteLine("=== DANH SACH MAY NGOAI VI ===");
             Console.WriteLine();
 
+            foreach (var error in MachineRegistry.PluginErrors)
+                Console.WriteLine($"[PLUGIN ERROR] {error}");
+            if (MachineRegistry.PluginErrors.Count > 0) Console.WriteLine();
+
             var settings = SiteConfigStore.Load();
             for (var i = 0; i < MachineRegistry.Modules.Count; i++)
             {

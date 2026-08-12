@@ -6,21 +6,21 @@ using IceBot.Machines.IceCream;
 
 namespace IceBot.Machines
 {
-    // The one place to touch (besides writing the module itself) when adding a new machine:
-    // add its module instance to Modules below. Everything else — WorkflowRunner triggering
-    // it (if it implements IMachineTrigger), ConfigSetupWizard asking for its COM port, the
-    // console test menu listing it — reads from this registry automatically.
-    //
-    // Every workflow step (.lua file) belongs to exactly one machine identifier — there is no
-    // such thing as a step with no machine. Register every machine here, not just the ones
-    // that need a serial connection (see IMachineModule vs IMachineTrigger).
+    // Built-ins are defaults. A valid DLL plugin under drivers/*/driver.json replaces the
+    // built-in with the same MachineType, without changing or rebuilding IceBot.exe.
     internal static class MachineRegistry
     {
-        public static readonly IReadOnlyList<IMachineModule> Modules = new IMachineModule[]
+        private static readonly IMachineModule[] BuiltInModules =
         {
             new CupDroppingMachineModule(),
             new IceCreamMachineModule(),
         };
+
+        private static readonly MachinePluginLoadResult PluginResult = MachinePluginLoader.Load(
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "drivers"));
+
+        public static readonly IReadOnlyList<IMachineModule> Modules = BuildModules();
+        public static IReadOnlyList<string> PluginErrors => PluginResult.Errors;
 
         private static readonly Dictionary<string, IMachineModule> ByStepName = BuildStepIndex();
 
@@ -30,6 +30,18 @@ namespace IceBot.Machines
             return ByStepName.TryGetValue(key, out module!);
         }
 
+        private static IReadOnlyList<IMachineModule> BuildModules()
+        {
+            var map = new Dictionary<string, IMachineModule>(StringComparer.OrdinalIgnoreCase);
+            foreach (var module in BuiltInModules) map[module.MachineType] = module;
+            foreach (var plugin in PluginResult.Modules)
+            {
+                MachinePluginLoader.ValidateModule(plugin);
+                map[plugin.MachineType] = plugin;
+            }
+            return new List<IMachineModule>(map.Values);
+        }
+
         private static Dictionary<string, IMachineModule> BuildStepIndex()
         {
             var map = new Dictionary<string, IMachineModule>(StringComparer.OrdinalIgnoreCase);
@@ -37,10 +49,11 @@ namespace IceBot.Machines
             {
                 foreach (var step in module.StepNames)
                 {
+                    if (map.ContainsKey(step))
+                        throw new InvalidOperationException($"StepName '{step}' bi trung giua cac driver may.");
                     map[step] = module;
                 }
             }
-
             return map;
         }
     }

@@ -89,11 +89,39 @@ Peripheral machine mainboard (e.g. cup-dropping machine, RS485 @ 115200)
 
 - **Implemented today**: cup-dropping machine (`docs/301 Cup-Dropping Machine Serial Communication Protocol V0.0.3.md`) and the ice cream dispenser (`docs/Ice Cream Machine (Custom STM32 Controller) Serial Communication Protocol V0.1.md`, RS485 via MAX485 to a custom STM32 board) — both under `code/src/IceBot/Machines/`, both reuse `SerialFrameCodec` since the two protocols share the same frame shape.
 - COM port per machine type is site-configured (`MachinePorts` in `config/icebot.site.env`, menu 1.2).
-- Every workflow step (`.lua` file) belongs to exactly one machine identifier — there is no such thing as a step with no machine. `MachineRegistry.Modules` is the list of every registered machine (`IMachineModule`), including machines that are pure arm motion with no serial connection.
+- Every workflow step (`.lua` file) belongs to exactly one machine identifier — there is no such thing as a step with no machine. `MachineRegistry.Modules` is assembled at startup from built-in modules plus valid external DLL plugins, including machines that are pure arm motion with no serial connection.
 - `IMachineModule` (base, mandatory) carries identity: `MachineType`, `DisplayName`, `StepNames`. There is no ordering/position field — BE sends orders with the run order already decided (see "Order → queue example" below), so IceBot has no need to sort steps itself.
 - `IMachineTrigger : IMachineModule` (optional) is implemented only by machines that are also wired to this PC over RS485 and need a signal sent after their step's `.lua` runs. It requires **two** methods: `Trigger(comPort)` (fire the machine's action) and `TestConnection(comPort)` (open the port, do a real query round-trip, throw on failure — no business-specific parsing needed). `WorkflowRunner`, `ConfigSetupWizard` (COM-port prompts), and the console test menus only look at `MachineRegistry.Modules.OfType<IMachineTrigger>()` — a machine that's pure arm motion just implements `IMachineModule` and is left alone by all of them.
 - The `.lua` file itself cannot send this signal (Fairino Lua has no raw serial/UART primitive) — the real signal is always sent from IceBot (C#) over RS485 after the file finishes running.
-- To add a new machine: create a `Machines/<MachineName>/` folder with a `<MachineName>Client.cs` (raw RS485 protocol — reuse `SerialFrameCodec` if the frame shape matches) and a `<MachineName>Module.cs` implementing `IMachineTrigger` (`Trigger` + `TestConnection`; see `Machines/CupDropping/` or `Machines/IceCream/` for both), then register one instance in `MachineRegistry.Modules`. `TestConnection` is what makes the machine show up automatically in "Test may > 2 Test ket noi may ngoai vi" once its step name is provisioned — no menu code to write per machine.
+- To add or replace a machine driver without modifying IceBot source, build a `net472` plugin against `IceBot.Driver.Abstractions`, then install its DLL and matching `driver.json` under `drivers/<driver-name>/` and restart IceBot. The loader verifies schema, path containment, SHA-256, public entry type, parameterless constructor, interface contract, machine identity, and step names. A plugin with the same `MachineType` replaces the built-in driver; a new `MachineType` adds another machine. See `driver-sdk/README.md` and `driver-sdk/IceBot.Driver.Template`.
+
+### External machine driver packages
+
+The plugin contract is now a separate public `net472` assembly:
+
+```text
+IceBot.Driver.Abstractions.dll
+  IMachineModule       identity + Lua StepNames
+  IMachineTrigger      Trigger + TestConnection
+  IMachineDiagnostics  optional human-readable status
+```
+
+Install a complete package next to the deployed `IceBot.exe`:
+
+```text
+drivers/<driver-name>/
+  driver.json
+  Vendor.Driver.dll
+```
+
+`driver.json` schema 1 contains `machineType`, DLL filename, fully-qualified public `entryType`,
+driver version, and SHA-256. A driver class must have a public parameterless constructor. IceBot
+loads verified DLL bytes without locking the package file, but registry discovery occurs once at
+process startup, so installing or replacing a package still requires an IceBot restart. Invalid
+plugins do not stop valid machines from loading; their errors appear under **Cau hinh > 6. Danh
+sach may ngoai vi**. Installing a different physical model that uses the same logical machine slot
+means deploying a plugin with the same stable `MachineType`; its existing COM configuration and BE
+`DeviceId` mapping are therefore retained. Use a new `MachineType` when both machines must coexist.
 
 ### Example — ice cream dispenser (máy kem)
 
@@ -620,7 +648,7 @@ MoveJ(
 | `WorkflowRunner` — sequential step queue, each `.lua` file run in full (chaining is free — see script chaining rule) | ✅ Done |
 | Cup-dropping machine — RS485 serial client (`IceBot.Machines`) | ✅ Done |
 | Ice cream dispenser — RS485 serial client (`IceBot.Machines`) | ✅ Done |
-| `IMachineModule` (mandatory identity) / `IMachineTrigger` (optional serial: `Trigger` + `TestConnection`) / `IMachineDiagnostics` (optional) + `MachineRegistry.Modules` — every step's machine registered, only serial-capable ones trigger **after** the step's `.lua` runs | ✅ Done (`CupDroppingMachineModule` + `IceCreamMachineModule` registered so far; add more as protocols are documented — one new module + one line in `Modules`, no other file touched) |
+| Public `IceBot.Driver.Abstractions` contracts + validated DLL plugin loader + dynamic `MachineRegistry.Modules` — every step's machine registered, plugins install without editing/rebuilding IceBot, and a matching `MachineType` can replace a built-in driver | ✅ Done (built-in cup/ice-cream defaults remain; future drivers use `driver-sdk` and install as `DLL + driver.json`) |
 | Test may > 1 "Test tay Robot" — connect check + sample `.lua` run from `test-workflow/` (separate from `workflow/`) | ✅ Done (`ConsoleMenu.RunTestMode`; sample file itself not shipped, user-supplied) |
 | Test may > 2 "Test ket noi may ngoai vi" — connection check driven by `SiteSettings.ProvisionedSteps`, generic via `IMachineTrigger.TestConnection` | ✅ Done (`ConsoleMenu.RunPeripheralConnectionTestMode`) |
 | `WorkflowProvisioner` records provisioned step names (`SiteSettings.ProvisionedSteps`) after every successful fetch | ✅ Done |

@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\lib\fairino-csharp-sdk\src\FRRobot\FRRobot.csproj" />
+    <ProjectReference Include="..\IceBot.Driver.Abstractions\IceBot.Driver.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,6 +31,13 @@
     </None>
     <None Include="..\..\test-workflow\**\*">
       <Link>test-workflow\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\drivers\**\*">
+      <Link>drivers\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
