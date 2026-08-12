@@ -22,10 +22,8 @@ namespace IceBot.Config
         public string OperatorAccessToken { get; set; } = string.Empty;
         public string OperatorRefreshToken { get; set; } = string.Empty;
 
-        // Stable local installation identity is created once before kiosk registration. BE stores
-        // it as the kiosk serial so a rerun can recover the same KioskId instead of creating a
-        // duplicate if KIOSK_ID was not saved successfully after the first HTTP response.
-        public Guid EdgeInstallationId { get; set; }
+        // The Edge PC and kiosk are the same physical machine. KioskId is returned by BE when
+        // this machine is registered and is reused locally on subsequent initialization runs.
         public Guid KioskId { get; set; }
         public Dictionary<string, Guid> MachineDeviceIds { get; set; } =
             new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);

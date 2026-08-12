@@ -10,16 +10,14 @@ namespace IceBot.Harness.Tests
         public void PreserveBackendDeviceIdentities_CopiesKioskAndDeviceMappings()
         {
             var kioskId = Guid.NewGuid();
-            var installationId = Guid.NewGuid();
             var deviceId = Guid.NewGuid();
-            var current = new SiteSettings { EdgeInstallationId = installationId, KioskId = kioskId };
+            var current = new SiteSettings { KioskId = kioskId };
             current.MachineDeviceIds["ice_cream"] = deviceId;
             var updated = new SiteSettings();
 
             ConfigSetupWizard.PreserveBackendDeviceIdentities(current, updated);
 
             Assert.Equal(kioskId, updated.KioskId);
-            Assert.Equal(installationId, updated.EdgeInstallationId);
             Assert.Equal(deviceId, updated.GetMachineDeviceId("ICE_CREAM"));
         }
 

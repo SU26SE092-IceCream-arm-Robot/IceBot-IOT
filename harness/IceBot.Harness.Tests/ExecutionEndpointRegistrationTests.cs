@@ -16,9 +16,7 @@ namespace IceBot.Harness.Tests
         [Fact]
         public void BuildKioskCode_IsStableAndDoesNotDependOnKioskListOrder()
         {
-            var installationId = Guid.Parse("12345678-90ab-cdef-1234-567890abcdef");
-
-            Assert.Equal("KIOSK-1234567890AB", ExecutionEndpointRegistrationApi.BuildKioskCode(installationId));
+            Assert.Equal("KIOSK-EDGE-PC-01", ExecutionEndpointRegistrationApi.BuildKioskCode("edge pc.01"));
         }
 
         [Fact]

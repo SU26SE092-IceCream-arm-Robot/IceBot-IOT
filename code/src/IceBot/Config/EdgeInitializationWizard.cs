@@ -64,14 +64,7 @@ namespace IceBot.Config
                 return settings.KioskId;
             }
 
-            if (settings.EdgeInstallationId == Guid.Empty)
-            {
-                settings.EdgeInstallationId = Guid.NewGuid();
-                SiteConfigStore.Save(settings);
-                Console.WriteLine($"Da tao dinh danh cai dat Edge: {settings.EdgeInstallationId:D}");
-            }
-
-            var result = api.FindOrCreateKiosk(settings.EdgeInstallationId, Environment.MachineName);
+            var result = api.FindOrCreateKiosk(Environment.MachineName);
             if (!result.Success)
             {
                 Console.WriteLine("[ERROR] " + result.Message);

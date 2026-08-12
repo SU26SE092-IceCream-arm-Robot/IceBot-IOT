@@ -275,10 +275,10 @@ certificate for mTLS runtime calls, use the BE's private **HTTPS** NetBird addre
 1. `InitIceBot.exe` has already required the store-account login before displaying the menu.
 2. Prompt for the NetBird setup key and run `netbird up --setup-key ...`; stop registration if
    NetBird cannot connect.
-3. If local `KIOSK_ID` exists, reuse it immediately. Otherwise generate and durably save one
-   `EDGE_INSTALLATION_ID`, search BE for a kiosk whose `SerialNumber` exactly equals that ID, and
-   recover its `KioskId` when found. If none exists, the account must resolve to exactly one
-   accessible store; create this Edge itself as a `RoboticVending` kiosk under that store via
+3. If local `KIOSK_ID` exists, reuse it immediately. Otherwise build the stable, BE-required
+   kiosk code `KIOSK-{WINDOWS_MACHINE_NAME}` and search the accessible kiosks for that exact code
+   to recover its `KioskId`. If none exists, the account must resolve to exactly one accessible
+   store; create this Edge itself as a `RoboticVending` kiosk under that store via
    `POST /api/v1/management/stores/{storeId}/kiosks` and save the returned `KIOSK_ID`. There is
    never a kiosk list or kiosk-selection prompt. More than one accessible store is treated as an
    account-scope error instead of asking the technician to guess.
@@ -307,8 +307,7 @@ on Edge, and configure `EXECUTION_CLIENT_CERT_PATH`. The private key is never up
 - After HTTP 201, IceBot persists the BE-generated identity as
   `MACHINE_DEVICE_IDS=<MachineType>:<DeviceId>,...`. Future status/device-event uplinks must
   resolve the BE identity through `SiteSettings.GetMachineDeviceId(machineType)`.
-- Re-running **InitIceBot > Cau hinh > Cau hinh he thong** preserves `EDGE_INSTALLATION_ID`,
-  `KIOSK_ID`, and the
+- Re-running **InitIceBot > Cau hinh > Cau hinh he thong** preserves `KIOSK_ID` and the
   complete `MACHINE_DEVICE_IDS` dictionary. These BE identities must never be cleared merely
   because a technician changes the BE URL, endpoint certificate, robot IP, account, or COM ports.
 - `KIOSK_ID` is stored only because this management API requires it. A future mTLS Edge-specific
@@ -691,7 +690,7 @@ MoveJ(
 | Config wizard (NetBird setup key, public URL) | ✅ Done |
 | NetBird auto-install (winget, if missing) + auto-`up` at every app startup (`NetBirdSetup.cs`, `ConsoleMenu.EnsureNetBirdConnected`) | ✅ Done |
 | Real operator login + access/refresh rotation | ✅ Done |
-| New Edge initialization: login -> NetBird -> reuse/register kiosk by stable installation ID -> idempotent endpoint registration -> persist IDs | ✅ Done; mTLS provisioning remains a separate required step |
+| New Edge initialization: login -> NetBird -> reuse/register kiosk by stable machine code -> idempotent endpoint registration -> persist IDs | ✅ Done; mTLS provisioning remains a separate required step |
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done; private BE URL and provisioned endpoint certificate are deployment inputs still to add |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |
