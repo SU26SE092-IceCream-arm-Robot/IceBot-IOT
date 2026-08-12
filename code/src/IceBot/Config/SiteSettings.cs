@@ -23,7 +23,9 @@ namespace IceBot.Config
         public string OperatorRefreshToken { get; set; } = string.Empty;
 
         // The Edge PC and kiosk are the same physical machine. KioskId is returned by BE when
-        // this machine is registered and is reused locally on subsequent initialization runs.
+        // this machine is registered. KioskCode is the unique code printed on its physical case;
+        // the technician enters it once and Edge persists it together with the returned KioskId.
+        public string KioskCode { get; set; } = string.Empty;
         public Guid KioskId { get; set; }
         public Dictionary<string, Guid> MachineDeviceIds { get; set; } =
             new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);

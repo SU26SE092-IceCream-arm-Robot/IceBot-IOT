@@ -113,6 +113,7 @@ namespace IceBot.Config
 
         internal static void PreserveBackendDeviceIdentities(SiteSettings current, SiteSettings updated)
         {
+            updated.KioskCode = current.KioskCode;
             updated.KioskId = current.KioskId;
             updated.MachineDeviceIds = new Dictionary<string, Guid>(
                 current.MachineDeviceIds,
@@ -131,6 +132,7 @@ namespace IceBot.Config
             Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(settings.ApiKey) ? "(chua dat)" : "****")}");
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
             Console.WriteLine($"  Tai khoan cua hang : {(string.IsNullOrEmpty(settings.StoreAccount) ? "(chua dat)" : settings.StoreAccount)}");
+            Console.WriteLine($"  Kiosk code          : {(string.IsNullOrEmpty(settings.KioskCode) ? "(chua nhap)" : settings.KioskCode)}");
             Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.OperatorAccessToken) ? "CHUA (dung Khoi tao Edge trong InitIceBot.exe)" : "ROI")}");
             foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {

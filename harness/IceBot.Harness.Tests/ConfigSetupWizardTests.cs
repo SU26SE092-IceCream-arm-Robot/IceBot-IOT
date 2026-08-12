@@ -11,13 +11,14 @@ namespace IceBot.Harness.Tests
         {
             var kioskId = Guid.NewGuid();
             var deviceId = Guid.NewGuid();
-            var current = new SiteSettings { KioskId = kioskId };
+            var current = new SiteSettings { KioskCode = "ICE-KIOSK-001", KioskId = kioskId };
             current.MachineDeviceIds["ice_cream"] = deviceId;
             var updated = new SiteSettings();
 
             ConfigSetupWizard.PreserveBackendDeviceIdentities(current, updated);
 
             Assert.Equal(kioskId, updated.KioskId);
+            Assert.Equal("ICE-KIOSK-001", updated.KioskCode);
             Assert.Equal(deviceId, updated.GetMachineDeviceId("ICE_CREAM"));
         }
 

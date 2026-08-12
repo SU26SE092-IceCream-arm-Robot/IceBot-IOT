@@ -47,6 +47,7 @@ namespace IceBot.Config
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
                     case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
                     case "BE_REFRESH_TOKEN": settings.OperatorRefreshToken = value; break;
+                    case "KIOSK_CODE": settings.KioskCode = value; break;
                     case "KIOSK_ID": Guid.TryParse(value, out var kioskId); settings.KioskId = kioskId; break;
                     case "MACHINE_DEVICE_IDS": settings.MachineDeviceIds = ParseMachineDeviceIds(value); break;
                     case "EXECUTION_ENDPOINT_ID": Guid.TryParse(value, out var endpointId); settings.ExecutionEndpointId = endpointId; break;
@@ -81,6 +82,7 @@ namespace IceBot.Config
                 $"STORE_PASSWORD={settings.StorePassword}",
                 $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
                 $"BE_REFRESH_TOKEN={settings.OperatorRefreshToken}",
+                $"KIOSK_CODE={settings.KioskCode}",
                 $"KIOSK_ID={settings.KioskId:D}",
                 $"MACHINE_DEVICE_IDS={SerializeMachineDeviceIds(settings.MachineDeviceIds)}",
                 $"EXECUTION_ENDPOINT_ID={settings.ExecutionEndpointId:D}",
@@ -109,6 +111,7 @@ namespace IceBot.Config
             SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
             SetEnv("ICEBOT_BE_ACCESS_TOKEN", settings.OperatorAccessToken);
             SetEnv("ICEBOT_BE_REFRESH_TOKEN", settings.OperatorRefreshToken);
+            SetEnv("ICEBOT_KIOSK_CODE", settings.KioskCode);
             SetEnv("ICEBOT_KIOSK_ID", settings.KioskId == Guid.Empty ? string.Empty : settings.KioskId.ToString("D"));
             SetEnv("ICEBOT_EXECUTION_ENDPOINT_ID", settings.ExecutionEndpointId == Guid.Empty ? string.Empty : settings.ExecutionEndpointId.ToString("D"));
             SetEnv("ICEBOT_EXECUTION_CLIENT_CERT_PATH", settings.ExecutionClientCertificatePath);

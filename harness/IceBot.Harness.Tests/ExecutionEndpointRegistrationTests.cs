@@ -14,9 +14,22 @@ namespace IceBot.Harness.Tests
         }
 
         [Fact]
-        public void BuildKioskCode_IsStableAndDoesNotDependOnKioskListOrder()
+        public void NormalizeKioskCode_PreservesPrintedCodeAndUppercasesIt()
         {
-            Assert.Equal("KIOSK-EDGE-PC-01", ExecutionEndpointRegistrationApi.BuildKioskCode("edge pc.01"));
+            var valid = ExecutionEndpointRegistrationApi.TryNormalizeKioskCode(
+                "  ice-kiosk-001  ", out var code, out var error);
+
+            Assert.True(valid, error);
+            Assert.Equal("ICE-KIOSK-001", code);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("A")]
+        [InlineData("BAD=CODE")]
+        public void NormalizeKioskCode_RejectsValuesUnsafeForBackendOrLocalConfig(string input)
+        {
+            Assert.False(ExecutionEndpointRegistrationApi.TryNormalizeKioskCode(input, out _, out _));
         }
 
         [Fact]

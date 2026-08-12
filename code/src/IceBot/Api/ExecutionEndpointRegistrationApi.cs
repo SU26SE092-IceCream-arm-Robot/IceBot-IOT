@@ -67,9 +67,10 @@ namespace IceBot.Api
             _http = http;
         }
 
-        public KioskRegistrationResult FindOrCreateKiosk(string machineName)
+        public KioskRegistrationResult FindOrCreateKiosk(string kioskCode, string machineName)
         {
-            var code = BuildKioskCode(machineName);
+            if (!TryNormalizeKioskCode(kioskCode, out var code, out var codeError))
+                return FailKiosk(codeError);
             var lookupResponse = SendWithRefresh(
                 HttpMethod.Get,
                 $"api/v1/management/kiosks?search={Uri.EscapeDataString(code)}",
@@ -182,14 +183,21 @@ namespace IceBot.Api
             return value.Length <= 100 ? value : value.Substring(0, 100);
         }
 
-        internal static string BuildKioskCode(string machineName)
+        internal static bool TryNormalizeKioskCode(string input, out string code, out string error)
         {
-            var source = NormalizeMachineName(machineName);
-            var builder = new StringBuilder("KIOSK-");
-            foreach (var c in source)
-                builder.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? char.ToUpperInvariant(c) : '-');
-            var value = builder.ToString().TrimEnd('-');
-            return value.Length <= 50 ? value : value.Substring(0, 50);
+            code = (input ?? string.Empty).Trim().ToUpperInvariant();
+            if (code.Length < 2 || code.Length > 50)
+            {
+                error = "Kiosk Code in tren vo may phai co tu 2 den 50 ky tu.";
+                return false;
+            }
+            if (code.IndexOf('=') >= 0 || code.IndexOf('\r') >= 0 || code.IndexOf('\n') >= 0)
+            {
+                error = "Kiosk Code khong duoc chua dau '=' hoac ky tu xuong dong.";
+                return false;
+            }
+            error = string.Empty;
+            return true;
         }
 
         private static string NormalizeMachineName(string machineName) =>
