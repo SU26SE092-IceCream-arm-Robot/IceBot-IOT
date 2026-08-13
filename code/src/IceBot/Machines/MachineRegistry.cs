@@ -4,12 +4,13 @@ using System.IO;
 
 namespace IceBot.Machines
 {
-    // Plugin-only registry: every peripheral driver comes from drivers/*/driver.json.
+    // Plugin-only registry: every peripheral driver comes from
+    // %ProgramData%/IceBot/drivers/*/driver.json in both development and production.
     // An empty drivers directory intentionally produces an empty machine list.
     internal static class MachineRegistry
     {
         private static readonly MachinePluginLoadResult PluginResult = MachinePluginLoader.Load(
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "drivers"));
+            MachineDriverDirectory.Resolve());
 
         public static readonly IReadOnlyList<IMachineModule> Modules = BuildModules();
         public static IReadOnlyList<string> PluginErrors => PluginResult.Errors;

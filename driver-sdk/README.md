@@ -4,10 +4,10 @@ Copy `IceBot.Driver.Template`, implement the machine protocol, and build it for 
 The public plugin class must implement `IMachineModule`; controllable machines normally implement
 `IMachineTrigger`, and may implement `IMachineDiagnostics`.
 
-Install one complete package on Edge:
+Install one complete package into the shared Edge driver directory:
 
 ```text
-drivers/<driver-name>/
+C:\ProgramData\IceBot\drivers\<driver-name>\
   driver.json
   Vendor.Driver.dll
 ```

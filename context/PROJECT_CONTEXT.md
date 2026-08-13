@@ -93,11 +93,11 @@ Peripheral machine mainboard (e.g. cup-dropping machine, RS485 @ 115200)
   implementation remains in IceBot core. The old built-in ice-cream implementation has also been
   removed; an ice-cream machine is unavailable until a separate DLL package is provided.
 - COM port per machine type is site-configured (`MachinePorts` in `config/icebot.site.env`, menu 1.2).
-- Every workflow step (`.lua` file) belongs to exactly one machine identifier — there is no such thing as a step with no machine. `MachineRegistry.Modules` loads valid external DLL plugins at startup and contains no built-in modules. An empty `drivers/` directory produces an empty machine list.
+- Every workflow step (`.lua` file) belongs to exactly one machine identifier — there is no such thing as a step with no machine. `MachineRegistry.Modules` loads valid external DLL plugins at startup and contains no built-in modules. An empty `C:\ProgramData\IceBot\drivers` directory produces an empty machine list.
 - `IMachineModule` (base, mandatory) carries identity: `MachineType`, `DisplayName`, `StepNames`. There is no ordering/position field — BE sends orders with the run order already decided (see "Order → queue example" below), so IceBot has no need to sort steps itself.
 - `IMachineTrigger : IMachineModule` (optional) is implemented only by machines that are also wired to this PC over RS485 and need a signal sent after their step's `.lua` runs. It requires **two** methods: `Trigger(comPort)` (fire the machine's action) and `TestConnection(comPort)` (open the port, do a real query round-trip, throw on failure — no business-specific parsing needed). `WorkflowRunner`, `ConfigSetupWizard` (COM-port prompts), and the console test menus only look at `MachineRegistry.Modules.OfType<IMachineTrigger>()` — a machine that's pure arm motion just implements `IMachineModule` and is left alone by all of them.
 - The `.lua` file itself cannot send this signal (Fairino Lua has no raw serial/UART primitive) — the real signal is always sent from IceBot (C#) over RS485 after the file finishes running.
-- To add or replace a machine driver without modifying IceBot source, build a `net472` plugin against `IceBot.Driver.Abstractions`, then install its DLL and matching `driver.json` under `drivers/<driver-name>/` and restart IceBot. The loader verifies schema, path containment, SHA-256, public entry type, parameterless constructor, interface contract, machine identity, and step names. Setup creates `drivers/` empty and never installs packages from the repository's `DRIVER-DLL/` catalog automatically. See `driver-sdk/README.md` and `driver-sdk/IceBot.Driver.Template`.
+- To add or replace a machine driver without modifying IceBot source, build a `net472` plugin against `IceBot.Driver.Abstractions`, then install its DLL and matching `driver.json` under `C:\ProgramData\IceBot\drivers\<driver-name>\` and restart IceBot. The loader verifies schema, path containment, SHA-256, public entry type, parameterless constructor, interface contract, machine identity, and step names. Setup creates this shared directory empty and never installs packages from the repository's `DRIVER-DLL/` catalog automatically. See `driver-sdk/README.md` and `driver-sdk/IceBot.Driver.Template`.
 
 ### External machine driver packages
 
@@ -113,7 +113,7 @@ IceBot.Driver.Abstractions.dll
 Install a complete package next to the deployed `IceBot.exe`:
 
 ```text
-drivers/<driver-name>/
+C:\ProgramData\IceBot\drivers\<driver-name>\
   driver.json
   Vendor.Driver.dll
 ```
@@ -253,7 +253,9 @@ Setup.exe (machine environment, once)
 `Setup.exe` is a self-contained .NET 8 Windows bootstrapper. It requires Administrator, verifies
 .NET Framework 4.7.2+, installs NetBird (offline prerequisite first, winget fallback), copies the
 application payload to a user-selected directory (default `C:\Program Files\IceBot`), creates the
-mutable runtime directories and their ACLs, and creates Desktop/Start Menu shortcuts. The normal
+mutable runtime directories and their ACLs, creates the separate shared driver catalog at
+`C:\ProgramData\IceBot\drivers`, and creates Desktop/Start Menu shortcuts. Payload installation
+explicitly ignores any stale `drivers/` directory from build output. The normal
 interactive flow uses a Windows folder picker; cancel exits before any installation mutation.
 Automation can bypass the picker with `Setup.exe --install-dir "D:\IceBot"`. It never asks for store credentials,
 Kiosk Code, or NetBird setup key, never registers an Edge, and never starts sales. System
@@ -565,8 +567,9 @@ Implementation: `ConsoleMenu.Run()` (main), `ConsoleMenu.RunConfigMenu()`, `Cons
 
 Both operational executables are deployed in the same directory. `InitIceBot.csproj` deliberately outputs
 `InitIceBot.exe` beside `IceBot.exe`, so they share the same base-directory resources:
-`config/icebot.site.env`, `drivers/`, `workflow/`, `test-workflow/`, and `data/`. Do not deploy the
-technician executable into a separate directory unless these paths are explicitly centralized.
+`config/icebot.site.env`, `workflow/`, `test-workflow/`, and `data/`. Drivers are deliberately
+outside both executables at `C:\ProgramData\IceBot\drivers`, allowing dev and installed builds to
+use the same packages without writing into `bin/` or losing drivers during upgrades.
 
 Print status to stdout: provision progress, queue, step N/M, errors, completion. No web UI unless explicitly requested later.
 
@@ -842,7 +845,8 @@ Fairino C# SDK on robot controller: connect to arm @ `192.168.58.2` → for each
 | `code/src/IceBot/Machines/MachinePluginLoader.cs` | Validates manifests/checksums and loads external driver DLLs |
 | `code/src/IceBot/Machines/MachineRegistry.cs` | Plugin-only module list and step-name lookup; contains no built-in machines |
 | `driver-sdk/IceBot.Driver.CupDropping/` | Source project for the standalone cup-dropping plugin; not compiled into IceBot core |
-| `DRIVER-DLL/CupDropping/` | Ready `DLL + driver.json` package; technician installs it explicitly into the Edge `drivers/` directory |
+| `code/src/IceBot/Machines/MachineDriverDirectory.cs` | Resolves the shared Windows driver catalog at `C:\ProgramData\IceBot\drivers` |
+| `DRIVER-DLL/CupDropping/` | Ready package; technician installs it explicitly into `C:\ProgramData\IceBot\drivers\cup-dropping` |
 | `code/src/IceBot/Networking/LocalApiServer.cs` | Inbound HTTP API (tunnel ingress) |
 | `code/src/IceBot/Config/` | `AppConfig` plus `Connectivity/`, `Setup/`, and `Storage/` functional groups |
 | `code/workflow/` | Lua scripts (gitignored, copied to output on build) |

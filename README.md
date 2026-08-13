@@ -102,7 +102,9 @@ code/src/IceBot/bin/Debug/net472/IceBot.exe
 code/src/IceBot/bin/Debug/net472/InitIceBot.exe
 ```
 
-`IceBot.exe serve` là alias tường minh của chế độ runtime. Hai file EXE phải nằm cùng thư mục để dùng chung `config/`, `certificates/`, `drivers/`, `workflow/`, `test-workflow/` và `data/`.
+`IceBot.exe serve` là alias tường minh của chế độ runtime. Hai file EXE phải nằm cùng thư mục để
+dùng chung `config/`, `certificates/`, `workflow/`, `test-workflow/` và `data/`. Driver là ngoại lệ:
+cả bản dev và production đều đọc từ `C:\ProgramData\IceBot\drivers`.
 
 ### Tạo package cài đặt
 
@@ -135,7 +137,8 @@ Chạy bằng quyền Administrator. Setup sẽ:
 1. Kiểm tra .NET Framework 4.7.2+; nếu thiếu, chạy bộ cài offline trong `prerequisites/`.
 2. Cài NetBird từ installer offline; nếu không có thì dùng `winget`.
 3. Mở hộp thoại để người dùng chọn thư mục cài đặt; mặc định là `C:\Program Files\IceBot`.
-4. Tạo `config/`, `certificates/`, `drivers/`, `workflow/`, `test-workflow/`, `data/` và chỉ cấp quyền ghi cho tài khoản Windows đang cài đặt.
+4. Tạo dữ liệu ứng dụng trong thư mục cài và tạo kho driver dùng chung
+   `C:\ProgramData\IceBot\drivers`; chỉ cấp quyền ghi cần thiết cho tài khoản Windows đang cài đặt.
 5. Tạo shortcut `IceBot` và `Init IceBot` trên Desktop/Start Menu.
 
 Setup không đăng nhập, không nhận Kiosk Code/NetBird key, không đăng ký Edge và không tự chạy hệ thống bán hàng.
@@ -278,7 +281,8 @@ Contract Order theo tên file Lua cũ và contract artifact ID/release manifest 
 Máy ngoại vi giao tiếp trực tiếp với Edge qua RS485. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ plugin DLL sau khi Lua hoàn tất.
 
 Core `code/src/IceBot/Machines/` hiện chỉ còn plugin loader và registry. Không có code giao thức
-hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục `drivers/` trống,
+hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục
+`C:\ProgramData\IceBot\drivers` trống,
 `MachineRegistry.Modules` cũng trống.
 
 Driver máy thả cốc đã được tách hoàn toàn khỏi `IceBot.exe`. Package build sẵn nằm tại:
@@ -290,13 +294,13 @@ DRIVER-DLL/CupDropping/
 ```
 
 Muốn sử dụng máy thả cốc, kỹ thuật viên copy nguyên package trên vào
-`<thư mục cài IceBot>/drivers/cup-dropping/` rồi restart IceBot. Setup mới chỉ tạo thư mục
-`drivers/` trống và không tự cài bất kỳ driver máy ngoại vi nào.
+`C:\ProgramData\IceBot\drivers\cup-dropping\` rồi restart IceBot. Setup chỉ tạo kho driver dùng
+chung này ở trạng thái trống và không tự cài bất kỳ driver máy ngoại vi nào.
 
 Để thêm hoặc thay máy mà không sửa source IceBot, tạo plugin target `net472` dựa trên `IceBot.Driver.Abstractions`, sau đó cài:
 
 ```text
-drivers/<driver-name>/
+C:\ProgramData\IceBot\drivers\<driver-name>\
 ├── driver.json
 └── Vendor.Driver.dll
 ```

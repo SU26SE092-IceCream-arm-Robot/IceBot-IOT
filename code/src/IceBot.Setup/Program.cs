@@ -53,6 +53,7 @@ internal static class Program
             Console.WriteLine("[4/5] Tạo thư mục dữ liệu");
             CreateRuntimeDirectories(installDirectory);
             SetRuntimePermissions(installDirectory);
+            CreateSharedDriverDirectory();
 
             Console.WriteLine("[5/5] Tạo shortcut");
             CreateShortcuts(installDirectory);
@@ -217,7 +218,7 @@ internal static class Program
     {
         var mutableRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "config", "certificates", "data", "workflow"
+            "config", "certificates", "data", "drivers", "workflow"
         };
 
         Directory.CreateDirectory(destination);
@@ -235,22 +236,36 @@ internal static class Program
 
     private static void CreateRuntimeDirectories(string installDirectory)
     {
-        foreach (var name in new[] { "config", "certificates", "drivers", "workflow", "test-workflow", "data", "data/order-inbox" })
+        foreach (var name in new[] { "config", "certificates", "workflow", "test-workflow", "data", "data/order-inbox" })
             Directory.CreateDirectory(Path.Combine(installDirectory, name));
     }
 
     private static void SetRuntimePermissions(string installDirectory)
     {
         // Application binaries remain protected by Program Files. Only site-local paths need
-        // Modify permission so IceBot can persist configuration, certificates, plugins and jobs.
+        // Modify permission so IceBot can persist configuration, certificates and jobs.
         // Grant only the account running Setup, not every local Windows user.
         var userSid = WindowsIdentity.GetCurrent().User?.Value
             ?? throw new InvalidOperationException("Không xác định được tài khoản Windows đang cài đặt.");
-        foreach (var name in new[] { "config", "certificates", "drivers", "workflow", "test-workflow", "data" })
+        foreach (var name in new[] { "config", "certificates", "workflow", "test-workflow", "data" })
         {
             var path = Path.Combine(installDirectory, name);
             Run("icacls.exe", $"\"{path}\" /grant *{userSid}:(OI)(CI)M", $"cấp quyền thư mục {name}");
         }
+    }
+
+    private static void CreateSharedDriverDirectory()
+    {
+        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        if (string.IsNullOrWhiteSpace(commonData))
+            throw new InvalidOperationException("Không xác định được thư mục ProgramData của Windows.");
+
+        var path = Path.Combine(commonData, "IceBot", "drivers");
+        Directory.CreateDirectory(path);
+
+        var userSid = WindowsIdentity.GetCurrent().User?.Value
+            ?? throw new InvalidOperationException("Không xác định được tài khoản Windows đang cài đặt.");
+        Run("icacls.exe", $"\"{path}\" /grant *{userSid}:(OI)(CI)M", "cấp quyền thư mục driver dùng chung");
     }
 
     private static void CreateShortcuts(string installDirectory)

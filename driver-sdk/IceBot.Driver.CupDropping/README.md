@@ -4,7 +4,7 @@ Plugin RS485 cho máy thả cốc. Driver này không được compile vào `Ice
 mặc định. Build package rồi chủ động copy cả thư mục package vào Edge:
 
 ```text
-<IceBot install>/drivers/cup-dropping/
+C:\ProgramData\IceBot\drivers\cup-dropping\
 ├── driver.json
 └── IceBot.Driver.CupDropping.dll
 ```
