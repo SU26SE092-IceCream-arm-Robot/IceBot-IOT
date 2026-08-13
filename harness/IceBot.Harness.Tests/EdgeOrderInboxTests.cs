@@ -9,7 +9,7 @@ namespace IceBot.Harness.Tests
     public class EdgeOrderInboxTests
     {
         [Fact]
-        public void Validate_AcceptsBackendSchema4ExecuteOrder()
+        public void Validate_AcceptsBackendSchema5ExecuteOrder()
         {
             var commandId = Guid.NewGuid();
             var orderId = Guid.NewGuid();
@@ -55,16 +55,38 @@ namespace IceBot.Harness.Tests
         {
             return JsonSerializer.Serialize(new
             {
-                SchemaVersion = 4,
+                SchemaVersion = 5,
                 CommandId = commandId,
                 OrderId = orderId,
                 OrderNumber = "ORD-001",
+                KioskId = Guid.NewGuid(),
+                TargetExecutionEndpointId = Guid.NewGuid(),
+                ConfigurationReleaseId = Guid.NewGuid(),
+                ReleaseChecksum = "release-checksum",
+                CommandExpiryAt = DateTimeOffset.UtcNow.AddMinutes(5),
                 OrderLines = new[]
                 {
                     new
                     {
+                        OrderItemId = Guid.NewGuid(),
                         Quantity = quantity,
-                        RobotPrograms = new[] { new { RobotProgramId = Guid.NewGuid() } }
+                        ProductionUnitStartNo = 1,
+                        RobotPrograms = new[]
+                        {
+                            new
+                            {
+                                BindingOrder = 1,
+                                Artifacts = new[]
+                                {
+                                    new
+                                    {
+                                        RobotArtifactId = Guid.NewGuid(),
+                                        RunOrder = 1,
+                                        ArtifactChecksum = "artifact-checksum"
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             });

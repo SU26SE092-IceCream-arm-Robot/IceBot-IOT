@@ -8,6 +8,7 @@ namespace IceBot.Workflow
     internal sealed class EdgeOrderCommandReceiver : IDisposable
     {
         private readonly ManualResetEvent _stop = new ManualResetEvent(false);
+        private readonly EdgeOrderExecutionWorker _executor = new EdgeOrderExecutionWorker();
         private Thread? _worker;
 
         public bool IsRunning => _worker != null && _worker.IsAlive;
@@ -23,6 +24,7 @@ namespace IceBot.Workflow
             }
 
             _worker = new Thread(PollLoop) { IsBackground = true, Name = "IceBot-EdgeOrderReceiver" };
+            _executor.Start();
             _worker.Start();
             Console.WriteLine("[ORDER-PULL] Da bat dau nhan ExecuteOrder tu BE.");
         }
@@ -44,12 +46,43 @@ namespace IceBot.Workflow
             foreach (var command in pull.Commands)
             {
                 if (!string.Equals(command.CommandType, "ExecuteOrder", StringComparison.OrdinalIgnoreCase)) continue;
-                var order = EdgeOrderInbox.Validate(command.CommandId, command.PayloadJson);
-                var isNew = EdgeOrderInbox.TryStore(order, AppConfig.GetOrderInboxDirectory());
-                EdgeDeploymentApi.AcknowledgeReceived(command.CommandId);
-                if (!isNew) continue;
-                received++;
-                Console.WriteLine($"[ORDER-PULL] Da nhan don {order.OrderNumber} ({order.OrderId:D}), command {order.CommandId:D}; da luu vao inbox.");
+                try
+                {
+                    var order = EdgeOrderInbox.Validate(command.CommandId, command.PayloadJson);
+                    if (EdgeOrderExecutionQueue.Contains(command.CommandId, AppConfig.GetOrderJobsDirectory()))
+                    {
+                        EdgeDeploymentApi.AcknowledgeAccepted(command.CommandId);
+                        EdgeOrderExecutionQueue.Activate(command.CommandId, AppConfig.GetOrderJobsDirectory());
+                        continue;
+                    }
+                    var settings = SiteConfigStore.Load();
+                    EdgeOrderInbox.ValidateForThisEdge(order, settings.KioskId, settings.ExecutionEndpointId,
+                        settings.ActiveConfigurationReleaseId, settings.ActiveConfigurationReleaseChecksum,
+                        AppConfig.GetWorkflowDirectory(), DateTimeOffset.UtcNow);
+                    EdgeOrderInbox.TryStore(order, AppConfig.GetOrderInboxDirectory());
+                    var admission = EdgeOrderExecutionQueue.TryAdmit(order, AppConfig.GetOrderJobsDirectory());
+                    if (admission == OrderAdmissionResult.Busy)
+                    {
+                        EdgeDeploymentApi.AcknowledgeExecutorBusy(command.CommandId);
+                        Console.WriteLine($"[ORDER-PULL] Tu choi tam thoi {order.OrderNumber}: queue da du 10 cay.");
+                        continue;
+                    }
+
+                    EdgeDeploymentApi.AcknowledgeAccepted(command.CommandId);
+                    EdgeOrderExecutionQueue.Activate(command.CommandId, AppConfig.GetOrderJobsDirectory());
+                    if (admission == OrderAdmissionResult.Accepted) received++;
+                    Console.WriteLine($"[ORDER-PULL] Da chap nhan don {order.OrderNumber} ({order.TotalQuantity} cay), command {order.CommandId:D}.");
+                }
+                catch (OrderRejectionException ex)
+                {
+                    EdgeDeploymentApi.AcknowledgeRejected(command.CommandId, ex.Code, ex.Message);
+                    Console.WriteLine($"[ORDER-PULL] Tu choi command {command.CommandId:D}: {ex.Message}");
+                }
+                catch (FormatException ex)
+                {
+                    EdgeDeploymentApi.AcknowledgeRejected(command.CommandId, "InvalidPayload", ex.Message);
+                    Console.WriteLine($"[ORDER-PULL] Payload khong hop le {command.CommandId:D}: {ex.Message}");
+                }
             }
             return received;
         }
@@ -58,6 +91,7 @@ namespace IceBot.Workflow
         {
             _stop.Set();
             _worker?.Join(TimeSpan.FromSeconds(35));
+            _executor.Dispose();
             _stop.Dispose();
         }
     }

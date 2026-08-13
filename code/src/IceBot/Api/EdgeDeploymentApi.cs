@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using IceBot.Config;
+using IceBot.Workflow;
 
 namespace IceBot.Api
 {
@@ -72,6 +73,16 @@ namespace IceBot.Api
             Acknowledge(commandId, "Received", false);
         }
 
+        public static void AcknowledgeExecutorBusy(Guid commandId)
+        {
+            Acknowledge(commandId, "ExecutorBusy", false, "QueueCapacity", "Edge queue is at its 10-unit capacity.");
+        }
+
+        public static void AcknowledgeRejected(Guid commandId, string code, string message)
+        {
+            Acknowledge(commandId, "Rejected", false, code, message);
+        }
+
         public static void ReportDeployment(
             Guid commandId,
             FullEdgeDeploymentPayload payload,
@@ -93,6 +104,33 @@ namespace IceBot.Api
                     sourceConfigurationReleaseId = payload.ConfigurationReleaseId,
                     releaseChecksum = payload.ReleaseChecksum,
                     physicalOutputMayHaveOccurred = false,
+                    stockMovements = Array.Empty<object>()
+                });
+        }
+
+        public static void ReportProduction(ProductionReportData report)
+        {
+            Send<object>(
+                $"commands/{report.CommandId:D}/reports",
+                new
+                {
+                    sourceEventId = report.SourceEventId,
+                    sequenceNumber = report.SequenceNumber,
+                    edgeCreatedAt = report.EdgeCreatedAt,
+                    executorReportedAt = report.EdgeCreatedAt,
+                    reportType = "ProductionExecution",
+                    status = report.Status,
+                    sourceProductionJobId = report.SourceProductionJobId,
+                    orderItemId = report.OrderItemId,
+                    productionUnitNo = report.ProductionUnitNo,
+                    productionUnitQuantity = report.ProductionUnitQuantity,
+                    activeSetVersion = report.ActiveSetVersion,
+                    activeSetChecksum = report.ActiveSetChecksum,
+                    sourceConfigurationReleaseId = report.SourceConfigurationReleaseId,
+                    releaseChecksum = report.ReleaseChecksum,
+                    physicalOutputMayHaveOccurred = report.PhysicalOutputMayHaveOccurred,
+                    errorCode = report.ErrorCode,
+                    errorMessage = report.ErrorMessage,
                     stockMovements = Array.Empty<object>()
                 });
         }
@@ -157,7 +195,12 @@ namespace IceBot.Api
             }
         }
 
-        private static void Acknowledge(Guid commandId, string status, bool localStatePersisted)
+        private static void Acknowledge(
+            Guid commandId,
+            string status,
+            bool localStatePersisted,
+            string? rejectionCode = null,
+            string? rejectionMessage = null)
         {
             Send<object>(
                 $"commands/{commandId:D}/ack",
@@ -165,6 +208,8 @@ namespace IceBot.Api
                 {
                     ackStatus = status,
                     acknowledgedAt = DateTimeOffset.UtcNow,
+                    rejectionCode,
+                    rejectionMessage,
                     physicalOutputMayHaveOccurred = false,
                     localStatePersisted
                 });

@@ -63,10 +63,8 @@ namespace IceBot.Workflow
 
         private static void Report(Guid commandId, FullEdgeDeploymentPayload payload, string status)
         {
-            var settings = SiteConfigStore.Load();
-            settings.ExecutionReportSequence++;
-            SiteConfigStore.Save(settings);
-            EdgeDeploymentApi.ReportDeployment(commandId, payload, status, settings.ExecutionReportSequence);
+            EdgeDeploymentApi.ReportDeployment(
+                commandId, payload, status, SiteConfigStore.NextExecutionReportSequence());
         }
 
         private static IReadOnlyList<string> InstallVerifiedBundle(byte[] bundleBytes, IReadOnlyCollection<DeploymentArtifactData> artifacts)

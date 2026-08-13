@@ -10,10 +10,10 @@ IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng
 - `IceBot.exe` là runtime sản xuất: tự mở server, kết nối NetBird và bắt đầu pull Order từ BE bằng mTLS. Không cần đăng nhập tài khoản cửa hàng để chạy.
 - `InitIceBot.exe` dành cho kỹ thuật viên: đăng nhập, khởi tạo Edge, cấu hình, đăng ký máy ngoại vi và kiểm tra phần cứng.
 - Đăng nhập thật với BE, đăng ký Kiosk/Execution Endpoint, cấp mTLS, kích hoạt Kiosk và heartbeat đã được triển khai.
-- mTLS `ExecuteOrder` hiện mới **xác thực, lưu bền vững vào inbox và ACK `Received`**; chưa chuyển Order đó thành job điều khiển robot.
+- mTLS `ExecuteOrder` đã có queue bền vững, kiểm tra đúng Kiosk/Endpoint/release/Lua, ACK `Accepted`, chạy lần lượt từng cây và gửi trạng thái về BE.
 - API cũ `POST /api/orders` có thể nhận danh sách tên file Lua và đưa vào hàng đợi chạy robot.
 - Đồng bộ Full Edge deployment đã có code, nhưng đang **tạm hoãn** vì BE chưa có Lua production/deployment để tải xuống.
-- Gửi trạng thái hoàn thành/thất bại của quá trình sản xuất về BE chưa được triển khai.
+- Trạng thái từng cây (`Accepted`, `Running`, `Completed`, `Failed`, `RequiresManualIntervention`) được lưu vào outbox bền vững và gửi về BE qua mTLS.
 
 ## Kiến trúc
 
@@ -36,7 +36,7 @@ Các pattern chính:
 - Registry Pattern để ánh xạ `MachineType` và Lua step tới driver.
 - Producer–Consumer Queue để chỉ một worker điều khiển robot tại một thời điểm.
 - Wizard/Orchestrator cho quy trình khởi tạo Edge.
-- Local durable inbox để chống lưu trùng Order mTLS theo `CommandId`.
+- Durable inbox + execution queue/outbox để chống trùng Order và khôi phục an toàn theo `CommandId`.
 
 ## Cấu trúc repository
 
@@ -240,13 +240,16 @@ URL public mặc định đủ cho login và API quản trị. Nếu reverse pro
 BE
   → ExecuteOrder command
   → Edge pull bằng certificate mTLS
-  → kiểm tra schema 4 và các định danh Order
+  → kiểm tra schema 3/4/5, Kiosk, Endpoint, release và checksum Lua
   → lưu payload bất biến tại data/order-inbox/{CommandId}.json
-  → chống trùng bằng CommandId
-  → ACK Received
+  → tạo job từng cây tại data/order-jobs/{CommandId}.json
+  → giới hạn 4 cây/Order và 10 cây đang chờ/chạy
+  → ACK Accepted
+  → chạy tuần tự từng cây, mỗi cây là một workflow home-to-home
+  → lưu tiến độ và gửi report qua data/report-outbox
 ```
 
-Luồng này hiện **chưa chạy robot** và chưa ACK `Accepted`. Phần tiếp theo cần chuyển inbox thành execution job bền vững, kiểm tra endpoint/kiosk/release, chạy từng đơn vị sản phẩm và gửi trạng thái về BE.
+Nếu Edge khởi động lại giữa lúc một cây đang chạy, hệ thống không tự làm lại cây đó mà chuyển sang `RequiresManualIntervention` và dừng các đơn sau để tránh bán trùng.
 
 ### Local HTTP API — luồng cũ
 
@@ -274,7 +277,7 @@ Mỗi file `.lua` là một bước chuyển động của tay máy. Khi thực 
 
 Code provisioning hỗ trợ pull `DeployConfiguration` bằng mTLS, tải ZIP từ object storage, kiểm tra kích thước/SHA-256 và chỉ cài bundle hợp lệ. Tuy nhiên tính năng này hiện được **để lại, chưa đưa vào quy trình cài bắt buộc**, vì BE chưa có file Lua production.
 
-Contract Order theo tên file Lua cũ và contract artifact ID/release manifest mới cũng chưa được nối hoàn chỉnh.
+Order mTLS dùng trực tiếp `{RobotArtifactId}.lua` theo contract deployment mới. API local cũ vẫn dùng tên file để tương thích.
 
 ## Máy ngoại vi và plugin driver
 
@@ -324,12 +327,9 @@ dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj
 
 ## Các phần chưa hoàn thành
 
-- Chuyển Order mTLS trong durable inbox thành workflow thực thi robot.
-- Kiểm tra chéo Kiosk/Execution Endpoint/release trước khi nhận Order.
 - Backpressure đầy đủ cho inbox: dung lượng đĩa, tuổi Order và telemetry.
-- Theo dõi tiến độ bền vững theo từng cây kem, pause/resume khi hết nguyên liệu.
-- Gửi trạng thái running/completed/failed và sự cố máy ngoại vi về BE.
-- Hoàn thiện contract artifact ID giữa deployment Lua mới và execution Order.
+- Kiểm tra nguyên liệu trước từng cây và chức năng pause/resume/reconcile cho kỹ thuật viên.
+- Gửi telemetry trạng thái riêng của từng máy ngoại vi về BE.
 - Xác thực provisioning Lua thực tế sau khi BE có Lua production.
 
 Chi tiết đầy đủ và các quyết định thiết kế nằm trong [context/PROJECT_CONTEXT.md](context/PROJECT_CONTEXT.md).

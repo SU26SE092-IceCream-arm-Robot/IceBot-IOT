@@ -8,6 +8,8 @@ namespace IceBot.Config
         public const string DefaultRobotIp = "192.168.58.2";
 
         public const int ApiListenPort = 5080;
+        public const int MaxPendingProductionUnits = 10;
+        public const int MaxProductionUnitsPerOrder = 4;
 
         public static string ApiListenPrefix => $"http://localhost:{ApiListenPort}/";
 
@@ -90,6 +92,16 @@ namespace IceBot.Config
         public static string GetOrderInboxDirectory()
         {
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "order-inbox");
+        }
+
+        public static string GetOrderJobsDirectory()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "order-jobs");
+        }
+
+        public static string GetReportOutboxDirectory()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "report-outbox");
         }
 
         public static string GetTestWorkflowDirectory()

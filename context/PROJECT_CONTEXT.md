@@ -219,28 +219,27 @@ resolved via `MachineRegistry.TryGetModule`).
 
 ### Execution model (production)
 
-Cloud server **cannot** reach the store LAN directly. Orders are **pushed to the robot controller** via public ingress:
+Production orders use the Full Edge outbound mTLS channel; BE does not open an inbound connection
+to the store LAN:
 
 ```
-Payment OK on cloud
-    → POST order to robot controller
-         via NetBird
-         body: OrderRequest { orderId, steps: [ "cup_s.lua", "ice_chocolate_s.lua", ... ] }
-         (BE already resolved which files + what order — no mapping logic on the edge)
-    → IceBot validates every named file exists in local workflow/ (400 if not) → OrderQueue.Enqueue
-    → single background worker thread calls WorkflowRunner.RunQueue(steps, ...) — serialized,
-      so two orders never drive the arm at the same time
-    → WorkflowRunner runs the queue in order, per step:
+Payment OK on BE
+    → BE creates ExecuteOrder for this Kiosk + Execution Endpoint + active release
+    → IceBot pulls the command over mTLS through NetBird
+    → validates identity/release/expiry, orders artifact IDs and verifies local Lua checksums
+    → saves a durable job, ACKs Accepted, and creates one production job per unit
+    → single execution worker calls WorkflowRunner.RunQueue(...) once per unit — serialized
+    → WorkflowRunner runs the artifact queue in order, per step:
          1. LuaUpload → ProgramLoad → ProgramRun the step's .lua file on Fairino arm (192.168.58.2)
          2. Resolve the step's machine in MachineRegistry.Modules; if it implements
             IMachineTrigger (e.g. cup_s), resolve its COM port and call Trigger(comPort)
             right after — arm is already in position
-    → Optional: POST status back to cloud (completed / failed) — not implemented yet
+    → persist and send per-unit production status to BE through the report outbox
 ```
 
 **Current:** Console menu + CLI; real operator login; mTLS Full Edge deployment pull and verified
-Lua bundle installation; local API `serve` mode; RS485 peripheral triggers. Order execution still
-uses the legacy inbound filename contract and status POST-back remains TODO.
+Lua bundle installation; local API `serve` mode; RS485 peripheral triggers; durable mTLS order
+execution and per-unit status reporting. The inbound filename API remains for local compatibility.
 
 **Canonical installation/operation flow (2026-08-12):**
 
@@ -416,67 +415,63 @@ a Docker-only hostname such as `minio:9000` is invalid outside the BE host.
 - Bundle entries are immutable GUID names (`artifacts/{RobotArtifactId}.lua`) per BE contract;
   local filenames are therefore `{RobotArtifactId}.lua`.
 - `workflow/` remains gitignored and site-local.
-- The legacy inbound `/api/orders` filename-based execution contract predates the BE's current
-  artifact-ID/release-manifest contract. Lua deployment sync is implemented, but order execution
-  still needs a separate migration to resolve BE artifact IDs from the active release manifest.
+- The legacy inbound `/api/orders` filename-based execution contract remains available for local
+  compatibility. The production mTLS path resolves every BE artifact directly as
+  `{RobotArtifactId}.lua` and verifies its SHA-256 before accepting an order.
 
 ---
 
-## ExecuteOrder receipt (durable inbox)
+## ExecuteOrder execution (durable queue)
 
 `serve` mode starts `EdgeOrderCommandReceiver` alongside the legacy local HTTP server. The receiver
 uses the Full Edge mTLS identity and calls command pull every five seconds. It selects only
 `CommandType = ExecuteOrder`; deployment commands remain owned by the explicit provisioning flow.
 
-For each ExecuteOrder command, Edge currently:
+For each ExecuteOrder command, Edge:
 
-1. Validates schema version 4, envelope/payload `CommandId`, `OrderId`, `OrderNumber`, non-empty
-   order lines, positive line `Quantity`, and non-empty robot programs.
-2. Writes the original immutable payload to
-   `data/order-inbox/{CommandId}.json` using a temporary file followed by rename.
-3. Treats the command file name as the idempotency key, so a redelivered command is not stored
-   twice.
-4. Sends transport ACK `Received`. It deliberately does not send `Accepted` yet because the
-   command has not been converted into a durable local execution job/outbox.
+1. Accepts BE schema 3/4/5 and validates command, order-line, unit and artifact identities.
+2. Rejects a command when `KioskId`, `TargetExecutionEndpointId`, active release ID/checksum or
+   expiry does not match this Edge.
+3. Orders programs by `BindingOrder`, artifacts by `RunOrder`, resolves each artifact as
+   `workflow/{RobotArtifactId}.lua`, and verifies its SHA-256.
+4. Enforces at most 4 production units in one order and at most 10 pending/running units in the
+   local queue. A full queue receives `ExecutorBusy`, not `Accepted`.
+5. Saves the immutable input under `data/order-inbox/` and a per-unit execution job under
+   `data/order-jobs/`. `CommandId` is the idempotency key.
+6. Sends ACK `Accepted` only after the execution job is durable, then runs exactly one complete
+   home-to-home workflow per unit. Two units never control the robot concurrently.
+7. Persists `Pending`/`Running`/`Completed`/`Failed` state and queues Accepted, Running, Completed,
+   Failed or RequiresManualIntervention reports under `data/report-outbox/`. The outbox retries in
+   sequence when mTLS connectivity returns.
 
-This phase only receives orders safely. It does **not** drive the robot. The next phase must read
-the durable inbox, verify active release provenance, order robot programs/artifacts by
-`BindingOrder`/`RunOrder`, execute the complete workflow once per production unit, persist unit
-progress, and send Accepted/running/completed/failed reports. Each quantity unit must be a full
-home-to-home run so only one ice cream is produced at a time.
+If the process restarts while a unit is `Running`, Edge does not retry that unit because physical
+output may already exist. It records `RequiresManualIntervention`, reports
+`RuntimeRestartedDuringExecution`, and pauses later work. A workflow failure is also reported with
+`physicalOutputMayHaveOccurred=true` and pauses the queue for technician/business resolution.
 
 The private BE URL remains a deployment input. Without `BE_API_URL`, execution endpoint ID, and
 client PFX, `serve` logs one configuration warning and leaves the receiver disabled.
 
 ### ExecuteOrder failure scenarios and open decisions
 
-The following cases are required design inputs for the execution phase. They are documented now
-but are **not fully implemented** by the receipt-only worker.
+The following cases are safety rules for the execution worker.
 
 #### BE delivers an order for another store/kiosk
 
 - BE command pull authenticates one execution endpoint and queries commands by that endpoint's
   bound kiosk and endpoint ID, so cross-kiosk delivery should already be prevented server-side.
-- Edge must still perform defense-in-depth validation before storing/accepting a command:
+- Edge also performs defense-in-depth validation before accepting a command:
   `TargetExecutionEndpointId` must equal local `EXECUTION_ENDPOINT_ID`; payload `KioskId` must
   equal a locally provisioned kiosk ID; release ID/checksum must equal the active deployment.
-- **Current gap:** the receipt validator checks command/order identity and structure but does not
-  yet persist a local kiosk ID or enforce these kiosk/endpoint/release comparisons.
-- On mismatch, Edge must not execute or ACK `Accepted`. It should quarantine the command, emit an
-  auditable rejection/error code, and let BE/support investigate; silently rerouting the order is
-  forbidden.
+- On mismatch, Edge does not execute or ACK `Accepted`; it sends a coded `Rejected` ACK.
 
 #### Edge receives more orders than it can safely hold or execute
 
-- Command pull is naturally bounded per request (`maxCommands` is at most 20), but the current
-  disk inbox has no total item/byte/age limit and therefore is not complete backpressure.
-- Before execution is enabled, add configurable inbox capacity, minimum free-disk threshold,
-  oldest-command age monitoring, and queue-depth health/telemetry.
-- When capacity is reached, Edge must stop pulling/accepting new work and report a busy/capacity
-  condition. Commands should remain durable in BE for later pull; Edge must not acknowledge them
-  as accepted and must not drop the oldest order to make room.
-- **Open decision:** product/operations must choose maximum queued order count, maximum inbox
-  bytes, maximum waiting time, and whether BE stops sales for this kiosk or redirects new sales.
+- One order may contain at most 4 units. The queue admits at most 10 pending/running units across
+  all orders.
+- At capacity Edge replies `ExecutorBusy` with code `QueueCapacity`; the command remains BE-owned
+  for retry and no old order is dropped.
+- Free-disk thresholds, maximum inbox bytes/age and queue-depth telemetry remain future hardening.
 
 #### Ingredients run out during production
 
@@ -492,8 +487,8 @@ but are **not fully implemented** by the receipt-only worker.
   decision. Edge must preserve their durable queue state.
 - Refund, remake, partial fulfillment, cancellation, or routing to another kiosk are BE/business
   decisions. Edge reports facts and provenance; it must not silently choose compensation.
-- **Current gap:** ingredient readiness, per-unit durable progress, pause/resume, failure reports,
-  and BE compensation coordination are not implemented yet.
+- **Current gap:** per-unit progress and failure reports are implemented, but ingredient readiness
+  checks and an explicit technician resume/reconciliation command are not implemented yet.
 
 ---
 
@@ -744,7 +739,7 @@ MoveJ(
 | Full Edge mTLS command pull + presigned bundle download + size/SHA-256 verification | ✅ Done |
 | Full Edge deployment ACK + Installed/Active reports | ✅ Done |
 | `WorkflowProvisioner` / `FullEdgeConfigurationInstaller` — verified install to `workflow/` | ✅ Done |
-| Background ExecuteOrder command pull in `serve` + schema validation + disk inbox + Received ACK | ✅ Done; receipt only, execution intentionally pending |
+| Background ExecuteOrder mTLS pull, Edge/release validation, durable 10-unit queue, Accepted ACK and one-unit-at-a-time execution | ✅ Done |
 | `serve` — `LocalApiServer` `/health` | ✅ Done |
 | Fairino `LuaUpload` → `ProgramRun` | ✅ Done |
 | `WorkflowRunner` — sequential step queue, each `.lua` file run in full (chaining is free — see script chaining rule) | ✅ Done |
@@ -760,7 +755,7 @@ MoveJ(
 | `OrderQueue` — single background worker serializes `WorkflowRunner.RunQueue` calls off the HTTP thread | ✅ Done — `Workflow/OrderQueue.cs` |
 | Auto home-return (`robot_home`) at start + end of every queue run | ✅ Done — `WorkflowRunner` calls `FairinoLuaExecutor.MoveToTeachingPoint("robot_home")` before and after the queue; reads the named teaching point from the controller (SDK `GetRobotTeachingPoint` + `MoveJ`). Requires the point to be saved on the robot as `robot_home` |
 | POST `/api/orders` → run robot | ✅ Done — validates `steps` files exist, enqueues onto `OrderQueue` |
-| POST status (done/failed) back to BE after a run | ❌ TODO |
+| Durable per-unit Accepted/Running/Completed/Failed/manual-intervention report outbox to BE | ✅ Done |
 
 ### Design change (2026-07-31): ordering moved from IceBot to BE
 

@@ -8,6 +8,7 @@ namespace IceBot.Config
     internal static class SiteConfigStore
     {
         private static SiteSettings? _cached;
+        private static readonly object SequenceGate = new object();
 
         public static string ConfigDirectory =>
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
@@ -101,6 +102,17 @@ namespace IceBot.Config
 
             _cached = settings;
             ApplyToEnvironment(settings);
+        }
+
+        public static long NextExecutionReportSequence()
+        {
+            lock (SequenceGate)
+            {
+                var settings = Load();
+                settings.ExecutionReportSequence++;
+                Save(settings);
+                return settings.ExecutionReportSequence;
+            }
         }
 
         public static void ApplyToEnvironment(SiteSettings settings)
