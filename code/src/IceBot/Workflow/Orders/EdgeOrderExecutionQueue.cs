@@ -105,6 +105,14 @@ namespace IceBot.Workflow
 
         public static void RecoverInterruptedJobs(string jobsDirectory)
         {
+            RecoverInterruptedJobs(jobsDirectory, (job, unit) =>
+                ProductionReportOutbox.Enqueue(job, unit, unit.Status, true, unit.ErrorCode, unit.ErrorMessage));
+        }
+
+        internal static void RecoverInterruptedJobs(
+            string jobsDirectory,
+            Action<DurableOrderJob, DurableProductionUnit> enqueueRecoveryReport)
+        {
             lock (Gate)
             {
                 foreach (var job in LoadAll(jobsDirectory))
@@ -124,7 +132,7 @@ namespace IceBot.Workflow
                         job.Status = "RequiresManualIntervention";
                         Save(job, jobsDirectory);
                         foreach (var unit in recovered)
-                            ProductionReportOutbox.Enqueue(job, unit, unit.Status, true, unit.ErrorCode, unit.ErrorMessage);
+                            enqueueRecoveryReport(job, unit);
                     }
                 }
             }

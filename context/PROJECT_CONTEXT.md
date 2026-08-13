@@ -498,6 +498,17 @@ The following cases are safety rules for the execution worker.
 |------|--------|
 | Language | **C#** (.NET Framework **4.7.2**) |
 | Installer | Self-contained **.NET 8 Windows x64** bootstrapper (`Setup.exe`) |
+
+## Automated test status (2026-08-13)
+
+The xUnit harness now contains 68 passing test cases for completed, deterministic logic: config
+identity preservation, mTLS certificate creation, kiosk/endpoint/device response parsing, Full
+Edge deployment payload and safe bundle installation, DLL plugin validation, legacy Order parsing,
+ExecuteOrder schema/identity/release/artifact validation, and durable queue admission/idempotency.
+
+Run with `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj`. The consolidated
+matrix and the separate real-BE/NetBird/robot/RS485 checklist live in `testing/`. Hardware and live
+network paths are deliberately classified as integration/manual tests rather than mocked unit tests.
 | UI | **Console / CMD** — no GUI required |
 | Robot SDK | Fairino C# SDK (`code/lib/fairino-csharp-sdk/`) |
 | Ingress | NetBird (`deploy/` still has the old DuckDNS + Cloudflare Tunnel scripts, stale) |
