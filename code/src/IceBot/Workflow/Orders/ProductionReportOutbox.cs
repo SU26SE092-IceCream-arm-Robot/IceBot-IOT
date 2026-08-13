@@ -36,21 +36,13 @@ namespace IceBot.Workflow
         public static void Enqueue(DurableOrderJob job, DurableProductionUnit unit, string status,
             bool physicalOutputMayHaveOccurred, string? errorCode, string? errorMessage)
         {
-            Enqueue(job, unit, status, physicalOutputMayHaveOccurred, errorCode, errorMessage,
-                AppConfig.GetReportOutboxDirectory(), SiteConfigStore.NextExecutionReportSequence());
-        }
-
-        internal static void Enqueue(DurableOrderJob job, DurableProductionUnit unit, string status,
-            bool physicalOutputMayHaveOccurred, string? errorCode, string? errorMessage,
-            string directory, long sequenceNumber)
-        {
             lock (Gate)
             {
                 var report = new ProductionReportData
                 {
                     CommandId = job.CommandId,
                     SourceEventId = Guid.NewGuid(),
-                    SequenceNumber = sequenceNumber,
+                    SequenceNumber = SiteConfigStore.NextExecutionReportSequence(),
                     EdgeCreatedAt = DateTimeOffset.UtcNow,
                     Status = status,
                     SourceProductionJobId = unit.SourceProductionJobId,
@@ -64,6 +56,7 @@ namespace IceBot.Workflow
                     ErrorCode = errorCode,
                     ErrorMessage = errorMessage
                 };
+                var directory = AppConfig.GetReportOutboxDirectory();
                 Directory.CreateDirectory(directory);
                 var path = Path.Combine(directory, report.SequenceNumber.ToString("D20") + "-" + report.SourceEventId.ToString("N") + ".json");
                 var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");

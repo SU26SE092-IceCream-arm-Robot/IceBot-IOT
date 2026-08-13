@@ -35,7 +35,7 @@ namespace IceBot.Workflow
 
                 var bytes = EdgeDeploymentApi.DownloadBundle(bundle);
                 VerifyChecksum(bytes, bundle.Checksum, "bundle");
-                var saved = InstallVerifiedBundle(bytes, payload.Artifacts, AppConfig.GetWorkflowDirectory());
+                var saved = InstallVerifiedBundle(bytes, payload.Artifacts);
 
                 var settings = SiteConfigStore.Load();
                 settings.ActiveConfigurationDeploymentId = payload.DeploymentId;
@@ -67,11 +67,9 @@ namespace IceBot.Workflow
                 commandId, payload, status, SiteConfigStore.NextExecutionReportSequence());
         }
 
-        internal static IReadOnlyList<string> InstallVerifiedBundle(
-            byte[] bundleBytes,
-            IReadOnlyCollection<DeploymentArtifactData> artifacts,
-            string workflowDir)
+        private static IReadOnlyList<string> InstallVerifiedBundle(byte[] bundleBytes, IReadOnlyCollection<DeploymentArtifactData> artifacts)
         {
+            var workflowDir = AppConfig.GetWorkflowDirectory();
             Directory.CreateDirectory(workflowDir);
             var expected = artifacts.ToDictionary(item => item.RobotArtifactId);
             var stagingDir = Path.Combine(Path.GetTempPath(), "icebot-lua-" + Guid.NewGuid().ToString("N"));

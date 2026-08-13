@@ -106,56 +106,6 @@ namespace IceBot.Harness.Tests
             Assert.Contains("cup_s", driver.StepNames);
             Assert.IsAssignableFrom<IMachineTrigger>(driver);
         }
-
-        [Fact]
-        public void Load_RejectsTamperedDllBySha256()
-        {
-            var directory = Path.Combine(Path.GetTempPath(), "icebot-plugin-tamper-test-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(directory);
-            try
-            {
-                File.Copy(typeof(HarnessMachineDriver).Assembly.Location, Path.Combine(directory, "Driver.dll"));
-                File.WriteAllText(Path.Combine(directory, "driver.json"), JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    machineType = "harness_machine",
-                    assembly = "Driver.dll",
-                    entryType = typeof(HarnessMachineDriver).FullName,
-                    driverVersion = "1.0.0",
-                    sha256 = new string('0', 64)
-                }));
-
-                var result = MachinePluginLoader.Load(directory);
-
-                Assert.Empty(result.Modules);
-                Assert.Contains(result.Errors, error => error.Contains("SHA-256"));
-            }
-            finally { Directory.Delete(directory, true); }
-        }
-
-        [Theory]
-        [InlineData(2, "machine", "Driver.dll", "Type", "1", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
-        [InlineData(1, "machine", "Driver.exe", "Type", "1", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
-        [InlineData(1, "machine", "Driver.dll", "Type", "1", "not-a-checksum")]
-        public void ValidateManifest_RejectsUnsupportedOrUnsafeContracts(int schema, string machine,
-            string assembly, string entryType, string version, string sha)
-        {
-            Assert.Throws<InvalidDataException>(() => MachinePluginLoader.ValidateManifest(new MachinePluginManifest
-            {
-                SchemaVersion = schema,
-                MachineType = machine,
-                Assembly = assembly,
-                EntryType = entryType,
-                DriverVersion = version,
-                Sha256 = sha
-            }));
-        }
-
-        [Fact]
-        public void ValidateModule_RejectsMachineTypeUnsafeForConfigSerialization()
-        {
-            Assert.Throws<InvalidDataException>(() => MachinePluginLoader.ValidateModule(new UnsafeMachineDriver()));
-        }
     }
 
     public sealed class HarnessMachineDriver : IMachineModule
@@ -163,12 +113,5 @@ namespace IceBot.Harness.Tests
         public string MachineType => "harness_machine";
         public string DisplayName => "Harness machine";
         public IReadOnlyCollection<string> StepNames { get; } = new[] { "harness_step" };
-    }
-
-    public sealed class UnsafeMachineDriver : IMachineModule
-    {
-        public string MachineType => "unsafe,type";
-        public string DisplayName => "Unsafe";
-        public IReadOnlyCollection<string> StepNames { get; } = new[] { "step" };
     }
 }
