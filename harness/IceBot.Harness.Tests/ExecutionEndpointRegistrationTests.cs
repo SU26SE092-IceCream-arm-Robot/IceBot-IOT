@@ -72,6 +72,60 @@ namespace IceBot.Harness.Tests
         }
 
         [Fact]
+        public void SelectUnambiguousProvisioningFullEdgeEndpoint_ReusesSingleSeededEndpoint()
+        {
+            var kioskId = Guid.NewGuid();
+            var seededEndpoint = new BackendExecutionEndpoint
+            {
+                Id = Guid.NewGuid(),
+                KioskId = kioskId,
+                EndpointCode = "ICEBOT-DEMO-EDGE",
+                ExecutionProfile = "FullEdge",
+                Status = "Provisioning"
+            };
+
+            var selected = ExecutionEndpointRegistrationApi.SelectUnambiguousProvisioningFullEdgeEndpoint(
+                new[] { seededEndpoint }, kioskId, out var ambiguous);
+
+            Assert.False(ambiguous);
+            Assert.Same(seededEndpoint, selected);
+        }
+
+        [Fact]
+        public void SelectUnambiguousProvisioningFullEdgeEndpoint_RejectsAmbiguousProvisioningEndpoints()
+        {
+            var kioskId = Guid.NewGuid();
+            var selected = ExecutionEndpointRegistrationApi.SelectUnambiguousProvisioningFullEdgeEndpoint(
+                new[]
+                {
+                    new BackendExecutionEndpoint { Id = Guid.NewGuid(), KioskId = kioskId, ExecutionProfile = "FullEdge", Status = "Provisioning" },
+                    new BackendExecutionEndpoint { Id = Guid.NewGuid(), KioskId = kioskId, ExecutionProfile = "FullEdge", Status = "Provisioning" }
+                },
+                kioskId,
+                out var ambiguous);
+
+            Assert.True(ambiguous);
+            Assert.Null(selected);
+        }
+
+        [Fact]
+        public void SelectUnambiguousProvisioningFullEdgeEndpoint_IgnoresOtherProfilesAndStates()
+        {
+            var kioskId = Guid.NewGuid();
+            var selected = ExecutionEndpointRegistrationApi.SelectUnambiguousProvisioningFullEdgeEndpoint(
+                new[]
+                {
+                    new BackendExecutionEndpoint { Id = Guid.NewGuid(), KioskId = kioskId, ExecutionProfile = "LowCostController", Status = "Provisioning" },
+                    new BackendExecutionEndpoint { Id = Guid.NewGuid(), KioskId = kioskId, ExecutionProfile = "FullEdge", Status = "Active" }
+                },
+                kioskId,
+                out var ambiguous);
+
+            Assert.False(ambiguous);
+            Assert.Null(selected);
+        }
+
+        [Fact]
         public void ParseManagementResponse_ReturnsActiveProfileIdentity()
         {
             var profileIdentity = Guid.NewGuid();

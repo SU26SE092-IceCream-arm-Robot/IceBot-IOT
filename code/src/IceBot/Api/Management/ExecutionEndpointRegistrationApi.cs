@@ -182,15 +182,24 @@ namespace IceBot.Api
             {
                 if (!string.Equals(existing.ExecutionProfile, "FullEdge", StringComparison.OrdinalIgnoreCase))
                     return Fail($"Ma {endpointCode} da ton tai nhung khong phai FullEdge.");
-                return new ExecutionEndpointRegistrationResult
-                {
-                    Success = true,
-                    EndpointId = existing.Id,
-                    Status = existing.Status,
-                    ProfileIdentity = existing.ProfileIdentity,
-                    Created = false,
-                    Message = "Edge da duoc dang ky tren BE; da khoi phuc Execution Endpoint ID."
-                };
+                return Reuse(existing, "Edge da duoc dang ky tren BE; da khoi phuc Execution Endpoint ID.");
+            }
+
+            var provisioningEndpoint = SelectUnambiguousProvisioningFullEdgeEndpoint(
+                endpoints,
+                kioskId,
+                out var provisioningEndpointIsAmbiguous);
+            if (provisioningEndpointIsAmbiguous)
+            {
+                return Fail(
+                    "Kiosk co nhieu Full Edge dang cho cau hinh. Hay chon Execution Endpoint ID cu the truoc khi khoi tao Edge.");
+            }
+
+            if (provisioningEndpoint != null)
+            {
+                return Reuse(
+                    provisioningEndpoint,
+                    "Da dung lai Full Edge dang cho cau hinh cua kiosk; se provision chung chi mTLS cho endpoint nay.");
             }
 
             var createResponse = SendWithRefresh(
@@ -198,6 +207,22 @@ namespace IceBot.Api
                 $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints",
                 new { endpointCode, executionProfile = 1 });
             return ParseCreate(createResponse);
+        }
+
+        internal static BackendExecutionEndpoint? SelectUnambiguousProvisioningFullEdgeEndpoint(
+            IEnumerable<BackendExecutionEndpoint> endpoints,
+            Guid kioskId,
+            out bool isAmbiguous)
+        {
+            var candidates = endpoints
+                .Where(endpoint =>
+                    endpoint.KioskId == kioskId &&
+                    string.Equals(endpoint.ExecutionProfile, "FullEdge", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(endpoint.Status, "Provisioning", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            isAmbiguous = candidates.Length > 1;
+            return candidates.Length == 1 ? candidates[0] : null;
         }
 
         public ExecutionEndpointManagementResult GetEndpoint(Guid kioskId, Guid endpointId)
@@ -237,6 +262,17 @@ namespace IceBot.Api
             var value = builder.ToString().TrimEnd('-');
             return value.Length <= 100 ? value : value.Substring(0, 100);
         }
+
+        private static ExecutionEndpointRegistrationResult Reuse(BackendExecutionEndpoint endpoint, string message) =>
+            new ExecutionEndpointRegistrationResult
+            {
+                Success = true,
+                EndpointId = endpoint.Id,
+                Status = endpoint.Status,
+                ProfileIdentity = endpoint.ProfileIdentity,
+                Created = false,
+                Message = message
+            };
 
         internal static bool TryNormalizeKioskCode(string input, out string code, out string error)
         {
