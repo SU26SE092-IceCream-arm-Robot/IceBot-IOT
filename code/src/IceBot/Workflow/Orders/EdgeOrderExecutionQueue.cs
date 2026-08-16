@@ -55,9 +55,11 @@ namespace IceBot.Workflow
             {
                 Directory.CreateDirectory(jobsDirectory);
                 if (File.Exists(JobPath(jobsDirectory, order.CommandId))) return OrderAdmissionResult.AlreadyStored;
-                var occupied = LoadAll(jobsDirectory).SelectMany(job => job.Units)
-                    .Count(unit => unit.Status == "Pending" || unit.Status == "Running");
-                if (occupied + order.TotalQuantity > AppConfig.MaxPendingProductionUnits) return OrderAdmissionResult.Busy;
+                // A kiosk is a customer-attended single-session machine. Edge keeps a durable
+                // queue for crash recovery, not to admit another customer while the current
+                // order is pending, running, failed, or awaiting manual intervention.
+                if (LoadAll(jobsDirectory).Any(job => job.Status != "Completed"))
+                    return OrderAdmissionResult.Busy;
 
                 var job = new DurableOrderJob
                 {
@@ -138,6 +140,14 @@ namespace IceBot.Workflow
                 if (jobs.Any(job => job.Status == "Failed" || job.Status == "RequiresManualIntervention")) return null;
                 return jobs.Where(job => job.Status == "Pending" && job.Units.Any(unit => unit.Status == "Pending"))
                     .OrderBy(job => job.AcceptedAt).FirstOrDefault();
+            }
+        }
+
+        public static bool HasActiveOrUnresolvedWork(string jobsDirectory)
+        {
+            lock (Gate)
+            {
+                return LoadAll(jobsDirectory).Any(job => job.Status != "Completed");
             }
         }
 
@@ -229,6 +239,7 @@ namespace IceBot.Workflow
                 try
                 {
                     ProductionReportOutbox.Flush();
+                    DeploymentReportOutbox.Flush();
                     var job = EdgeOrderExecutionQueue.NextRunnable(AppConfig.GetOrderJobsDirectory());
                     if (job == null) { _stop.WaitOne(TimeSpan.FromSeconds(2)); continue; }
                     var unit = EdgeOrderExecutionQueue.BeginNextUnit(job, AppConfig.GetOrderJobsDirectory());
@@ -245,6 +256,7 @@ namespace IceBot.Workflow
                         Console.WriteLine($"[ORDER] LOI {job.OrderNumber}, cay {unit.ProductionUnitNo}: {ex.Message}");
                     }
                     ProductionReportOutbox.Flush();
+                    DeploymentReportOutbox.Flush();
                 }
                 catch (Exception ex)
                 {

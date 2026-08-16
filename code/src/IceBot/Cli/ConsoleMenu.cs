@@ -5,7 +5,6 @@ using System.Threading;
 using IceBot.Api;
 using IceBot.Config;
 using IceBot.Machines;
-using IceBot.Networking;
 using IceBot.Robot;
 using IceBot.Workflow;
 
@@ -249,24 +248,30 @@ namespace IceBot.Cli
 
             PrintIngressInfo();
 
+            var edgeReported = EdgeMtlsProbe.SendHeartbeatAndReportedDevices(out var edgeReportMessage);
+            Console.WriteLine(edgeReported ? "[OK] " + edgeReportMessage : "[WARN] " + edgeReportMessage);
+            var readinessReported = EdgeMtlsProbe.SendReadiness(out var readinessMessage);
+            Console.WriteLine(readinessReported ? "[OK] " + readinessMessage : "[WARN] " + readinessMessage);
+
             using (var orderReceiver = new EdgeOrderCommandReceiver())
-            using (var api = new LocalApiServer())
             {
                 orderReceiver.Start();
-                api.Start();
                 TrySetConsoleTitle("IceBot - SERVER RUNNING");
                 Console.WriteLine();
                 Console.WriteLine("========================================");
                 Console.WriteLine("[RUNNING] ICEBOT SERVER DANG HOAT DONG");
-                Console.WriteLine($"API        : {(api.IsRunning ? "RUNNING" : "STOPPED")} - {AppConfig.ApiListenPrefix}");
                 Console.WriteLine($"Order pull : {(orderReceiver.IsRunning ? "RUNNING" : "DISABLED - KIEM TRA CAU HINH mTLS")}");
-                Console.WriteLine($"Health     : {AppConfig.ApiListenPrefix.TrimEnd('/')}/health");
                 Console.WriteLine("========================================");
                 Console.WriteLine("Lenh: test = chay lua | exit = thoat");
                 Console.WriteLine();
 
                 using (var statusTimer = new Timer(_ =>
-                    Console.WriteLine($"\n[STATUS {DateTime.Now:HH:mm:ss}] Server=RUNNING | API={(api.IsRunning ? "RUNNING" : "STOPPED")} | OrderPull={(orderReceiver.IsRunning ? "RUNNING" : "DISABLED")}"),
+                {
+                    var edgeReport = EdgeMtlsProbe.SendHeartbeatAndReportedDevices(out var edgeReportMessage);
+                    var inventory = EdgeMtlsProbe.SendSimulatedInventoryObservations(out var inventoryMessage);
+                    var readiness = EdgeMtlsProbe.SendReadiness(out var readinessMessage);
+                    Console.WriteLine($"\n[STATUS {DateTime.Now:HH:mm:ss}] Server=RUNNING | OrderPull={(orderReceiver.IsRunning ? "RUNNING" : "DISABLED")} | Heartbeat={(edgeReport ? "REPORTED" : "FAILED")} | Inventory={(inventory ? "REPORTED" : "FAILED")}: {inventoryMessage} | Readiness={(readiness ? "REPORTED" : "FAILED")}: {readinessMessage}");
+                },
                     null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30)))
                 {
 
@@ -336,12 +341,14 @@ namespace IceBot.Cli
             var connected = false;
             try
             {
-                using (var executor = new FairinoLuaExecutor(AppConfig.RobotIp))
+                using (var executor = RobotWorkflowExecutorFactory.Create(AppConfig.RobotIp))
                 {
                     executor.Connect();
                 }
 
-                Console.WriteLine($"   Tay may ({AppConfig.RobotIp}): connect");
+                Console.WriteLine(AppConfig.RobotExecutionMode == RobotExecutionMode.Simulated
+                    ? "   Simulator: connected (khong co ket noi FR5 that)."
+                    : $"   Tay may ({AppConfig.RobotIp}): connect");
                 connected = true;
             }
             catch (Exception ex)
@@ -405,22 +412,23 @@ namespace IceBot.Cli
             Console.WriteLine("  IceBot-IOT  |  Fairino FR5 Controller");
             Console.WriteLine("========================================");
             Console.WriteLine($"Robot IP : {AppConfig.RobotIp}");
+            Console.WriteLine($"Execution mode : {AppConfig.RobotExecutionMode}");
+            if (AppConfig.RobotExecutionMode == RobotExecutionMode.Simulated)
+                Console.WriteLine("[WARN] Simulated mode does not connect to, validate, or move a physical robot.");
             Console.WriteLine($"Workflow : {AppConfig.GetWorkflowDirectory()}");
             Console.WriteLine();
         }
 
         private static void PrintIngressInfo()
         {
-            Console.WriteLine("Ingress (NetBird):");
+            Console.WriteLine("Ket noi Edge (NetBird/mTLS):");
             Console.WriteLine($"  NetBird setup key : {(string.IsNullOrEmpty(AppConfig.NetBirdSetupKey) ? "chua dat" : "da dat")}");
-            Console.WriteLine($"  Public URL     : {AppConfig.PublicUrl}");
-            Console.WriteLine($"  Local API      : {AppConfig.ApiListenPrefix}");
-            Console.WriteLine($"  API key        : {(string.IsNullOrEmpty(AppConfig.ApiKey) ? "chua dat" : "da dat")}");
+            Console.WriteLine($"  BE private URL : {AppConfig.BeApiUrl}");
+            Console.WriteLine($"  Execution ID   : {(AppConfig.ExecutionEndpointId == Guid.Empty ? "chua dat" : AppConfig.ExecutionEndpointId.ToString("D"))}");
+            Console.WriteLine($"  Client PFX     : {(string.IsNullOrEmpty(AppConfig.ExecutionClientCertificatePath) ? "chua dat" : "da dat")}");
             Console.WriteLine($"  Dang nhap BE   : {(string.IsNullOrEmpty(AppConfig.OperatorAccessToken) ? "CHUA (IceBot.exe login)" : "da dang nhap")}");
             Console.WriteLine();
-            Console.WriteLine("BE endpoints:");
-            Console.WriteLine($"  POST {AppConfig.PublicUrl.TrimEnd('/')}/api/orders");
-            Console.WriteLine($"  GET  {AppConfig.PublicUrl.TrimEnd('/')}/health");
+            Console.WriteLine("Edge nhan command tu BE qua mTLS pull; khong mo HTTP order API local.");
         }
 
         public static void Pause()

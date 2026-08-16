@@ -5,7 +5,7 @@ using fairino;
 
 namespace IceBot.Robot
 {
-    internal sealed class FairinoLuaExecutor : IDisposable
+    internal sealed class FairinoLuaExecutor : IRobotWorkflowExecutor
     {
         private readonly fairino.Robot _robot;
         private readonly string _robotIp;

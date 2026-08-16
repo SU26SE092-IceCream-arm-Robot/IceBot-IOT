@@ -141,9 +141,9 @@ namespace IceBot.Config
                 var port = settings.GetMachinePort(trigger.MachineType);
                 Console.WriteLine($"  {trigger.DisplayName,-15}: {(string.IsNullOrEmpty(port) ? "(chua cau hinh)" : port)}");
             }
-            Console.WriteLine($"  Local API      : {AppConfig.ApiListenPrefix}");
-            Console.WriteLine($"  BE POST orders : {settings.PublicUrl.TrimEnd('/')}/api/orders");
-            Console.WriteLine($"  BE GET health  : {settings.PublicUrl.TrimEnd('/')}/health");
+            Console.WriteLine($"  BE private URL : {settings.BeApiUrl}");
+            Console.WriteLine($"  Execution ID   : {(settings.ExecutionEndpointId == Guid.Empty ? "(chua cau hinh)" : settings.ExecutionEndpointId.ToString("D"))}");
+            Console.WriteLine("  Order command  : mTLS pull tu Backend");
         }
 
         private static string Prompt(string label, string current)

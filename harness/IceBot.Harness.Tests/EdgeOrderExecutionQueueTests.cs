@@ -9,18 +9,15 @@ namespace IceBot.Harness.Tests
     public class EdgeOrderExecutionQueueTests
     {
         [Fact]
-        public void TryAdmit_LimitsQueueToTenProductionUnits()
+        public void TryAdmit_AllowsOnlyOneCustomerSessionUntilCompletion()
         {
             var directory = Path.Combine(Path.GetTempPath(), "icebot-order-queue-test-" + Guid.NewGuid().ToString("N"));
             try
             {
                 Assert.Equal(OrderAdmissionResult.Accepted, EdgeOrderExecutionQueue.TryAdmit(BuildOrder(4), directory));
-                Assert.Equal(OrderAdmissionResult.Accepted, EdgeOrderExecutionQueue.TryAdmit(BuildOrder(4), directory));
-                Assert.Equal(OrderAdmissionResult.Accepted, EdgeOrderExecutionQueue.TryAdmit(BuildOrder(2), directory));
                 Assert.Equal(OrderAdmissionResult.Busy, EdgeOrderExecutionQueue.TryAdmit(BuildOrder(1), directory));
-                Assert.Equal(10, EdgeOrderExecutionQueue.LoadAll(directory)[0].Units.Count +
-                    EdgeOrderExecutionQueue.LoadAll(directory)[1].Units.Count +
-                    EdgeOrderExecutionQueue.LoadAll(directory)[2].Units.Count);
+                Assert.True(EdgeOrderExecutionQueue.HasActiveOrUnresolvedWork(directory));
+                Assert.Single(EdgeOrderExecutionQueue.LoadAll(directory));
             }
             finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
         }

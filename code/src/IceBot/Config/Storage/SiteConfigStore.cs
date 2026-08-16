@@ -44,6 +44,11 @@ namespace IceBot.Config
                     case "BE_API_URL": settings.BeApiUrl = value; break;
                     case "API_KEY": settings.ApiKey = value; break;
                     case "ROBOT_IP": settings.RobotIp = value; break;
+                    case "PRIMARY_ROBOT_SOURCE_DEVICE_KEY": settings.PrimaryRobotSourceDeviceKey = value; break;
+                    case "PRIMARY_ROBOT_RUNTIME_TARGET_CODE": settings.PrimaryRobotRuntimeTargetCode = value; break;
+                    case "PRIMARY_ROBOT_MACHINE_MODEL_CODE": settings.PrimaryRobotMachineModelCode = value; break;
+                    case "REPORTED_DEVICES_SNAPSHOT_REVISION": long.TryParse(value, out var reportedDevicesRevision); settings.ReportedDevicesSnapshotRevision = reportedDevicesRevision; break;
+                    case "REPORTED_DEVICES_SNAPSHOT_SIGNATURE": settings.ReportedDevicesSnapshotSignature = value; break;
                     case "STORE_ACCOUNT": settings.StoreAccount = value; break;
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
                     case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
@@ -57,7 +62,9 @@ namespace IceBot.Config
                     case "ACTIVE_CONFIGURATION_DEPLOYMENT_ID": Guid.TryParse(value, out var deploymentId); settings.ActiveConfigurationDeploymentId = deploymentId; break;
                     case "ACTIVE_CONFIGURATION_RELEASE_ID": Guid.TryParse(value, out var releaseId); settings.ActiveConfigurationReleaseId = releaseId; break;
                     case "ACTIVE_CONFIGURATION_RELEASE_CHECKSUM": settings.ActiveConfigurationReleaseChecksum = value; break;
+                    case "ACTIVE_WORKFLOW_DIRECTORY": settings.ActiveWorkflowDirectory = value; break;
                     case "EXECUTION_REPORT_SEQUENCE": long.TryParse(value, out var sequence); settings.ExecutionReportSequence = sequence; break;
+                    case "EXECUTION_READINESS_REVISION": long.TryParse(value, out var readinessRevision); settings.ExecutionReadinessRevision = readinessRevision; break;
                     case "MACHINE_PORTS": settings.MachinePorts = ParseMachinePorts(value); break;
                     case "PROVISIONED_STEPS": settings.ProvisionedSteps = ParseList(value); break;
                 }
@@ -80,6 +87,11 @@ namespace IceBot.Config
                 $"BE_API_URL={settings.BeApiUrl}",
                 $"API_KEY={settings.ApiKey}",
                 $"ROBOT_IP={settings.RobotIp}",
+                $"PRIMARY_ROBOT_SOURCE_DEVICE_KEY={settings.PrimaryRobotSourceDeviceKey}",
+                $"PRIMARY_ROBOT_RUNTIME_TARGET_CODE={settings.PrimaryRobotRuntimeTargetCode}",
+                $"PRIMARY_ROBOT_MACHINE_MODEL_CODE={settings.PrimaryRobotMachineModelCode}",
+                $"REPORTED_DEVICES_SNAPSHOT_REVISION={settings.ReportedDevicesSnapshotRevision}",
+                $"REPORTED_DEVICES_SNAPSHOT_SIGNATURE={settings.ReportedDevicesSnapshotSignature}",
                 $"STORE_ACCOUNT={settings.StoreAccount}",
                 $"STORE_PASSWORD={settings.StorePassword}",
                 $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
@@ -93,7 +105,9 @@ namespace IceBot.Config
                 $"ACTIVE_CONFIGURATION_DEPLOYMENT_ID={settings.ActiveConfigurationDeploymentId:D}",
                 $"ACTIVE_CONFIGURATION_RELEASE_ID={settings.ActiveConfigurationReleaseId:D}",
                 $"ACTIVE_CONFIGURATION_RELEASE_CHECKSUM={settings.ActiveConfigurationReleaseChecksum}",
+                $"ACTIVE_WORKFLOW_DIRECTORY={settings.ActiveWorkflowDirectory}",
                 $"EXECUTION_REPORT_SEQUENCE={settings.ExecutionReportSequence}",
+                $"EXECUTION_READINESS_REVISION={settings.ExecutionReadinessRevision}",
                 $"MACHINE_PORTS={SerializeMachinePorts(settings.MachinePorts)}",
                 $"PROVISIONED_STEPS={string.Join(",", settings.ProvisionedSteps)}",
             };
@@ -112,6 +126,36 @@ namespace IceBot.Config
                 settings.ExecutionReportSequence++;
                 Save(settings);
                 return settings.ExecutionReportSequence;
+            }
+        }
+
+        public static long NextExecutionReadinessRevision()
+        {
+            lock (SequenceGate)
+            {
+                var settings = Load();
+                settings.ExecutionReadinessRevision++;
+                Save(settings);
+                return settings.ExecutionReadinessRevision;
+            }
+        }
+
+        // Reusing a revision for an unchanged snapshot makes reconnect delivery idempotent.
+        // A changed discovery result receives the next durable revision.
+        public static long GetReportedDevicesSnapshotRevision(string signature)
+        {
+            lock (SequenceGate)
+            {
+                var settings = Load();
+                if (settings.ReportedDevicesSnapshotRevision <= 0 ||
+                    !string.Equals(settings.ReportedDevicesSnapshotSignature, signature, StringComparison.Ordinal))
+                {
+                    settings.ReportedDevicesSnapshotRevision = Math.Max(0, settings.ReportedDevicesSnapshotRevision) + 1;
+                    settings.ReportedDevicesSnapshotSignature = signature;
+                    Save(settings);
+                }
+
+                return settings.ReportedDevicesSnapshotRevision;
             }
         }
 

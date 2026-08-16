@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using IceBot.Api;
 using IceBot.Config;
+using IceBot.Robot.Hardware;
 
 namespace IceBot.Workflow
 {
@@ -23,8 +24,31 @@ namespace IceBot.Workflow
                 if (command == null)
                     return new ProvisionResult { Success = true, Message = "BE khong co deployment Lua dang cho." };
 
+                return Install(command);
+            }
+            catch (Exception ex)
+            {
+                return new ProvisionResult { Success = false, Retryable = IsRetryable(ex), Message = ex.Message };
+            }
+        }
+
+        public static ProvisionResult Install(EdgeCommandData command)
+        {
+            try
+            {
                 var payload = EdgeDeploymentApi.ParseFullEdgeDeployment(command);
+                var currentSettings = SiteConfigStore.Load();
+                if (currentSettings.ActiveConfigurationDeploymentId == payload.DeploymentId)
+                {
+                    DeploymentReportOutbox.Enqueue(command.CommandId, payload, "Installed");
+                    DeploymentReportOutbox.Enqueue(command.CommandId, payload, "Active");
+                    EdgeDeploymentApi.AcknowledgeAccepted(command.CommandId);
+                    DeploymentReportOutbox.Flush();
+                    return new ProvisionResult { Success = true, Message = $"Deployment {payload.DeploymentId:D} da duoc kich hoat truoc do." };
+                }
+
                 var bundle = payload.FullEdgeBundle!;
+                ValidateDeclaredTargets(payload.Artifacts, new ConfiguredRobotDeviceDiscovery().Discover(SiteConfigStore.Load()));
                 if (bundle.ContentLengthBytes <= 0 || bundle.ContentLengthBytes > MaximumBundleBytes)
                     throw new InvalidDataException("Bundle size is outside the allowed Full Edge limit.");
                 if (bundle.ArtifactCount != payload.Artifacts.Count)
@@ -35,44 +59,52 @@ namespace IceBot.Workflow
 
                 var bytes = EdgeDeploymentApi.DownloadBundle(bundle);
                 VerifyChecksum(bytes, bundle.Checksum, "bundle");
-                var saved = InstallVerifiedBundle(bytes, payload.Artifacts);
+                var installed = InstallVerifiedBundle(bytes, payload.Artifacts, payload.DeploymentId);
 
                 var settings = SiteConfigStore.Load();
                 settings.ActiveConfigurationDeploymentId = payload.DeploymentId;
                 settings.ActiveConfigurationReleaseId = payload.ConfigurationReleaseId;
                 settings.ActiveConfigurationReleaseChecksum = payload.ReleaseChecksum;
-                settings.ProvisionedSteps = saved.Select(Path.GetFileNameWithoutExtension).ToList();
+                settings.ActiveWorkflowDirectory = installed.DirectoryPath;
+                settings.ProvisionedSteps = installed.SavedFiles.Select(Path.GetFileNameWithoutExtension).ToList();
                 SiteConfigStore.Save(settings);
 
+                DeploymentReportOutbox.Enqueue(command.CommandId, payload, "Installed");
+                DeploymentReportOutbox.Enqueue(command.CommandId, payload, "Active");
                 EdgeDeploymentApi.AcknowledgeAccepted(command.CommandId);
-                Report(command.CommandId, payload, "Installed");
-                Report(command.CommandId, payload, "Active");
+                DeploymentReportOutbox.Flush();
 
                 return new ProvisionResult
                 {
                     Success = true,
-                    Message = $"Da tai, xac minh va kich hoat {saved.Count} file Lua tu deployment {payload.DeploymentId:D}.",
-                    SavedFiles = saved
+                    Message = $"Da tai, xac minh va kich hoat {installed.SavedFiles.Count} file Lua tu deployment {payload.DeploymentId:D}.",
+                    SavedFiles = installed.SavedFiles
                 };
             }
             catch (Exception ex)
             {
-                return new ProvisionResult { Success = false, Message = ex.Message };
+                return new ProvisionResult { Success = false, Retryable = IsRetryable(ex), Message = ex.Message };
             }
         }
 
-        private static void Report(Guid commandId, FullEdgeDeploymentPayload payload, string status)
+        private static bool IsRetryable(Exception exception)
         {
-            EdgeDeploymentApi.ReportDeployment(
-                commandId, payload, status, SiteConfigStore.NextExecutionReportSequence());
+            return exception is System.Net.Http.HttpRequestException ||
+                exception is System.Threading.Tasks.TaskCanceledException ||
+                exception is IOException;
         }
 
-        private static IReadOnlyList<string> InstallVerifiedBundle(byte[] bundleBytes, IReadOnlyCollection<DeploymentArtifactData> artifacts)
+        private static InstalledBundle InstallVerifiedBundle(
+            byte[] bundleBytes,
+            IReadOnlyCollection<DeploymentArtifactData> artifacts,
+            Guid deploymentId)
         {
-            var workflowDir = AppConfig.GetWorkflowDirectory();
-            Directory.CreateDirectory(workflowDir);
+            var workflowRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "workflow");
+            var releasesDirectory = Path.Combine(workflowRoot, "releases");
+            Directory.CreateDirectory(releasesDirectory);
             var expected = artifacts.ToDictionary(item => item.RobotArtifactId);
-            var stagingDir = Path.Combine(Path.GetTempPath(), "icebot-lua-" + Guid.NewGuid().ToString("N"));
+            var stagingDir = Path.Combine(releasesDirectory, ".staging-" + Guid.NewGuid().ToString("N"));
+            var activeDirectory = Path.Combine(releasesDirectory, deploymentId.ToString("D") + "-" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             Directory.CreateDirectory(stagingDir);
             try
             {
@@ -109,19 +141,47 @@ namespace IceBot.Workflow
                 foreach (var source in Directory.GetFiles(stagingDir, "*.lua"))
                 {
                     var fileName = Path.GetFileName(source);
-                    var destination = Path.Combine(workflowDir, fileName);
-                    var temporary = destination + ".new";
-                    File.Copy(source, temporary, true);
-                    if (File.Exists(destination)) File.Replace(temporary, destination, null); else File.Move(temporary, destination);
                     saved.Add(fileName);
                 }
-                File.Copy(Path.Combine(stagingDir, "release-content-manifest.json"), Path.Combine(workflowDir, "release-content-manifest.json"), true);
-                return saved;
+                Directory.Move(stagingDir, activeDirectory);
+                return new InstalledBundle(activeDirectory, saved);
             }
             finally
             {
                 if (Directory.Exists(stagingDir)) Directory.Delete(stagingDir, true);
             }
+        }
+
+        private static void ValidateDeclaredTargets(
+            IReadOnlyCollection<DeploymentArtifactData> artifacts,
+            IReadOnlyCollection<ReportedRobotDevice> devices)
+        {
+            if (devices.Count == 0)
+                throw new InvalidDataException("Edge has no reported hardware profile for deployment compatibility.");
+
+            foreach (var artifact in artifacts)
+            {
+                if (string.IsNullOrWhiteSpace(artifact.RuntimeTargetCode) ||
+                    string.IsNullOrWhiteSpace(artifact.MachineModelCode))
+                    throw new InvalidDataException($"Artifact {artifact.RobotArtifactId:D} has no declared runtime target or machine model.");
+
+                if (!devices.Any(device =>
+                    string.Equals(device.RuntimeTargetCode, artifact.RuntimeTargetCode, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(device.MachineModelCode, artifact.MachineModelCode, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidDataException($"Artifact {artifact.RobotArtifactId:D} is not declared compatible with this Edge hardware.");
+            }
+        }
+
+        private sealed class InstalledBundle
+        {
+            public InstalledBundle(string directoryPath, IReadOnlyList<string> savedFiles)
+            {
+                DirectoryPath = directoryPath;
+                SavedFiles = savedFiles;
+            }
+
+            public string DirectoryPath { get; }
+            public IReadOnlyList<string> SavedFiles { get; }
         }
 
         private static void VerifyChecksum(byte[] bytes, string expected, string label)

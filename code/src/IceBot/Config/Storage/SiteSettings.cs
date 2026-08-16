@@ -14,6 +14,13 @@ namespace IceBot.Config
         public string BeApiUrl { get; set; } = "https://api.icebot.io.vn";
         public string ApiKey { get; set; } = string.Empty;
         public string RobotIp { get; set; } = AppConfig.DefaultRobotIp;
+        // Current hardware identity is reported by Edge after mTLS authentication. These defaults
+        // keep the single-FR5 demo usable without making provisioning own robot compatibility.
+        public string PrimaryRobotSourceDeviceKey { get; set; } = "arm-primary";
+        public string PrimaryRobotRuntimeTargetCode { get; set; } = "FAIRINO_LUA_V1";
+        public string PrimaryRobotMachineModelCode { get; set; } = "FR5";
+        public long ReportedDevicesSnapshotRevision { get; set; }
+        public string ReportedDevicesSnapshotSignature { get; set; } = string.Empty;
 
         // Operator tokens are separate from the Edge device credential. StorePassword remains
         // only for migration from older config and is cleared after a successful login.
@@ -41,10 +48,20 @@ namespace IceBot.Config
         public Guid ActiveConfigurationDeploymentId { get; set; }
         public Guid ActiveConfigurationReleaseId { get; set; }
         public string ActiveConfigurationReleaseChecksum { get; set; } = string.Empty;
+        public string ActiveWorkflowDirectory { get; set; } = string.Empty;
         public long ExecutionReportSequence { get; set; }
+        public long ExecutionReadinessRevision { get; set; }
 
-        // Peripheral machines wired directly to this PC over serial, keyed by machine type
-        // (e.g. "cup_dropping" -> "COM3"). See IceBot.Machines.MachineRegistry.
+        // Development simulator only. This simulates an optional sensor gateway reporting
+        // observations for a Cloud-owned dispenser topology; it does not make the dispenser
+        // a machine controlled by this Edge process.
+        public List<SimulatedInventoryObservationSettings> SimulatedInventoryObservations { get; set; } =
+            new List<SimulatedInventoryObservationSettings>();
+
+        // Peripheral machines directly controlled by this Edge over serial, keyed by machine
+        // type (for example "cup_dropping" -> "COM3"). This is not the kiosk inventory
+        // topology: an independent ice-cream dispenser is configured in Cloud separately.
+        // See IceBot.Machines.MachineRegistry.
         public Dictionary<string, string> MachinePorts { get; set; } =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -61,5 +78,12 @@ namespace IceBot.Config
         public bool IsConfigured =>
             !string.IsNullOrWhiteSpace(NetBirdSetupKey)
             && !string.IsNullOrWhiteSpace(PublicUrl);
+    }
+
+    internal sealed class SimulatedInventoryObservationSettings
+    {
+        public Guid IngredientDispenserStateId { get; set; }
+        public Guid DeviceId { get; set; }
+        public string Level { get; set; } = "Full";
     }
 }

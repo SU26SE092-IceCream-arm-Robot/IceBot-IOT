@@ -210,20 +210,6 @@ namespace IceBot.Api
                 null));
         }
 
-        public ExecutionEndpointManagementResult SetDefaultRuntimeTarget(Guid kioskId, Guid endpointId)
-        {
-            return ParseManagement(SendWithRefresh(
-                HttpMethod.Put,
-                $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints/{endpointId:D}/supported-robot-targets",
-                new
-                {
-                    targets = new[]
-                    {
-                        new { runtimeTargetCode = "FAIRINO_LUA_V1", machineModelCode = "FR5" }
-                    }
-                }));
-        }
-
         public ExecutionEndpointManagementResult ProvisionMutualTls(
             Guid kioskId, Guid endpointId, Guid profileIdentity, string certificateFingerprint)
         {

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using IceBot.Config;
+using IceBot.Robot.Hardware;
 
 namespace IceBot.Workflow
 {
@@ -115,6 +117,9 @@ namespace IceBot.Workflow
             if (command.TotalQuantity > Config.AppConfig.MaxProductionUnitsPerOrder)
                 throw new OrderRejectionException("OrderQuantityLimit", "An order may contain at most 4 production units.");
 
+            ValidateDeclaredTargets(command, new ConfiguredRobotDeviceDiscovery()
+                .Discover(SiteConfigStore.Load()));
+
             foreach (var artifact in OrderedArtifacts(command))
             {
                 var path = Path.Combine(workflowDirectory, artifact.ScriptFileName);
@@ -132,6 +137,26 @@ namespace IceBot.Workflow
         public static IReadOnlyList<ReceivedArtifact> OrderedArtifacts(ReceivedOrderCommand command) =>
             command.OrderLines.SelectMany(line => line.RobotPrograms.OrderBy(program => program.BindingOrder)
                 .SelectMany(program => program.Artifacts.OrderBy(artifact => artifact.RunOrder))).ToArray();
+
+        private static void ValidateDeclaredTargets(
+            ReceivedOrderCommand command,
+            IReadOnlyCollection<ReportedRobotDevice> devices)
+        {
+            if (devices.Count == 0)
+                throw new OrderRejectionException("HardwareProfileUnknown", "Edge has no reported hardware profile.");
+
+            foreach (var artifact in OrderedArtifacts(command))
+            {
+                if (string.IsNullOrWhiteSpace(artifact.RuntimeTargetCode) ||
+                    string.IsNullOrWhiteSpace(artifact.MachineModelCode))
+                    throw new OrderRejectionException("ArtifactTargetUndeclared", "Order artifact has no declared runtime target or machine model.");
+
+                if (!devices.Any(device =>
+                    string.Equals(device.RuntimeTargetCode, artifact.RuntimeTargetCode, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(device.MachineModelCode, artifact.MachineModelCode, StringComparison.OrdinalIgnoreCase)))
+                    throw new OrderRejectionException("UnsupportedHardwareTarget", "Order artifact is not declared compatible with this Edge hardware.");
+            }
+        }
 
         public static bool TryStore(ReceivedOrderCommand command, string inboxDirectory)
         {

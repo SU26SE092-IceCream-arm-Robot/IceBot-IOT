@@ -45,6 +45,12 @@ namespace IceBot.Workflow
             var received = 0;
             foreach (var command in pull.Commands)
             {
+                if (string.Equals(command.CommandType, "DeployConfiguration", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleDeployment(command);
+                    continue;
+                }
+
                 if (!string.Equals(command.CommandType, "ExecuteOrder", StringComparison.OrdinalIgnoreCase)) continue;
                 try
                 {
@@ -64,7 +70,7 @@ namespace IceBot.Workflow
                     if (admission == OrderAdmissionResult.Busy)
                     {
                         EdgeDeploymentApi.AcknowledgeExecutorBusy(command.CommandId);
-                        Console.WriteLine($"[ORDER-PULL] Tu choi tam thoi {order.OrderNumber}: queue da du 10 cay.");
+                        Console.WriteLine($"[ORDER-PULL] Tu choi tam thoi {order.OrderNumber}: kiosk dang xu ly mot phien khach hang.");
                         continue;
                     }
 
@@ -85,6 +91,32 @@ namespace IceBot.Workflow
                 }
             }
             return received;
+        }
+
+        private static void HandleDeployment(EdgeCommandData command)
+        {
+            if (EdgeOrderExecutionQueue.HasActiveOrUnresolvedWork(AppConfig.GetOrderJobsDirectory()))
+            {
+                EdgeDeploymentApi.AcknowledgeExecutorBusy(command.CommandId);
+                Console.WriteLine($"[DEPLOYMENT] Tam hoan deployment {command.CommandId:D}: kiosk dang co phien san xuat dang xu ly.");
+                return;
+            }
+
+            var result = FullEdgeConfigurationInstaller.Install(command);
+            if (result.Success)
+            {
+                Console.WriteLine("[DEPLOYMENT] " + result.Message);
+                return;
+            }
+
+            if (result.Retryable)
+            {
+                Console.WriteLine("[DEPLOYMENT] Chua the cai dat; se thu lai: " + result.Message);
+                return;
+            }
+
+            EdgeDeploymentApi.AcknowledgeRejected(command.CommandId, "DeploymentInstallRejected", result.Message);
+            Console.WriteLine("[DEPLOYMENT] Tu choi " + command.CommandId.ToString("D") + ": " + result.Message);
         }
 
         public void Dispose()

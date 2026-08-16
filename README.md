@@ -89,8 +89,13 @@ IceBot-IOT/
 ## Build và chạy
 
 ```powershell
+.\code\scripts\restore-fairino-sdk-dependencies.ps1
 dotnet build code/IceBot-IOT.sln
 ```
+
+Fairino C# SDK phụ thuộc assembly legacy `CookComputing.XmlRpcV2`. Package đã được lưu cùng
+repository tại `code/lib/fairino-csharp-sdk/packages`; chạy script restore một lần sau clean clone
+trước khi build với `--no-restore`.
 
 Sau khi build Debug:
 
@@ -318,6 +323,18 @@ Driver máy kem tích hợp cũ đã bị xóa khỏi core. Muốn điều khi�
 plugin DLL riêng theo contract trên.
 
 Đăng ký máy với BE tại **InitIceBot → Cấu hình → Đăng ký máy ngoại vi với BE**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ và hiển thị máy nào chưa đăng ký.
+
+`MACHINE_DEVICE_IDS` chỉ dùng cho máy ngoại vi được Edge điều khiển trực tiếp, chẳng hạn máy thả cốc qua RS485. Nó không phải là danh sách toàn bộ thiết bị vật lý của kiosk.
+
+Máy kem/dispenser có thể hoạt động độc lập và không kết nối Edge. Backend là nơi sở hữu topology của thiết bị đó:
+
+```text
+Kiosk
+  -> Device: ICE_CREAM_DISPENSER_01
+  -> IngredientDispenserState: từng bình/container nguyên liệu
+```
+
+Edge chỉ report phần cứng robot mà nó thực sự điều khiển (`reported-devices`), readiness và execution. Khi có sensor cho máy kem, sensor gateway có thể gửi inventory observation vào các `IngredientDispenserStateId` đã được Backend cấu hình. Chế độ `Simulated` chỉ giả lập sensor gateway này cho Development; nó không khẳng định Edge điều khiển máy kem.
 
 ## Kiểm thử
 

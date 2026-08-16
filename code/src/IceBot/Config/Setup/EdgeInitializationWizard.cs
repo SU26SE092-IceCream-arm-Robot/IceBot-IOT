@@ -124,13 +124,6 @@ namespace IceBot.Config
             Console.WriteLine("[OK] " + certificate.Message);
             Console.WriteLine("SHA-256 fingerprint: " + certificate.Sha256Fingerprint);
 
-            var target = api.SetDefaultRuntimeTarget(settings.KioskId, settings.ExecutionEndpointId);
-            if (!target.Success)
-            {
-                Console.WriteLine("[ERROR] Khong khai bao duoc runtime target: " + target.Message);
-                return;
-            }
-
             var provision = api.ProvisionMutualTls(
                 settings.KioskId,
                 settings.ExecutionEndpointId,
@@ -178,7 +171,7 @@ namespace IceBot.Config
                 return;
             }
             Console.WriteLine("[OK] Kiosk da Active va Operational.");
-            var connected = EdgeMtlsProbe.SendHeartbeat(out var message);
+            var connected = EdgeMtlsProbe.SendHeartbeatAndReportedDevices(out var message);
             Console.WriteLine(connected ? "[OK] " + message : "[ERROR] " + message);
         }
 

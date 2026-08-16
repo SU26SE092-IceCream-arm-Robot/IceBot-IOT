@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using IceBot.Robot;
 
 namespace IceBot.Config
 {
@@ -7,9 +8,14 @@ namespace IceBot.Config
     {
         public const string DefaultRobotIp = "192.168.58.2";
 
-        public const int ApiListenPort = 5080;
-        public const int MaxPendingProductionUnits = 10;
+        public const int DefaultApiListenPort = 5080;
         public const int MaxProductionUnitsPerOrder = 4;
+
+        public static int ApiListenPort =>
+            int.TryParse(Environment.GetEnvironmentVariable("ICEBOT_LOCAL_API_PORT"), out var configuredPort) &&
+            configuredPort is > 0 and <= 65535
+                ? configuredPort
+                : DefaultApiListenPort;
 
         public static string ApiListenPrefix => $"http://localhost:{ApiListenPort}/";
 
@@ -29,6 +35,28 @@ namespace IceBot.Config
 
         public static string RobotIp =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_ROBOT_IP"), SiteConfigStore.Load().RobotIp, DefaultRobotIp);
+
+        public static RobotExecutionMode RobotExecutionMode
+        {
+            get
+            {
+                var configured = Environment.GetEnvironmentVariable("ICEBOT_ROBOT_EXECUTION_MODE");
+                return string.Equals(configured, "Simulated", StringComparison.OrdinalIgnoreCase)
+                    ? RobotExecutionMode.Simulated
+                    : RobotExecutionMode.Fairino;
+            }
+        }
+
+        // Development-only fault injection. Zero means every simulated step succeeds.
+        public static int SimulatedFailStep =>
+            int.TryParse(Environment.GetEnvironmentVariable("ICEBOT_SIMULATED_FAIL_STEP"), out var step) && step > 0
+                ? step
+                : 0;
+
+        public static int SimulatedStepDelayMilliseconds =>
+            int.TryParse(Environment.GetEnvironmentVariable("ICEBOT_SIMULATED_STEP_DELAY_MS"), out var delay) && delay >= 0
+                ? Math.Min(delay, 60_000)
+                : 150;
 
         public static string StoreAccount =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_STORE_ACCOUNT"), SiteConfigStore.Load().StoreAccount);
@@ -59,7 +87,9 @@ namespace IceBot.Config
 
         // Secret: configure only on the Edge host/service environment, never icebot.site.env.
         public static string ExecutionClientCertificatePassword =>
-            Environment.GetEnvironmentVariable("ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD") ?? string.Empty;
+            FirstNonEmpty(
+                Environment.GetEnvironmentVariable("ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD"),
+                Environment.GetEnvironmentVariable("ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD", EnvironmentVariableTarget.User));
 
         public static readonly string[] TestScriptQueue =
         {
@@ -74,6 +104,12 @@ namespace IceBot.Config
 
         public static string GetWorkflowDirectory()
         {
+            var activeWorkflowDirectory = SiteConfigStore.Load().ActiveWorkflowDirectory;
+            if (!string.IsNullOrWhiteSpace(activeWorkflowDirectory) && Directory.Exists(activeWorkflowDirectory))
+            {
+                return activeWorkflowDirectory;
+            }
+
             var workflowNextToExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "workflow");
             if (Directory.Exists(workflowNextToExe))
             {

@@ -42,7 +42,7 @@ namespace IceBot.Workflow
                 Console.WriteLine($"  {i + 1}. {scriptFileNames[i]}");
             }
 
-            using (var armExecutor = new FairinoLuaExecutor(robotIp))
+            using (var armExecutor = RobotWorkflowExecutorFactory.Create(robotIp))
             {
                 armExecutor.Connect();
 
@@ -64,7 +64,7 @@ namespace IceBot.Workflow
             Console.WriteLine("[WORKFLOW] All scripts completed.");
         }
 
-        private static void RunStep(FairinoLuaExecutor armExecutor, string workflowDir, string stepName)
+        private static void RunStep(IRobotWorkflowExecutor armExecutor, string workflowDir, string stepName)
         {
             var fullPath = Path.Combine(workflowDir, stepName);
             if (!File.Exists(fullPath))

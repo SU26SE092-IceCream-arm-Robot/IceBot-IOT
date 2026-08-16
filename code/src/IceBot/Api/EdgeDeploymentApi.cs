@@ -46,6 +46,8 @@ namespace IceBot.Api
     {
         public Guid RobotArtifactId { get; set; }
         public string ArtifactChecksum { get; set; } = string.Empty;
+        public string RuntimeTargetCode { get; set; } = string.Empty;
+        public string MachineModelCode { get; set; } = string.Empty;
         public long ContentLengthBytes { get; set; }
     }
 
@@ -75,7 +77,7 @@ namespace IceBot.Api
 
         public static void AcknowledgeExecutorBusy(Guid commandId)
         {
-            Acknowledge(commandId, "ExecutorBusy", false, "QueueCapacity", "Edge queue is at its 10-unit capacity.");
+            Acknowledge(commandId, "ExecutorBusy", false, "ActiveCustomerSession", "Edge is completing an active customer production session.");
         }
 
         public static void AcknowledgeRejected(Guid commandId, string code, string message)
@@ -103,6 +105,26 @@ namespace IceBot.Api
                     deploymentId = payload.DeploymentId,
                     sourceConfigurationReleaseId = payload.ConfigurationReleaseId,
                     releaseChecksum = payload.ReleaseChecksum,
+                    physicalOutputMayHaveOccurred = false,
+                    stockMovements = Array.Empty<object>()
+                });
+        }
+
+        public static void ReportDeployment(DeploymentReportData report)
+        {
+            Send<object>(
+                $"commands/{report.CommandId:D}/reports",
+                new
+                {
+                    sourceEventId = report.SourceEventId,
+                    sequenceNumber = report.SequenceNumber,
+                    edgeCreatedAt = report.EdgeCreatedAt,
+                    executorReportedAt = report.EdgeCreatedAt,
+                    reportType = "Deployment",
+                    status = report.Status,
+                    deploymentId = report.DeploymentId,
+                    sourceConfigurationReleaseId = report.ConfigurationReleaseId,
+                    releaseChecksum = report.ReleaseChecksum,
                     physicalOutputMayHaveOccurred = false,
                     stockMovements = Array.Empty<object>()
                 });

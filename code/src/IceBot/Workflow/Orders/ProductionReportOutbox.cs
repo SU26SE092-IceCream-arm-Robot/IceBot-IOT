@@ -77,8 +77,23 @@ namespace IceBot.Workflow
                 if (!Directory.Exists(directory)) return;
                 foreach (var path in Directory.GetFiles(directory, "*.json").OrderBy(item => item, StringComparer.Ordinal))
                 {
-                    var report = JsonSerializer.Deserialize<ProductionReportData>(File.ReadAllText(path), JsonOptions)
-                        ?? throw new InvalidDataException("Production report outbox entry is empty.");
+                    ProductionReportData report;
+                    try
+                    {
+                        report = JsonSerializer.Deserialize<ProductionReportData>(File.ReadAllText(path), JsonOptions)
+                            ?? throw new InvalidDataException("Production report outbox entry is empty.");
+                    }
+                    catch (JsonException ex)
+                    {
+                        Quarantine(path, ex);
+                        continue;
+                    }
+                    catch (InvalidDataException ex)
+                    {
+                        Quarantine(path, ex);
+                        continue;
+                    }
+
                     try
                     {
                         EdgeDeploymentApi.ReportProduction(report);
@@ -91,6 +106,26 @@ namespace IceBot.Workflow
                     }
                 }
             }
+        }
+
+        public static int GetPendingCount()
+        {
+            lock (Gate)
+            {
+                var directory = AppConfig.GetReportOutboxDirectory();
+                return Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json").Length : 0;
+            }
+        }
+
+        private static void Quarantine(string path, Exception exception)
+        {
+            var directory = Path.Combine(AppConfig.GetReportOutboxDirectory(), "invalid");
+            Directory.CreateDirectory(directory);
+            var destination = Path.Combine(directory, Path.GetFileName(path));
+            if (File.Exists(destination)) File.Delete(destination);
+            File.Move(path, destination);
+            File.WriteAllText(destination + ".error.txt", exception.Message, new UTF8Encoding(false));
+            Console.WriteLine("[REPORT-OUTBOX] Da cach ly report khong hop le: " + Path.GetFileName(path));
         }
     }
 }
