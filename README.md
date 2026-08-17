@@ -12,7 +12,7 @@ IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng
 - Đăng nhập thật với BE, đăng ký Kiosk/Execution Endpoint, cấp mTLS, kích hoạt Kiosk và heartbeat đã được triển khai.
 - mTLS `ExecuteOrder` đã có queue bền vững, kiểm tra đúng Kiosk/Endpoint/release/Lua, ACK `Accepted`, chạy lần lượt từng cây và gửi trạng thái về BE.
 - API cũ `POST /api/orders` có thể nhận danh sách tên file Lua và đưa vào hàng đợi chạy robot.
-- Đồng bộ Full Edge deployment đã có code, nhưng đang **tạm hoãn** vì BE chưa có Lua production/deployment để tải xuống.
+- Đồng bộ Full Edge deployment tải bundle phát hành từ Backend, kiểm tra checksum rồi stage/activate trước khi nhận order. Nó chỉ chạy sau khi endpoint đã provision và đường HTTPS mTLS riêng cho Edge đã sẵn sàng.
 - Trạng thái từng cây (`Accepted`, `Running`, `Completed`, `Failed`, `RequiresManualIntervention`) được lưu vào outbox bền vững và gửi về BE qua mTLS.
 
 ## Kiến trúc
@@ -215,7 +215,7 @@ Chỉ hiển thị menu sau khi đăng nhập tài khoản cửa hàng thành c�
 0. Thoat
 ```
 
-Mục đồng bộ Lua được giữ lại nhưng chưa phải bước bắt buộc cho đến khi BE có Lua production.
+Mục đồng bộ Lua dùng để cài hoặc kiểm tra lại một bản phát hành cấu hình đã được Backend tạo. Trong vận hành bình thường, `IceBot.exe` cũng pull `DeployConfiguration` cùng với các command khác; kỹ thuật viên không chép Lua thủ công vào thư mục workflow.
 
 ## Cấu hình và danh tính
 
@@ -223,7 +223,7 @@ Cấu hình site nằm trong `config/icebot.site.env` cạnh file EXE và không
 
 | Giá trị | Mục đích |
 |---|---|
-| `BE_API_URL` | Mặc định `https://api.icebot.io.vn` |
+| `BE_API_URL` | URL HTTPS của Backend mà runtime Edge dùng để pull command, report readiness và tải deployment metadata |
 | `NETBIRD_SETUP_KEY` | Kết nối Edge vào mạng NetBird |
 | `KIOSK_CODE` | Code vật lý do kỹ thuật viên nhập một lần |
 | `KIOSK_ID` | ID do BE trả về, được tái sử dụng ở những lần sau |
@@ -235,7 +235,11 @@ Cấu hình site nằm trong `config/icebot.site.env` cạnh file EXE và không
 
 Password PFX chỉ đọc từ biến môi trường `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD`, không lưu vào file cấu hình. Có thể override cấu hình bằng các biến môi trường mang tiền tố `ICEBOT_`.
 
-URL public mặc định đủ cho login và API quản trị. Nếu reverse proxy không chuyển client certificate, `BE_API_URL` phải được đổi sang **private HTTPS URL của BE trên NetBird**. Không sử dụng HTTP cho mTLS.
+`InitIceBot.exe` tạo PFX RSA-3072 cùng private key tại Edge (mặc định `certificates/icebot-edge-client.pfx`) và chỉ gửi SHA-256 fingerprint để Backend provision endpoint. Private key/PFX không rời Edge; Backend dùng fingerprint đã provision để xác thực request mTLS.
+
+Runtime Full Edge phải dùng listener HTTPS mTLS riêng, ví dụ `https://edge-api.icebot.io.vn:8443`, được định tuyến qua NetBird trực tiếp đến Kestrel hoặc TLS passthrough. Không dùng HTTP và không dùng reverse proxy HTTP kết thúc TLS trên đường này, vì Kestrel sẽ không nhận được client certificate. URL public có thể dùng cho thao tác quản trị trước khi setup, nhưng không thay thế `BE_API_URL` của runtime sau khi endpoint đã provision.
+
+Server certificate của URL Edge phải khớp hostname và được Windows trên Edge tin cậy. Object-storage `DownloadUrl` là kết nối HTTPS độc lập: endpoint đó cũng phải reachable và có certificate tin cậy từ máy Edge.
 
 ## Nhận và xử lý Order
 
@@ -280,7 +284,7 @@ Mỗi file `.lua` là một bước chuyển động của tay máy. Khi thực 
 
 ### Đồng bộ Lua
 
-Code provisioning hỗ trợ pull `DeployConfiguration` bằng mTLS, tải ZIP từ object storage, kiểm tra kích thước/SHA-256 và chỉ cài bundle hợp lệ. Tuy nhiên tính năng này hiện được **để lại, chưa đưa vào quy trình cài bắt buộc**, vì BE chưa có file Lua production.
+Code provisioning pull `DeployConfiguration` bằng mTLS, tải ZIP từ object storage, kiểm tra kích thước/SHA-256 và chỉ cài bundle hợp lệ. Một deployment chỉ có thể Active sau khi Edge đã stage đủ file, xác nhận checksum và gửi report `Installed` rồi `Active` về Backend.
 
 Order mTLS dùng trực tiếp `{RobotArtifactId}.lua` theo contract deployment mới. API local cũ vẫn dùng tên file để tương thích.
 
@@ -347,6 +351,6 @@ dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj
 - Backpressure đầy đủ cho inbox: dung lượng đĩa, tuổi Order và telemetry.
 - Kiểm tra nguyên liệu trước từng cây và chức năng pause/resume/reconcile cho kỹ thuật viên.
 - Gửi telemetry trạng thái riêng của từng máy ngoại vi về BE.
-- Xác thực provisioning Lua thực tế sau khi BE có Lua production.
+- Xác thực deployment Lua với máy Fairino thật, gồm download endpoint, mTLS transport và activation report.
 
 Chi tiết đầy đủ và các quyết định thiết kế nằm trong [context/PROJECT_CONTEXT.md](context/PROJECT_CONTEXT.md).

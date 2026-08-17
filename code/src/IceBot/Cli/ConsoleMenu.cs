@@ -248,8 +248,10 @@ namespace IceBot.Cli
 
             PrintIngressInfo();
 
-            var edgeReported = EdgeMtlsProbe.SendHeartbeatAndReportedDevices(out var edgeReportMessage);
-            Console.WriteLine(edgeReported ? "[OK] " + edgeReportMessage : "[WARN] " + edgeReportMessage);
+            var heartbeatReported = EdgeMtlsProbe.SendHeartbeat(out var heartbeatMessage);
+            Console.WriteLine(heartbeatReported ? "[OK] Heartbeat: " + heartbeatMessage : "[WARN] Heartbeat: " + heartbeatMessage);
+            var hardwareReported = EdgeMtlsProbe.SendReportedDevices(out var hardwareMessage);
+            Console.WriteLine(hardwareReported ? "[OK] Hardware profile: " + hardwareMessage : "[WARN] Hardware profile: " + hardwareMessage);
             var readinessReported = EdgeMtlsProbe.SendReadiness(out var readinessMessage);
             Console.WriteLine(readinessReported ? "[OK] " + readinessMessage : "[WARN] " + readinessMessage);
 
@@ -267,10 +269,11 @@ namespace IceBot.Cli
 
                 using (var statusTimer = new Timer(_ =>
                 {
-                    var edgeReport = EdgeMtlsProbe.SendHeartbeatAndReportedDevices(out var edgeReportMessage);
+                    var heartbeat = EdgeMtlsProbe.SendHeartbeat(out var heartbeatMessage);
+                    var hardware = EdgeMtlsProbe.SendReportedDevices(out var hardwareMessage);
                     var inventory = EdgeMtlsProbe.SendSimulatedInventoryObservations(out var inventoryMessage);
                     var readiness = EdgeMtlsProbe.SendReadiness(out var readinessMessage);
-                    Console.WriteLine($"\n[STATUS {DateTime.Now:HH:mm:ss}] Server=RUNNING | OrderPull={(orderReceiver.IsRunning ? "RUNNING" : "DISABLED")} | Heartbeat={(edgeReport ? "REPORTED" : "FAILED")} | Inventory={(inventory ? "REPORTED" : "FAILED")}: {inventoryMessage} | Readiness={(readiness ? "REPORTED" : "FAILED")}: {readinessMessage}");
+                    Console.WriteLine($"\n[STATUS {DateTime.Now:HH:mm:ss}] Server=RUNNING | OrderPull={(orderReceiver.IsRunning ? "RUNNING" : "DISABLED")} | Heartbeat={(heartbeat ? "REPORTED" : "FAILED")}: {heartbeatMessage} | HardwareProfile={(hardware ? "REPORTED" : "FAILED")}: {hardwareMessage} | Inventory={(inventory ? "REPORTED" : "FAILED")}: {inventoryMessage} | Readiness={(readiness ? "REPORTED" : "FAILED")}: {readinessMessage}");
                 },
                     null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30)))
                 {
