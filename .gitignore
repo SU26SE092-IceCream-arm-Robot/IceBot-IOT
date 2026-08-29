@@ -50,3 +50,6 @@ context/**/note.md
 **/TestResults/
 *.trx
 testing/results/
+
+# Temporary files
+**/*.tmp
