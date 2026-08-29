@@ -22,3 +22,26 @@ deploy/cloudflare/cloudflared.exe
 # IceBot per-site config (next to exe at runtime)
 **/config/icebot.site.env
 **/config/duckdns.env
+
+# Context documents: keep Markdown/text, exclude Office files
+context/*.doc
+context/**/*.doc
+context/*.docx
+context/**/*.docx
+context/*.docm
+context/**/*.docm
+context/*.xls
+context/**/*.xls
+context/*.xlsx
+context/**/*.xlsx
+context/*.xlsm
+context/**/*.xlsm
+context/*.xlsb
+context/**/*.xlsb
+context/*.xltx
+context/**/*.xltx
+context/*.xltm
+context/**/*.xltm
+
+# Local context notes are not committed
+context/**/note.md

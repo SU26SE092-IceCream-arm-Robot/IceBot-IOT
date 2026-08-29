@@ -1,6 +1,6 @@
 # IceBot-IOT Project Context
 
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-29
 
 ## Purpose
 
@@ -25,7 +25,9 @@ Implemented:
 - Durable `ExecuteOrder` pull, inbox, serialized execution, and report outbox.
 - Real Fairino and explicit simulated robot executors.
 - Optional external peripheral drivers loaded as validated plugins.
+- Built-in Ice Cream machine driver with directional UP/DOWN limit-controlled operation.
 - Optional simulated inventory observations for Development.
+- Cloud-to-Edge production order delivery through outbound mTLS polling, validated in the integrated hardware deployment.
 
 Not complete or intentionally out of scope:
 
@@ -33,7 +35,7 @@ Not complete or intentionally out of scope:
 - Multi-robot production orchestration.
 - Automatic certification of Lua behavior or safety.
 - Cloud-to-Edge inbound order delivery.
-- A built-in ice-cream-machine driver.
+
 
 ## Canonical Runtime Flow
 
@@ -49,7 +51,7 @@ Customer checkout/payment in Backend
   -> Backend applies terminal evidence and completes the order
 ```
 
-There is no canonical inbound `POST /api/orders` flow. `LocalApiServer`, `OrderRequest`, and the old `OrderQueue` were removed. Do not recreate them as a second production lifecycle.
+Cloud-to-Edge order delivery is implemented through Edge-initiated outbound mTLS polling. There is no canonical inbound `POST /api/orders` flow. `LocalApiServer`, `OrderRequest`, and the old `OrderQueue` were removed. Do not recreate them as a second production lifecycle.
 
 ## Installation and Startup
 
@@ -218,7 +220,7 @@ $env:ICEBOT_SIMULATED_STEP_DELAY_MS = "150"
 $env:ICEBOT_SIMULATED_FAIL_STEP = "0"
 ```
 
-Simulation exercises the real inbox, durable queue, state transitions, and outbox without a physical FR5. In this mode `TriggerDevice` validates that a matching plugin exists but does not open the configured COM port or call the hardware driver; completed/failed evidence reports `physicalOutputMayHaveOccurred=false`. Production Lua may use the legacy `icemachine` identifier, which is canonicalized to the installed `ice_cream` driver. The automated lifecycle test validates checksum, immutable receipt, durable admission, ACK recovery, ordered plan execution, and `Accepted -> Running -> Completed` reports. It is Development/test evidence, not physical E2E proof.
+Simulation exercises the real inbox, durable queue, state transitions, and outbox without a physical FR5. In this mode readiness reports an available `ROBOT_ARM` capability at `ARM_PRIMARY` and `safety=Safe`, so a production release requiring that capability is dispatched through the same Backend contract as the physical path. The runtime computes the execution mode once per readiness request and logs the exact `safety` and `mode` transmitted for diagnosis. In Fairino mode, every readiness probe opens a read-only SDK session and reports `Safe` plus `ROBOT_ARM` only when SDK communication is healthy, E-stop is clear, SI0/SI1 are clear, and both robot error codes are zero. Any failed telemetry read becomes `Unknown`; E-stop, safety-stop, or a robot error becomes `Unsafe`; neither state advertises a robot capability. Serial connection tests discover `TriggerDevice` machine types by parsing the active Lua files, because Full Edge artifact filenames are UUIDs rather than machine names; they call only the driver `TestConnection` method. `TriggerDevice` validates that a matching plugin exists but does not open the configured COM port or call the hardware driver in simulation; completed/failed evidence reports `physicalOutputMayHaveOccurred=false`. Production Lua may use the legacy `icemachine` identifier, which is canonicalized to the installed `ice_cream` driver. The automated lifecycle test validates checksum, immutable receipt, durable admission, ACK recovery, ordered plan execution, and `Accepted -> Running -> Completed` reports. It is Development/test evidence, not physical E2E proof.
 
 ## Peripheral Machines and Inventory
 
@@ -229,7 +231,7 @@ Current physical model:
 - staff prepares and loads one ice-cream mixture into one machine compartment;
 - the ice-cream machine mixes/produces independently;
 - Edge primarily controls the robot arm;
-- only peripherals physically connected to Edge use plugin drivers;
+- only peripherals physically connected to Edge use Edge plugin drivers; each such peripheral must provide a documented serial transport and device-control protocol; transport may be RS232 or RS485 according to the device protocol;
 - optional sensors may report Cloud-owned dispenser state.
 
 Therefore:
@@ -249,13 +251,13 @@ C:\ProgramData\IceBot\drivers\<driver-name>\
   Vendor.Driver.dll
 ```
 
-`IMachineModule` provides identity and step names. `IMachineTrigger` is optional for hardware physically connected to this Edge. Core contains no device-specific protocol.
+`IMachineModule` provides identity and step names. `IMachineTrigger` is optional for hardware physically connected to this Edge. An Edge-controlled serial peripheral must provide a documented serial transport, a documented device-control protocol, and an Edge plugin driver. The transport may be RS232 or RS485 according to the device; device commands, frame formats, status codes, and checksums may be device-specific. Core contains no device-specific protocol.
 
 ## Readiness
 
 Readiness is operational evidence, not hardware identity. It includes storage/local-state health, report backlog, robot activity/safety evidence, queue capacity, and active deployment state where available.
 
-Simulation may explicitly report simulated safety. Physical mode must not claim safety merely because the process runs. Missing optional sensor topology is evaluated by Backend policy and must not invalidate endpoint identity by default.
+Simulation may explicitly report simulated safety. Physical mode must not claim safety merely because the process runs; it must instead receive a healthy Fairino SDK sample with E-stop, SI0/SI1, and robot errors all clear. Missing optional sensor topology is evaluated by Backend policy and must not invalidate endpoint identity by default.
 
 ## Repository Map
 
@@ -279,9 +281,9 @@ Simulation may explicitly report simulated safety. Physical mode must not claim 
 
 ```powershell
 .\code\scripts\restore-fairino-sdk-dependencies.ps1
-dotnet build .\code\IceBot-IOT.sln -c Debug --no-restore
-dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Debug --no-build
-# Latest verified result: 109 passed, 0 failed, 0 skipped
+dotnet build .\code\IceBot-IOT.sln -c Release --no-restore
+dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore
+# Latest verified result: 123 passed, 0 failed, 0 skipped
 ```
 
 Run:
@@ -291,6 +293,86 @@ Run:
 ```
 
 A real Backend plus simulated robot validates the software path through payment, dispatch, execution transitions, and completion reports. It does not validate physical robot or sensor behavior.
+
+## Ice-cream Machine Actuator and Limit Switches
+
+The custom ice-cream actuator uses a 24 V, 100 RPM JGB37-520 geared DC motor connected to an 8 mm lead screw with a 2 mm lead per revolution.
+
+The firmware has been corrected and flashed through ST-Link to the STM32F103C8T6. The actuator uses separate active-low limit inputs: `PB0` for the upper limit and `PB10` for the lower limit. Its current direction mapping matches the physical mechanism:
+
+- Firmware `UP` produces physical UP motion through `PB1/TIM3_CH4`.
+- Firmware `DOWN` produces physical DOWN motion through `PA8/TIM1_CH1`.
+
+The original reversed mapping was observed during the initial manual calibration and is historical information only.
+
+The STM32 firmware uses a default PWM of 20% when a command sends speed `0`. Motor command duration is encoded in 0.1-second units: `12` means 1.2 seconds and `16` means 1.6 seconds. A duration of `0` means run until the matching limit switch. The Edge ice-cream driver sends duration `0` and waits for the machine to return to Standby after the matching limit is reached. An Edge `UP` trigger runs only physical UP until the upper limit; an Edge `DOWN` trigger runs only physical DOWN until the lower limit. The driver never performs an automatic opposite-direction movement. `context/lua-tests/real-demo-1408.lua` currently sends `TriggerDevice("ice_cream", "UP")`; a DOWN movement requires a separate explicit `TriggerDevice("ice_cream", "DOWN")`. Workflow execution is synchronous, so the next step starts only after the current machine trigger returns, followed by any explicit `WaitMs` in the workflow.
+
+The manually calibrated physical travel from LOW to HIGH is approximately 8 seconds at 20% PWM, corresponding to an estimated 5.33 mm of linear travel. Time-based positioning is only an estimate and must not be treated as absolute position feedback.
+
+A `KW12-071` mechanical limit switch is used for the physical upper limit, and the lower limit uses the same active-low topology on `PB10`:
+
+- STM32 `PB0/B0` connects directly to the upper switch `COM`; STM32 `PB10` connects directly to the lower switch `COM`.
+- Each switch `NC` connects to STM32 GND.
+- Switch `NO` is left open.
+- A `4.7 kΩ` pull-up resistor connects STM32 `3.3 V` to `PB0/B0`; a second `4.7 kΩ` pull-up connects `3.3 V` to `PB10`.
+- The switch belongs entirely to the STM32 control power domain.
+- It must not connect to the 24 V motor domain, BTS7960 ground, `A8`, or `B1`.
+
+Firmware configures `PB0` as a GPIO/EXTI input with an active-low upper-limit signal. An active upper-limit signal must stop physical UP motion immediately and reject further physical UP commands, while physical DOWN motion remains available to release the switch.
+
+The updated firmware is flashed to the STM32. The upper switch provides automatic stopping and physical-UP protection; the lower switch provides automatic stopping and physical-DOWN protection. Each opposite direction remains available to release the corresponding switch.
+## Session Context Loading
+
+At the beginning of every new session, load both context files before making changes:
+
+1. `context/GLOBAL_WORKING_CONTEXT.md` for universal working rules.
+2. `context/PROJECT_CONTEXT.md` for IceBot-IOT project-specific scope, architecture, hardware, and verification requirements.
+
+The global context is shared across projects and must not be modified for project-specific notes. Project-specific updates belong in this file.
+## Unit Test Location and Procedure
+
+The project harness and test evidence are located here:
+
+For actuator firmware direction, limit-switch, or Edge trigger changes, the contract tests must cover command direction mapping, PB0/PB10 active-low GPIO/EXTI configuration, upper/lower-limit stopping, matching-direction rejection, and opposite-direction release behavior.
+
+
+- Test project: `harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj`.
+- Firmware contract tests: `harness/IceBot.Harness.Tests/IceCreamFirmwareContractTests.cs`.
+- Unit-test report: `testing/UNIT_TEST_REPORT.md`.
+- Test result evidence: `harness/IceBot.Harness.Tests/TestResults/PB10ConfigTests.trx`.
+
+When any project code changes, including Edge runtime, API, configuration/provisioning, deployment, order execution, robot workflow, peripheral driver, or STM32 firmware code changes:
+
+1. Identify the affected unit-test suites and add or update tests for the changed behavior.
+2. Run `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore`.
+3. For actuator firmware changes, the contract tests must cover command direction mapping, PB0/PB10 active-low GPIO/EXTI configuration, upper/lower-limit stopping, matching-direction rejection, and opposite-direction release behavior.
+4. Record total, passed, failed, skipped counts, scope, command, and evidence path in `testing/UNIT_TEST_REPORT.md`.
+5. For Edge code changes, run the directly affected suites first (for example `EdgeOrderInboxTests`, `EdgeOrderExecutionQueueTests`, `EdgeDeploymentApiTests`, `SiteSettingsTests`, `WorkflowExecutionPlanTests`, `IceCreamDriverTests`, or the matching suite), then run the full harness before handoff.
+6. Physical STM32, motor, limit-switch, ST-Link, and serial behavior still require cautious hardware verification; host unit tests do not replace it.
+
+## Protocol Reference Documents
+
+Detailed serial protocol definitions are maintained separately under `context/protocols/` and should not be duplicated in this project context:
+
+- Ice Cream machine: `context/protocols/Ice Cream Machine Serial Communication Protocol.md`
+- Cup-dropping machine: `context/protocols/301 Cup-Dropping Machine Serial Communication Protocol V0.0.3.md`
+
+## Architecture Reference Documents
+
+- Hardware Architecture: `context/Hardware_Architecture/Hardware_Architecture_Document.md`
+- Hardware Architecture notes: `context/Hardware_Architecture/note.md`
+- System Architecture: `context/System_Architecture/system architecture.md`
+- System Architecture diagrams: `context/System_Architecture/System Architecture.jpg` and `context/System_Architecture/System Architecture_2.jpg`
+
+Open the relevant protocol document when changing firmware, peripheral drivers, serial tests, or hardware wiring. Keep this context limited to project scope, implementation decisions, and verification rules.
+
+## Lua Test Files
+
+Project Lua files intended for testing are stored in:
+
+`context/lua-tests/`
+
+This directory currently contains test/demo variants such as `real-demo-1408.lua`, `pre-review.lua`, and machine-trigger scenarios. Use files in this directory as controlled workflow inputs for parser, plan-validation, Edge execution, and machine-trigger tests. Keep production workflow files separate from test variants. When a Lua test changes, run the directly affected workflow/Edge test suites and then the full harness; record the result in `testing/UNIT_TEST_REPORT.md`.
 
 ## Rules for Future Changes
 

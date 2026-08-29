@@ -1,0 +1,43 @@
+## 1.2 Hardware Architecture
+
+This section presents the hardware architecture of the automatic ice cream dispensing module and its connection to the Edge Computer in the kiosk system. The hardware architecture is divided into four main units: Control Unit, Communication Unit, Power Supply Unit, and Actuator Unit.
+
+**[Chèn Hình 1.2.1 tại đây]**
+
+**Figure 1.2.1 – Hardware Interconnection Diagram of the Automatic Ice Cream Dispensing Module**
+
+Figure 1.2.1 illustrates the overall interconnection between the hardware components. The Edge Computer communicates with the system through the USB-to-RS485 Converter, which converts data from the Edge Computer’s USB interface into RS485 signals.
+The RS485 signal is transmitted through the differential A/B communication line to the TTL-to-RS485 Converter Module (MAX485). The MAX485 module converts the RS485 signal into UART signals, allowing the STM32 to communicate through the USART1 interface. The Edge Computer is connected to the RS485 bus through the USB-to-RS485 Converter.
+After receiving a control command, the STM32 processes the data and generates PWM signals through pins PA8 and PB1. These PWM signals pass through two PC817 Optocouplers before reaching the BTS7960 Motor Driver Module. The BTS7960 uses these signals to control the operation of the JGB37-520 Geared DC Motor.
+The JGB37-520 motor is connected to the Lead Screw Mechanism. This mechanism converts the motor’s rotational motion into linear motion, thereby opening and closing the ice cream dispensing mechanism.
+Regarding the power supply, the 24V Switching Power Supply converts 220V AC into 24V DC to supply the BTS7960 motor power input and the motor. The LM2596 Step-Down Voltage Regulator converts the 24V supply into a separate 5V rail for the BTS7960 logic side and the output side of the PC817 optocouplers. The 5V Power Adapter supplies both the STM32 and the TTL-to-RS485 Converter Module (MAX485). Although both the STM32 and MAX485 are powered from 5V, the UART logic signals between them use 3.3V logic levels. The PC817 optocouplers electrically isolate the STM32/control-side ground from the motor-driver-side control signals.
+
+**[Chèn Hình 1.2.2 tại đây]**
+
+**Figure 1.2.2 – Detailed Electrical Schematic of the Automatic Ice Cream Dispensing Module**
+
+Figure 1.2.2 presents the detailed electrical schematic of the automatic ice cream dispensing module. The schematic shows the connections between the STM32, MAX485, two PC817 Optocouplers, 330 Ω and 4.7 kΩ resistors, BTS7960 Motor Driver Module, LM2596 Step-Down Voltage Regulator, JGB37-520 Geared DC Motor, and the 5V/24V power supplies.
+
+### 1.2.1 Control Unit
+
+**[Chèn bảng Control Unit tại đây]**
+
+### 1.2.2 Communication Unit
+
+**[Chèn bảng Communication Unit tại đây]**
+
+### 1.2.3 Power Supply Unit
+
+**[Chèn bảng Power Supply Unit tại đây]**
+
+### 1.2.4 Actuator Unit
+
+**[Chèn bảng Actuator Unit tại đây]**
+
+### 1.2.5 Communication Standardization and Extensibility
+
+The custom control circuit presented in this document was developed to convert a manually operated ice cream machine into an automatic mechanism. This design serves as a reference implementation for the specific ice cream machine and is not a mandatory hardware configuration for all devices integrated into the kiosk system.
+The system is designed according to a standardized architecture in which Edge-controlled peripheral machines are integrated through an RS485 interface. Each Edge-controlled peripheral must provide a compatible RS485 interface, a documented control protocol, and a corresponding Edge plugin driver. Devices may use their own control circuits and actuators. RS485 defines the physical communication layer; it does not by itself define device commands, frame structure, status codes, checksum rules, or machine-specific behavior.
+Using RS485 as the standard communication interface provides a consistent connection method between the Edge Computer and peripheral devices. The Edge Computer communicates with the RS485 bus through the USB-to-RS485 Converter, while controllers such as the STM32 use UART together with the TTL-to-RS485 Converter Module (MAX485). This design reduces differences between device types, simplifies the integration process, and supports system scalability.
+Peripheral devices may have different electrical designs, controllers, and actuation mechanisms. However, each peripheral directly controlled by the Edge Computer must provide a compatible RS485 interface, a documented control protocol, and a corresponding Edge plugin driver. The Edge plugin driver is responsible for opening the serial connection, translating Edge operations into device-specific commands, validating responses, and handling communication errors. A common application protocol is not assumed unless it is explicitly specified by the system.
+Therefore, the diagrams in this section describe a specific implementation for the ice cream machine while also providing a reference for integrating other peripheral devices into the kiosk system.
