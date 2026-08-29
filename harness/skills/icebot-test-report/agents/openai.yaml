@@ -1,0 +1,4 @@
+interface:
+  display_name: "IceBot Test Report"
+  short_description: "Run tests and generate a Markdown report"
+  default_prompt: "Use $icebot-test-report to test the latest IceBot changes and refresh the Markdown test document."

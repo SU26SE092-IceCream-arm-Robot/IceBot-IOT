@@ -45,3 +45,8 @@ context/**/*.xltm
 
 # Local context notes are not committed
 context/**/note.md
+
+# Generated test results
+**/TestResults/
+*.trx
+testing/results/

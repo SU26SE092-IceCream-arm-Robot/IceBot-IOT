@@ -381,6 +381,17 @@ Trong `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, Edge mô phỏng cả tay robot v
 
 Lần xác minh gần nhất: **123/123 test passed**, gồm smoke test điều hướng menu Cấu hình của `InitIceBot`, capability/safety dispatch simulated và physical Fairino đã xác minh telemetry, discovery máy ngoại vi từ Lua active, simulator ngoại vi, alias machine type, hardware snapshot idempotency. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
 
+### Phạm vi kiểm thử
+
+Các loại kiểm thử đã thực hiện:
+
+- Unit test cho Edge runtime và plugin driver.
+- Kiểm thử workflow Lua và thứ tự thực thi step.
+- Kiểm thử giao tiếp serial, frame và checksum.
+- Firmware contract test cho mapping motor, PWM và công tắc giới hạn.
+- Kiểm thử mô phỏng Edge và kiểm thử phần cứng thực tế bằng ST-Link/serial.
+- Kết quả gần nhất: 123 test passed.
+
 ## Các phần chưa hoàn thành
 
 - Backpressure đầy đủ cho inbox: dung lượng đĩa, tuổi Order và telemetry.
