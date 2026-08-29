@@ -49,6 +49,7 @@ namespace IceBot.Config
                     case "PRIMARY_ROBOT_MACHINE_MODEL_CODE": settings.PrimaryRobotMachineModelCode = value; break;
                     case "REPORTED_DEVICES_SNAPSHOT_REVISION": long.TryParse(value, out var reportedDevicesRevision); settings.ReportedDevicesSnapshotRevision = reportedDevicesRevision; break;
                     case "REPORTED_DEVICES_SNAPSHOT_SIGNATURE": settings.ReportedDevicesSnapshotSignature = value; break;
+                    case "REPORTED_DEVICES_SNAPSHOT_OBSERVED_AT": DateTimeOffset.TryParse(value, out var snapshotObservedAt); settings.ReportedDevicesSnapshotObservedAt = snapshotObservedAt == default ? (DateTimeOffset?)null : snapshotObservedAt; break;
                     case "STORE_ACCOUNT": settings.StoreAccount = value; break;
                     case "STORE_PASSWORD": settings.StorePassword = value; break;
                     case "BE_ACCESS_TOKEN": settings.OperatorAccessToken = value; break;
@@ -92,6 +93,7 @@ namespace IceBot.Config
                 $"PRIMARY_ROBOT_MACHINE_MODEL_CODE={settings.PrimaryRobotMachineModelCode}",
                 $"REPORTED_DEVICES_SNAPSHOT_REVISION={settings.ReportedDevicesSnapshotRevision}",
                 $"REPORTED_DEVICES_SNAPSHOT_SIGNATURE={settings.ReportedDevicesSnapshotSignature}",
+                $"REPORTED_DEVICES_SNAPSHOT_OBSERVED_AT={settings.ReportedDevicesSnapshotObservedAt:O}",
                 $"STORE_ACCOUNT={settings.StoreAccount}",
                 $"STORE_PASSWORD={settings.StorePassword}",
                 $"BE_ACCESS_TOKEN={settings.OperatorAccessToken}",
@@ -140,24 +142,40 @@ namespace IceBot.Config
             }
         }
 
-        // Reusing a revision for an unchanged snapshot makes reconnect delivery idempotent.
-        // A changed discovery result receives the next durable revision.
-        public static long GetReportedDevicesSnapshotRevision(string signature)
+        // Reusing both revision and observedAt for an unchanged snapshot makes reconnect
+        // delivery idempotent. A changed discovery result receives a new durable version.
+        public static ReportedDevicesSnapshotVersion GetReportedDevicesSnapshotVersion(string signature)
         {
             lock (SequenceGate)
             {
                 var settings = Load();
-                if (settings.ReportedDevicesSnapshotRevision <= 0 ||
-                    !string.Equals(settings.ReportedDevicesSnapshotSignature, signature, StringComparison.Ordinal))
-                {
-                    settings.ReportedDevicesSnapshotRevision = Math.Max(0, settings.ReportedDevicesSnapshotRevision) + 1;
-                    settings.ReportedDevicesSnapshotSignature = signature;
-                    Save(settings);
-                }
-
-                return settings.ReportedDevicesSnapshotRevision;
+                var version = ResolveReportedDevicesSnapshotVersion(
+                    settings, signature, DateTimeOffset.UtcNow, out var changed);
+                if (changed) Save(settings);
+                return version;
             }
         }
+
+        internal static ReportedDevicesSnapshotVersion ResolveReportedDevicesSnapshotVersion(
+            SiteSettings settings, string signature, DateTimeOffset now, out bool changed)
+        {
+            changed = settings.ReportedDevicesSnapshotRevision <= 0 ||
+                !string.Equals(settings.ReportedDevicesSnapshotSignature, signature, StringComparison.Ordinal) ||
+                !settings.ReportedDevicesSnapshotObservedAt.HasValue;
+            if (changed)
+            {
+                settings.ReportedDevicesSnapshotRevision = Math.Max(0, settings.ReportedDevicesSnapshotRevision) + 1;
+                settings.ReportedDevicesSnapshotSignature = signature;
+                settings.ReportedDevicesSnapshotObservedAt = now;
+            }
+
+            return new ReportedDevicesSnapshotVersion(
+                settings.ReportedDevicesSnapshotRevision,
+                settings.ReportedDevicesSnapshotObservedAt.GetValueOrDefault());
+        }
+
+        public static long GetReportedDevicesSnapshotRevision(string signature) =>
+            GetReportedDevicesSnapshotVersion(signature).Revision;
 
         public static void ApplyToEnvironment(SiteSettings settings)
         {
@@ -293,5 +311,17 @@ namespace IceBot.Config
             value = line.Substring(idx + 1).Trim();
             return true;
         }
+    }
+
+    internal sealed class ReportedDevicesSnapshotVersion
+    {
+        public ReportedDevicesSnapshotVersion(long revision, DateTimeOffset observedAt)
+        {
+            Revision = revision;
+            ObservedAt = observedAt;
+        }
+
+        public long Revision { get; }
+        public DateTimeOffset ObservedAt { get; }
     }
 }

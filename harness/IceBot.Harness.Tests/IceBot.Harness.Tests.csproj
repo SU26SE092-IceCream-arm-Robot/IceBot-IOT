@@ -17,6 +17,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\code\src\IceBot\IceBot.csproj" />
+    <ProjectReference Include="..\..\driver-sdk\IceBot.Driver.IceCream\IceBot.Driver.IceCream.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>
 
 </Project>

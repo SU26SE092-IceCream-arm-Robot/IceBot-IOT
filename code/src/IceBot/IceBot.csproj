@@ -7,15 +7,19 @@
     <AssemblyName>IceBot</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\lib\fairino-csharp-sdk\src\FRRobot\FRRobot.csproj" />
+    <!-- Robot controller Web 3.7.7: closest official compatible SDK tag is v1.1.0_robot3.7.8. -->
+    <ProjectReference Include="..\..\lib\fairino-csharp-sdk-robot3.7.8\src\FRRobot\FRRobot.csproj" />
     <ProjectReference Include="..\IceBot.Driver.Abstractions\IceBot.Driver.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
   </ItemGroup>

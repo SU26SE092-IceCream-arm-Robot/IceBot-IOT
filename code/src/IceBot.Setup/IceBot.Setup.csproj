@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <AssemblyName>Setup</AssemblyName>
+    <AssemblyName>IceBot-Setup</AssemblyName>
     <RootNamespace>IceBot.Setup</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -13,5 +13,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(InstallerBundleArchive)' != ''">
+    <EmbeddedResource Include="$(InstallerBundleArchive)" LogicalName="IceBot.Setup.install-bundle.zip" />
+  </ItemGroup>
 
 </Project>

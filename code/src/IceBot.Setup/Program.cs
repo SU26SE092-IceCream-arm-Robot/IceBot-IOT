@@ -1,6 +1,9 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Security.Principal;
+using System.Text.Json;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -10,6 +13,7 @@ internal static class Program
 {
     private const int NetFramework472Release = 461808;
     private const string NetBirdPackageId = "Netbird.Netbird";
+    private const string EmbeddedBundleResource = "IceBot.Setup.install-bundle.zip";
 
     [STAThread]
     private static int Main(string[] args)
@@ -18,42 +22,68 @@ internal static class Program
         Console.Title = "IceBot Setup";
         PrintHeader();
 
+        string? temporaryBundleDirectory = null;
         try
         {
             if (!OperatingSystem.IsWindows())
-                throw new InvalidOperationException("Setup.exe chỉ hỗ trợ Windows.");
+                throw new InvalidOperationException("Setup chỉ hỗ trợ Windows.");
 
-            var source = GetArgument(args, "--source")
-                ?? Path.Combine(AppContext.BaseDirectory, "payload");
+            var sourceArgument = GetArgument(args, "--source");
+            string bundleDirectory;
+            string payloadDirectory;
+            if (string.IsNullOrWhiteSpace(sourceArgument))
+            {
+                temporaryBundleDirectory = ExtractEmbeddedBundle();
+                bundleDirectory = temporaryBundleDirectory;
+                payloadDirectory = Path.Combine(bundleDirectory, "payload");
+            }
+            else
+            {
+                payloadDirectory = Path.GetFullPath(sourceArgument);
+                bundleDirectory = Directory.GetParent(payloadDirectory)?.FullName
+                    ?? throw new InvalidOperationException("Không xác định được thư mục bundle từ --source.");
+            }
+
+            ValidateBundle(payloadDirectory, bundleDirectory);
+            if (HasArgument(args, "--validate-only"))
+            {
+                Console.WriteLine("[OK] Bundle hợp lệ: Fairino robot3.7.8, runtime và hai driver đã được xác minh.");
+                return 0;
+            }
+
+            var elevatedExitCode = RelaunchElevatedIfRequired(args);
+            if (elevatedExitCode.HasValue)
+                return elevatedExitCode.Value;
+
             var installDirectory = GetArgument(args, "--install-dir");
             if (string.IsNullOrWhiteSpace(installDirectory))
             {
                 installDirectory = SelectInstallDirectory();
                 if (installDirectory == null)
                 {
-                    Console.WriteLine("[CANCELLED] Người dùng đã hủy cài đặt. Không có file nào được thay đổi.");
+                    Console.WriteLine("[CANCELLED] Đã hủy cài đặt. Không có file nào được thay đổi.");
                     Pause();
                     return 0;
                 }
             }
 
-            source = Path.GetFullPath(source);
             installDirectory = Path.GetFullPath(installDirectory);
-            ValidatePayload(source);
+            EnsureRuntimeProcessesStopped();
 
             Console.WriteLine("[1/5] Kiểm tra .NET Framework 4.7.2+");
-            EnsureNetFramework(AppContext.BaseDirectory);
+            EnsureNetFramework(bundleDirectory);
 
             Console.WriteLine("[2/5] Cài đặt NetBird");
-            EnsureNetBird(AppContext.BaseDirectory);
+            EnsureNetBird(bundleDirectory);
 
             Console.WriteLine($"[3/5] Cài IceBot vào {installDirectory}");
-            CopyPayload(source, installDirectory);
+            CopyPayload(payloadDirectory, installDirectory);
 
-            Console.WriteLine("[4/5] Tạo thư mục dữ liệu");
+            Console.WriteLine("[4/5] Tạo dữ liệu và cài driver máy ngoại vi");
             CreateRuntimeDirectories(installDirectory);
             SetRuntimePermissions(installDirectory);
             CreateSharedDriverDirectory();
+            InstallBundledDrivers(bundleDirectory);
 
             Console.WriteLine("[5/5] Tạo shortcut");
             CreateShortcuts(installDirectory);
@@ -61,8 +91,8 @@ internal static class Program
             Console.WriteLine();
             Console.WriteLine("========================================");
             Console.WriteLine("[OK] CÀI ĐẶT ICEBOT HOÀN TẤT");
-            Console.WriteLine("Bước tiếp theo: chạy InitIceBot.exe để khởi tạo Edge.");
-            Console.WriteLine("Sau khi khởi tạo thành công, chạy IceBot.exe để bán hàng.");
+            Console.WriteLine("Tiếp theo: chạy InitIceBot.exe để khởi tạo Edge.");
+            Console.WriteLine("Sau đó chạy IceBot.exe để vận hành bán hàng.");
             Console.WriteLine("========================================");
             Pause();
             return 0;
@@ -77,40 +107,117 @@ internal static class Program
             Pause();
             return 1;
         }
+        finally
+        {
+            if (temporaryBundleDirectory != null)
+            {
+                try { Directory.Delete(temporaryBundleDirectory, true); }
+                catch { }
+            }
+        }
     }
 
-    private static void ValidatePayload(string source)
+    private static string ExtractEmbeddedBundle()
     {
-        if (!Directory.Exists(source))
-            throw new DirectoryNotFoundException($"Không tìm thấy payload: {source}");
+        using var bundle = Assembly.GetExecutingAssembly().GetManifestResourceStream(EmbeddedBundleResource)
+            ?? throw new InvalidOperationException(
+                "IceBot-Setup.exe không chứa payload. Hãy tạo lại bằng deploy/installer/build-package.ps1.");
 
-        foreach (var file in new[] { "IceBot.exe", "InitIceBot.exe" })
+        var destination = Path.Combine(Path.GetTempPath(), "IceBot-Setup", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(destination);
+        using var archive = new ZipArchive(bundle, ZipArchiveMode.Read);
+        archive.ExtractToDirectory(destination);
+        return destination;
+    }
+
+    private static void ValidateBundle(string payloadDirectory, string bundleDirectory)
+    {
+        if (!Directory.Exists(payloadDirectory))
+            throw new DirectoryNotFoundException($"Không tìm thấy payload: {payloadDirectory}");
+
+        foreach (var file in new[]
         {
-            if (!File.Exists(Path.Combine(source, file)))
-                throw new FileNotFoundException($"Payload thiếu {file}. Hãy tạo package bằng deploy/installer/build-package.ps1.");
+            "IceBot.exe",
+            "InitIceBot.exe",
+            "libfairino.dll",
+            "CookComputing.XmlRpcV2.dll",
+            "IceBot.Driver.Abstractions.dll"
+        })
+        {
+            if (!File.Exists(Path.Combine(payloadDirectory, file)))
+                throw new FileNotFoundException($"Payload thiếu {file}.");
         }
+
+        foreach (var mutableRoot in new[] { "config", "certificates", "data", "drivers", "workflow" })
+        {
+            if (Directory.Exists(Path.Combine(payloadDirectory, mutableRoot)))
+                throw new InvalidOperationException($"Payload khong duoc chua du lieu cuc bo: {mutableRoot}.");
+        }
+
+        var manifestPath = Path.Combine(bundleDirectory, "installer-manifest.json");
+        if (!File.Exists(manifestPath))
+            throw new FileNotFoundException("Bundle thiếu installer-manifest.json.");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        var root = document.RootElement;
+        var sdk = root.GetProperty("fairinoSdk").GetString();
+        var expectedHash = root.GetProperty("libfairinoSha256").GetString();
+        if (!string.Equals(sdk, "robot3.7.8", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Fairino SDK không tương thích: {sdk ?? "không xác định"}.");
+
+        ValidateHash(Path.Combine(payloadDirectory, "libfairino.dll"), expectedHash, "libfairino.dll");
+        ValidateDriverPackage(bundleDirectory, "CupDropping", "bt_cup_l90");
+        ValidateDriverPackage(bundleDirectory, "IceCream", "ice_cream");
+    }
+
+    private static void ValidateDriverPackage(string bundleDirectory, string packageName, string expectedMachineType)
+    {
+        var packageDirectory = Path.Combine(bundleDirectory, "drivers", packageName);
+        var manifestPath = Path.Combine(packageDirectory, "driver.json");
+        if (!File.Exists(manifestPath))
+            throw new FileNotFoundException($"Bundle thiếu driver {packageName}.");
+
+        using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        var root = document.RootElement;
+        var machineType = root.GetProperty("machineType").GetString();
+        var assemblyName = root.GetProperty("assembly").GetString();
+        var expectedHash = root.GetProperty("sha256").GetString();
+        if (!string.Equals(machineType, expectedMachineType, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Driver {packageName} có machineType không đúng: {machineType}.");
+        if (string.IsNullOrWhiteSpace(assemblyName) || Path.GetFileName(assemblyName) != assemblyName)
+            throw new InvalidOperationException($"Driver {packageName} có tên assembly không hợp lệ.");
+
+        ValidateHash(Path.Combine(packageDirectory, assemblyName), expectedHash, $"driver {packageName}");
+    }
+
+    private static void ValidateHash(string filePath, string? expectedHash, string label)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"Thiếu {label}: {filePath}");
+        if (string.IsNullOrWhiteSpace(expectedHash))
+            throw new InvalidOperationException($"Manifest thiếu SHA-256 của {label}.");
+
+        var actualHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(filePath)));
+        if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"{label} không khớp SHA-256 trong manifest.");
     }
 
     private static string? SelectInstallDirectory()
     {
         var defaultDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "IceBot");
-
         using var dialog = new FolderBrowserDialog
         {
-            Description = "Chọn chính xác thư mục sẽ cài IceBot",
+            Description = "Chọn thư mục cài IceBot",
             SelectedPath = defaultDirectory,
             ShowNewFolderButton = true,
             UseDescriptionForTitle = true
         };
-
         Console.WriteLine("Chọn thư mục cài đặt trong cửa sổ vừa mở...");
-        return dialog.ShowDialog() == DialogResult.OK
-            ? dialog.SelectedPath
-            : null;
+        return dialog.ShowDialog() == DialogResult.OK ? dialog.SelectedPath : null;
     }
 
-    private static void EnsureNetFramework(string setupDirectory)
+    private static void EnsureNetFramework(string bundleDirectory)
     {
         if (GetNetFrameworkRelease() >= NetFramework472Release)
         {
@@ -118,18 +225,17 @@ internal static class Program
             return;
         }
 
-        var prerequisites = Path.Combine(setupDirectory, "prerequisites");
+        var prerequisites = Path.Combine(bundleDirectory, "prerequisites");
         var installer = Directory.Exists(prerequisites)
             ? Directory.GetFiles(prerequisites, "ndp*.exe").OrderBy(path => path).FirstOrDefault()
             : null;
-
         if (installer == null)
             throw new InvalidOperationException(
-                "Máy chưa có .NET Framework 4.7.2+. Package cài đặt thiếu offline installer ndp*.exe trong prerequisites.");
+                "Máy chưa có .NET Framework 4.7.2+ và installer không chứa bộ cài offline ndp*.exe.");
 
         Run(installer, "/q /norestart", "cài .NET Framework");
         if (GetNetFrameworkRelease() < NetFramework472Release)
-            throw new InvalidOperationException(".NET Framework yêu cầu khởi động lại Windows. Hãy restart rồi chạy Setup.exe lại.");
+            throw new InvalidOperationException("Hãy restart Windows rồi chạy IceBot-Setup.exe lại.");
     }
 
     private static int GetNetFrameworkRelease()
@@ -138,7 +244,7 @@ internal static class Program
         return key?.GetValue("Release") is int release ? release : 0;
     }
 
-    private static void EnsureNetBird(string setupDirectory)
+    private static void EnsureNetBird(string bundleDirectory)
     {
         if (FindNetBird() != null)
         {
@@ -146,7 +252,7 @@ internal static class Program
             return;
         }
 
-        var prerequisites = Path.Combine(setupDirectory, "prerequisites");
+        var prerequisites = Path.Combine(bundleDirectory, "prerequisites");
         var offlineInstaller = Directory.Exists(prerequisites)
             ? Directory.GetFiles(prerequisites, "*netbird*.*")
                 .Where(path => path.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
@@ -165,22 +271,20 @@ internal static class Program
         else
         {
             if (!CommandExists("winget.exe"))
-                throw new InvalidOperationException(
-                    "Không tìm thấy NetBird offline installer hoặc winget. Thêm bộ cài NetBird vào prerequisites rồi chạy lại Setup.exe.");
-
+                throw new InvalidOperationException("Không có NetBird offline installer hoặc winget.");
             Run("winget.exe",
                 $"install --id {NetBirdPackageId} --exact --silent --accept-package-agreements --accept-source-agreements",
                 "cài NetBird qua winget");
         }
 
         if (FindNetBird() == null)
-            throw new InvalidOperationException("Đã chạy bộ cài NetBird nhưng chưa tìm thấy netbird.exe. Hãy restart Windows rồi chạy Setup.exe lại.");
+            throw new InvalidOperationException("Đã cài NetBird nhưng chưa tìm thấy netbird.exe.");
     }
 
     private static string? FindNetBird()
     {
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        var knownPath = Path.Combine(programFiles, "Netbird", "netbird.exe");
+        var knownPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Netbird", "netbird.exe");
         if (File.Exists(knownPath)) return knownPath;
         return CommandExists("netbird.exe") ? "netbird.exe" : null;
     }
@@ -202,19 +306,27 @@ internal static class Program
             process?.WaitForExit(10_000);
             return process is { HasExited: true, ExitCode: 0 };
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
 
+    private static void EnsureRuntimeProcessesStopped()
+    {
+        var running = new[] { "IceBot", "InitIceBot" }
+            .SelectMany(Process.GetProcessesByName)
+            .Where(process => !process.HasExited)
+            .Select(process => $"{process.ProcessName} (PID {process.Id})")
+            .ToArray();
+        if (running.Length > 0)
+            throw new InvalidOperationException(
+                "Hay dong IceBot/InitIceBot truoc khi cai dat hoac nang cap: " + string.Join(", ", running));
+    }
     private static void CopyPayload(string source, string destination)
     {
         Directory.CreateDirectory(destination);
-        CopyDirectory(source, destination, string.Empty);
+        CopyDirectory(source, destination, string.Empty, preserveMutableRoots: true);
     }
 
-    private static void CopyDirectory(string source, string destination, string relativePath)
+    private static void CopyDirectory(string source, string destination, string relativePath, bool preserveMutableRoots)
     {
         var mutableRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -228,9 +340,10 @@ internal static class Program
         foreach (var directory in Directory.GetDirectories(source))
         {
             var name = Path.GetFileName(directory);
+            if (preserveMutableRoots && string.IsNullOrEmpty(relativePath) && mutableRoots.Contains(name))
+                continue;
             var childRelative = string.IsNullOrEmpty(relativePath) ? name : Path.Combine(relativePath, name);
-            if (string.IsNullOrEmpty(relativePath) && mutableRoots.Contains(name)) continue;
-            CopyDirectory(directory, Path.Combine(destination, name), childRelative);
+            CopyDirectory(directory, Path.Combine(destination, name), childRelative, preserveMutableRoots);
         }
     }
 
@@ -242,9 +355,6 @@ internal static class Program
 
     private static void SetRuntimePermissions(string installDirectory)
     {
-        // Application binaries remain protected by Program Files. Only site-local paths need
-        // Modify permission so IceBot can persist configuration, certificates and jobs.
-        // Grant only the account running Setup, not every local Windows user.
         var userSid = WindowsIdentity.GetCurrent().User?.Value
             ?? throw new InvalidOperationException("Không xác định được tài khoản Windows đang cài đặt.");
         foreach (var name in new[] { "config", "certificates", "workflow", "test-workflow", "data" })
@@ -256,25 +366,64 @@ internal static class Program
 
     private static void CreateSharedDriverDirectory()
     {
-        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(commonData))
-            throw new InvalidOperationException("Không xác định được thư mục ProgramData của Windows.");
-
-        var path = Path.Combine(commonData, "IceBot", "drivers");
+        var path = GetSharedDriverDirectory();
         Directory.CreateDirectory(path);
-
         var userSid = WindowsIdentity.GetCurrent().User?.Value
             ?? throw new InvalidOperationException("Không xác định được tài khoản Windows đang cài đặt.");
         Run("icacls.exe", $"\"{path}\" /grant *{userSid}:(OI)(CI)M", "cấp quyền thư mục driver dùng chung");
     }
 
+    private static string GetSharedDriverDirectory()
+    {
+        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        if (string.IsNullOrWhiteSpace(commonData))
+            throw new InvalidOperationException("Không xác định được ProgramData.");
+        return Path.Combine(commonData, "IceBot", "drivers");
+    }
+
+    private static void InstallBundledDrivers(string bundleDirectory)
+    {
+        var source = Path.Combine(bundleDirectory, "drivers");
+        if (!Directory.Exists(source))
+            throw new DirectoryNotFoundException("Bundle thieu thu muc drivers.");
+
+        var destination = GetSharedDriverDirectory();
+        foreach (var packageDirectory in Directory.GetDirectories(source))
+        {
+            var manifestPath = Path.Combine(packageDirectory, "driver.json");
+            using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var machineType = document.RootElement.GetProperty("machineType").GetString();
+            if (string.IsNullOrWhiteSpace(machineType) || Path.GetFileName(machineType) != machineType)
+                throw new InvalidOperationException("Driver bundle co machineType khong hop le.");
+
+            var canonicalDirectory = Path.Combine(destination, machineType);
+            CopyDirectory(packageDirectory, canonicalDirectory, string.Empty, preserveMutableRoots: false);
+
+            foreach (var existingDirectory in Directory.GetDirectories(destination))
+            {
+                if (string.Equals(existingDirectory, canonicalDirectory, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var existingManifest = Path.Combine(existingDirectory, "driver.json");
+                if (!File.Exists(existingManifest)) continue;
+                try
+                {
+                    using var existingDocument = JsonDocument.Parse(File.ReadAllText(existingManifest));
+                    var existingMachineType = existingDocument.RootElement.GetProperty("machineType").GetString();
+                    if (string.Equals(existingMachineType, machineType, StringComparison.OrdinalIgnoreCase))
+                        Directory.Delete(existingDirectory, true);
+                }
+                catch (JsonException)
+                {
+                    // Invalid third-party packages are left untouched for the runtime diagnostics.
+                }
+            }
+        }
+    }
     private static void CreateShortcuts(string installDirectory)
     {
         var desktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
-        var startMenu = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "IceBot");
+        var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "IceBot");
         Directory.CreateDirectory(startMenu);
-
         CreateShortcut(Path.Combine(desktop, "IceBot.lnk"), Path.Combine(installDirectory, "IceBot.exe"), installDirectory);
         CreateShortcut(Path.Combine(desktop, "Init IceBot.lnk"), Path.Combine(installDirectory, "InitIceBot.exe"), installDirectory);
         CreateShortcut(Path.Combine(startMenu, "IceBot.lnk"), Path.Combine(installDirectory, "IceBot.exe"), installDirectory);
@@ -284,10 +433,9 @@ internal static class Program
     private static void CreateShortcut(string shortcutPath, string targetPath, string workingDirectory)
     {
         var shellType = Type.GetTypeFromProgID("WScript.Shell")
-            ?? throw new InvalidOperationException("Windows Script Host không khả dụng để tạo shortcut.");
+            ?? throw new InvalidOperationException("Windows Script Host không khả dụng.");
         var shell = Activator.CreateInstance(shellType)
             ?? throw new InvalidOperationException("Không thể khởi tạo Windows Script Host.");
-
         try
         {
             var shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath })
@@ -325,6 +473,37 @@ internal static class Program
             throw new InvalidOperationException($"Không thể {operation} (exit code {process.ExitCode}).");
     }
 
+    private static int? RelaunchElevatedIfRequired(string[] args)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
+        if (principal.IsInRole(WindowsBuiltInRole.Administrator))
+            return null;
+
+        var executable = Environment.ProcessPath
+            ?? throw new InvalidOperationException("Không xác định được đường dẫn IceBot-Setup.exe.");
+        var info = new ProcessStartInfo
+        {
+            FileName = executable,
+            UseShellExecute = true,
+            Verb = "runas"
+        };
+        foreach (var argument in args)
+            info.ArgumentList.Add(argument);
+
+        try
+        {
+            using var process = Process.Start(info)
+                ?? throw new InvalidOperationException("Không thể yêu cầu quyền Administrator.");
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            throw new InvalidOperationException("Người dùng đã từ chối quyền Administrator.");
+        }
+    }
+
     private static string? GetArgument(string[] args, string name)
     {
         for (var index = 0; index < args.Length - 1; index++)
@@ -333,10 +512,13 @@ internal static class Program
         return null;
     }
 
+    private static bool HasArgument(string[] args, string name) =>
+        args.Any(argument => string.Equals(argument, name, StringComparison.OrdinalIgnoreCase));
+
     private static void PrintHeader()
     {
         Console.WriteLine("========================================");
-        Console.WriteLine("  ICEBOT SETUP | CÀI ĐẶT MÔI TRƯỜNG");
+        Console.WriteLine("  ICEBOT SETUP | CÀI ĐẶT HỆ THỐNG");
         Console.WriteLine("========================================");
     }
 

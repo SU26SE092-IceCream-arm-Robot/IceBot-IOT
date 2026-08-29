@@ -8,6 +8,8 @@ IceBot-IOT is the store-side Edge runtime for an IceBot kiosk. It pulls Cloud co
 
 The current demo uses one Fairino FR5 arm. Device identity and hardware reporting remain explicit so later versions can support other models or multiple robot devices without changing endpoint provisioning.
 
+The runtime home identity is `IceBot_Home`. Fairino controller Web 3.7.7 may return `143` or `-4` for its named-point query, so `FairinoLuaExecutor` contains the verified controller coordinates as a narrowly scoped fallback for that exact identity. Workflows move home before and after execution.
+
 ## Current Scope
 
 Implemented:
@@ -59,7 +61,7 @@ Setup.exe -> InitIceBot.exe -> IceBot.exe
 
 ### Setup.exe
 
-Owns machine installation only: prerequisites, NetBird, application files, mutable directories, ACLs, and shortcuts. It does not log in, register a kiosk/endpoint, provision mTLS, or start production.
+Owns machine installation only: prerequisites, NetBird, immutable application files, empty mutable directories, ACLs, shared drivers, and shortcuts. Packaging excludes build-machine `config`, certificates, data, drivers, and downloaded workflows; installation/upgrade is rejected while IceBot or InitIceBot is running. Bundled peripheral packages are installed under a canonical directory named by manifest `machineType`; upgrades remove legacy directories that declare the same `machineType`, while unrelated third-party packages are preserved. Setup does not log in, register a kiosk/endpoint, provision mTLS, or start production.
 
 ### InitIceBot.exe
 
@@ -67,11 +69,24 @@ Owns technician-authorized initialization:
 
 1. Persist the physical Kiosk Code.
 2. Connect NetBird.
-3. Resolve or register the kiosk.
-4. Resolve or create the Full Edge execution endpoint.
-5. Create/reuse the PFX and provision its fingerprint.
-6. Activate the kiosk when allowed.
-7. Send mTLS heartbeat and robot-device snapshot.
+3. Confirm robot identity/profile and configure one COM port per installed peripheral trigger.
+4. Resolve or register the kiosk.
+5. Resolve or create the Full Edge execution endpoint.
+6. Create/reuse the DPAPI-protected PFX and provision its fingerprint.
+7. Activate the kiosk when allowed.
+8. Send mTLS heartbeat and robot-device snapshot.
+The technician configuration UI is task-based:
+
+```text
+Configuration
+  -> First-time Edge setup / resume
+  -> Connectivity: Backend URL, NetBird, mTLS checks and certificate status
+  -> Devices: robot profile, peripheral registration, COM mapping and hardware report
+  -> Configuration status
+  -> Advanced recovery: deployment sync, hardware/report retry, heartbeat/readiness
+```
+
+Manual deployment synchronization and report flushing are recovery/diagnostic actions. They do not replace the unattended production command receiver and durable retry loops. Setup completion requires Kiosk, endpoint/runtime identities, HTTPS Backend URL, NetBird, an existing client PFX, and robot identity/profile. Production readiness additionally requires an active deployment/release/checksum and an existing active workflow directory. Backend-issued identities are not edited in normal settings menus.
 
 Endpoint identity provisioning must not depend on hardware compatibility. An endpoint may authenticate before its first hardware report.
 
@@ -108,7 +123,8 @@ Cloud communication is initiated by Edge over HTTPS/mTLS. NetBird provides priva
 | `EXECUTION_ENDPOINT_ID` | Edge command endpoint |
 | `FULL_EDGE_RUNTIME_ID` | Stable runtime identity |
 | `EXECUTION_CLIENT_CERT_PATH` | Local PFX path |
-| `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` | PFX password; environment-only |
+| `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` | Optional PFX password override; otherwise a random password is protected by Windows DPAPI |
+| PFX key storage | `UserKeySet | Exportable` for .NET Framework/Windows Schannel client authentication; never `EphemeralKeySet` |
 | `ROBOT_IP` / `ICEBOT_ROBOT_IP` | Robot IP; default `192.168.58.2` |
 
 If a public proxy does not forward client certificates, use a private HTTPS Backend URL reachable through NetBird.
@@ -134,7 +150,7 @@ MachineModelCode: FR5
 
 These are demo defaults, not registration constants. A later provider can report FR3, CR5, another runtime, or multiple devices without changing provisioning.
 
-The snapshot revision changes when the device signature changes. Hardware report answers what exists; readiness answers whether production can run now.
+The snapshot revision and `observedAt` change together when the device signature changes. Retries of unchanged content reuse both values so Backend treats reconnect delivery as idempotent instead of rejecting the same revision with different content. Hardware report answers what exists; readiness answers whether production can run now.
 
 ## Lua and Compatibility Boundary
 
@@ -166,7 +182,7 @@ Published release
   -> durable Installed and Active reports
 ```
 
-`FullEdgeConfigurationInstaller` owns installation. `DeploymentReportOutbox` prevents successful local installation from losing Cloud evidence during network failure.
+`FullEdgeConfigurationInstaller` owns installation. `DeploymentReportOutbox` prevents successful local installation from losing Cloud evidence during network failure. Deployment acknowledgements omit `physicalOutputMayHaveOccurred`; Backend permits that evidence only for a rejected `ExecuteOrder`, where Edge reports `false` before any production starts. Deployment outbox delivery is ordered by durable `SequenceNumber`, preserving the required `Installed` then `Active` transition even though filenames sort differently.
 
 ## Order Execution and Recovery
 
@@ -179,6 +195,7 @@ Invariants:
 - Backend supplies artifact order; Edge never reorders it;
 - referenced Lua must exist and match checksum;
 - duplicate delivery is idempotent by `CommandId`;
+- durable jobs left at `AwaitingAck` replay the idempotent Backend ACK after restart before queue activation;
 - interrupted `Running` work is not silently restarted;
 - uncertain physical output requires manual intervention;
 - report sequence numbers are persisted and monotonic.
@@ -201,7 +218,7 @@ $env:ICEBOT_SIMULATED_STEP_DELAY_MS = "150"
 $env:ICEBOT_SIMULATED_FAIL_STEP = "0"
 ```
 
-Simulation exercises the real inbox, durable queue, state transitions, and outbox without a physical FR5. It is Development/test evidence, not physical E2E proof.
+Simulation exercises the real inbox, durable queue, state transitions, and outbox without a physical FR5. In this mode `TriggerDevice` validates that a matching plugin exists but does not open the configured COM port or call the hardware driver; completed/failed evidence reports `physicalOutputMayHaveOccurred=false`. Production Lua may use the legacy `icemachine` identifier, which is canonicalized to the installed `ice_cream` driver. The automated lifecycle test validates checksum, immutable receipt, durable admission, ACK recovery, ordered plan execution, and `Accepted -> Running -> Completed` reports. It is Development/test evidence, not physical E2E proof.
 
 ## Peripheral Machines and Inventory
 
@@ -264,6 +281,7 @@ Simulation may explicitly report simulated safety. Physical mode must not claim 
 .\code\scripts\restore-fairino-sdk-dependencies.ps1
 dotnet build .\code\IceBot-IOT.sln -c Debug --no-restore
 dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Debug --no-build
+# Latest verified result: 109 passed, 0 failed, 0 skipped
 ```
 
 Run:
@@ -285,6 +303,7 @@ A real Backend plus simulated robot validates the software path through payment,
 - Keep sensor topology optional.
 - Persist state/evidence before acknowledging irreversible work.
 - Keep robot execution serial until multi-customer operation is explicitly designed.
+- Keep README, this project context, unit tests, and `testing/UNIT_TEST_REPORT.md` synchronized with behavior changes.
 - Treat uncertain physical output as manual intervention, never blind retry.
 
 ## Technology

@@ -26,7 +26,7 @@ namespace IceBot.Harness.Tests
         public void PreserveBackendDeviceIdentities_CreatesIndependentDictionary()
         {
             var current = new SiteSettings();
-            current.MachineDeviceIds["cup_dropping"] = Guid.NewGuid();
+            current.MachineDeviceIds["bt_cup_l90"] = Guid.NewGuid();
             var updated = new SiteSettings();
 
             ConfigSetupWizard.PreserveBackendDeviceIdentities(current, updated);

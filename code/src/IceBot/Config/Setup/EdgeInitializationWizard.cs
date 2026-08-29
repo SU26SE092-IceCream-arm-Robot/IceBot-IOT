@@ -9,12 +9,12 @@ namespace IceBot.Config
         {
             Console.WriteLine();
             Console.WriteLine("=== KHOI TAO MAY EDGE ===");
-            Console.WriteLine("Buoc 1/6: Xac dinh Kiosk Code");
+            Console.WriteLine("Buoc 1/7: Xac dinh Kiosk Code");
             var settings = SiteConfigStore.Load();
             if (!EnsureKioskCode(settings)) return;
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 2/6: Ket noi NetBird");
+            Console.WriteLine("Buoc 2/7: Ket noi NetBird");
             if (!ConfigSetupWizard.RunNetBird())
             {
                 Console.WriteLine("[ERROR] Chua the dang ky Edge vi NetBird chua ket noi.");
@@ -22,7 +22,12 @@ namespace IceBot.Config
             }
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 3/6: Kiem tra/dang ky Kiosk voi BE");
+            Console.WriteLine("Buoc 3/7: Cau hinh Robot va cong COM");
+            ConfigSetupWizard.RunRobotSettings();
+            ConfigSetupWizard.RunMachinePortSettings();
+
+            Console.WriteLine();
+            Console.WriteLine("Buoc 4/7: Kiem tra/dang ky Kiosk voi BE");
             RegisterExecutionEndpointIfMissing();
         }
 
@@ -38,7 +43,7 @@ namespace IceBot.Config
             Guid? backendProfileIdentity = null;
             if (settings.ExecutionEndpointId != Guid.Empty)
             {
-                Console.WriteLine("Buoc 4/6: Kiem tra Execution Endpoint");
+                Console.WriteLine("Buoc 5/7: Kiem tra Execution Endpoint");
                 Console.WriteLine($"[OK] Edge da co Execution Endpoint ID: {settings.ExecutionEndpointId:D}");
                 var current = api.GetEndpoint(kioskId, settings.ExecutionEndpointId);
                 if (!current.Success)
@@ -52,7 +57,7 @@ namespace IceBot.Config
             }
             else
             {
-                Console.WriteLine("Buoc 4/6: Dang ky Execution Endpoint");
+                Console.WriteLine("Buoc 5/7: Dang ky Execution Endpoint");
                 var endpointCode = ExecutionEndpointRegistrationApi.BuildEndpointCode(Environment.MachineName);
                 Console.WriteLine($"Dang ky ma Edge: {endpointCode}");
                 var result = api.FindOrCreate(kioskId, endpointCode);
@@ -73,7 +78,7 @@ namespace IceBot.Config
             settings.KioskId = kioskId;
             SiteConfigStore.Save(settings);
             Console.WriteLine();
-            Console.WriteLine("Buoc 5/6: Provision mTLS");
+            Console.WriteLine("Buoc 6/7: Provision mTLS");
             CompleteMutualTls(api, settings, endpointStatus, backendProfileIdentity);
         }
 
@@ -153,7 +158,7 @@ namespace IceBot.Config
         private static void ActivateKioskAndProbe(ExecutionEndpointRegistrationApi api, SiteSettings settings)
         {
             Console.WriteLine();
-            Console.WriteLine("Buoc 6/6: Kich hoat kiosk va kiem tra ket noi");
+            Console.WriteLine("Buoc 7/7: Kich hoat kiosk va kiem tra ket noi");
             var activation = api.ActivateKiosk(settings.KioskId);
             if (!activation.Success)
             {

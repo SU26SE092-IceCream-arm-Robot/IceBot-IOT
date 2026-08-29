@@ -21,6 +21,7 @@ namespace IceBot.Config
         public string PrimaryRobotMachineModelCode { get; set; } = "FR5";
         public long ReportedDevicesSnapshotRevision { get; set; }
         public string ReportedDevicesSnapshotSignature { get; set; } = string.Empty;
+        public DateTimeOffset? ReportedDevicesSnapshotObservedAt { get; set; }
 
         // Operator tokens are separate from the Edge device credential. StorePassword remains
         // only for migration from older config and is cleared after a successful login.

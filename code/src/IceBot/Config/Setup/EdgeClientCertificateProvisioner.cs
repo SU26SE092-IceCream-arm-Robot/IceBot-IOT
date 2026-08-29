@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace IceBot.Config
 {
@@ -28,13 +29,24 @@ namespace IceBot.Config
 
                 if (File.Exists(path))
                 {
-                    using (var existing = Load(path))
+                    var existingPassword = ResolveExistingPassword(path);
+                    using (var existing = Load(path, existingPassword))
                     {
                         if (!existing.HasPrivateKey)
                             return Fail("File PFX hien tai khong chua private key.");
                         if (DateTime.UtcNow < existing.NotBefore.ToUniversalTime() ||
                             DateTime.UtcNow >= existing.NotAfter.ToUniversalTime())
                             return Fail("Chung chi mTLS hien tai chua co hieu luc hoac da het han.");
+
+                        if (string.IsNullOrEmpty(GetEnvironmentPassword()) &&
+                            !File.Exists(PasswordSidecarPath(path)))
+                        {
+                            var migratedPassword = CreateAndPersistPassword(path);
+                            File.WriteAllBytes(path, existing.Export(X509ContentType.Pfx, migratedPassword));
+                            using (var migrated = Load(path, migratedPassword))
+                                return Success(path, migrated, "Da ma hoa lai va tai su dung chung chi mTLS hien co.");
+                        }
+
                         return Success(path, existing, "Tai su dung chung chi mTLS da co.");
                     }
                 }
@@ -55,12 +67,10 @@ namespace IceBot.Config
                     using (var certificate = request.CreateSelfSigned(
                         DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(5)))
                     {
-                        // Password is optional and environment-only. With no environment value the
-                        // generated PFX is passwordless, keeping the first-run flow non-interactive.
-                        File.WriteAllBytes(path, certificate.Export(
-                            X509ContentType.Pfx, GetPfxPassword()));
-                        using (var persisted = Load(path))
-                            return Success(path, persisted, "Da tao chung chi client mTLS tren Edge.");
+                        var password = GetOrCreatePassword(path);
+                        File.WriteAllBytes(path, certificate.Export(X509ContentType.Pfx, password));
+                        using (var persisted = Load(path, password))
+                            return Success(path, persisted, "Da tao chung chi client mTLS duoc bao ve tren Edge.");
                     }
                 }
             }
@@ -77,12 +87,40 @@ namespace IceBot.Config
                     .Replace("-", string.Empty).ToLowerInvariant();
         }
 
-        private static X509Certificate2 Load(string path) => new X509Certificate2(
-            path,
-            GetPfxPassword(),
-            X509KeyStorageFlags.EphemeralKeySet);
+        private static X509Certificate2 Load(string path, string? password) => new X509Certificate2(
+            path, password, X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable);
 
-        private static string? GetPfxPassword() =>
+        internal static X509Certificate2 LoadForMtls(string path) =>
+            Load(path, ResolveExistingPassword(path));
+
+        internal static string PasswordSidecarPath(string pfxPath) => pfxPath + ".password.dpapi";
+
+        private static string? ResolveExistingPassword(string path)
+        {
+            var environmentPassword = GetEnvironmentPassword();
+            if (!string.IsNullOrEmpty(environmentPassword)) return environmentPassword;
+            var sidecar = PasswordSidecarPath(path);
+            if (!File.Exists(sidecar)) return null;
+            var protectedBytes = File.ReadAllBytes(sidecar);
+            var clearBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(clearBytes);
+        }
+
+        private static string GetOrCreatePassword(string path) =>
+            ResolveExistingPassword(path) ?? CreateAndPersistPassword(path);
+
+        private static string CreateAndPersistPassword(string path)
+        {
+            var random = new byte[32];
+            using (var generator = RandomNumberGenerator.Create()) generator.GetBytes(random);
+            var password = Convert.ToBase64String(random);
+            var protectedBytes = ProtectedData.Protect(
+                Encoding.UTF8.GetBytes(password), null, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(PasswordSidecarPath(path), protectedBytes);
+            return password;
+        }
+
+        private static string? GetEnvironmentPassword() =>
             string.IsNullOrEmpty(AppConfig.ExecutionClientCertificatePassword)
                 ? null
                 : AppConfig.ExecutionClientCertificatePassword;

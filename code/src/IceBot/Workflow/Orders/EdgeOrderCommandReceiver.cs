@@ -33,10 +33,39 @@ namespace IceBot.Workflow
         {
             while (!_stop.WaitOne(0))
             {
-                try { PullOnce(); }
+                try
+                {
+                    RecoverAwaitingAcknowledgements(
+                        AppConfig.GetOrderJobsDirectory(),
+                        EdgeDeploymentApi.AcknowledgeAccepted);
+                    PullOnce();
+                }
                 catch (Exception ex) { Console.WriteLine("[ORDER-PULL] " + ex.Message); }
                 _stop.WaitOne(TimeSpan.FromSeconds(5));
             }
+        }
+
+        internal static int RecoverAwaitingAcknowledgements(
+            string jobsDirectory,
+            Action<Guid> acknowledgeAccepted) =>
+            RecoverAwaitingAcknowledgements(
+                jobsDirectory, acknowledgeAccepted, ProductionReportOutbox.Enqueue);
+
+        internal static int RecoverAwaitingAcknowledgements(
+            string jobsDirectory,
+            Action<Guid> acknowledgeAccepted,
+            ProductionReportSink enqueueReport)
+        {
+            var recovered = 0;
+            foreach (var job in EdgeOrderExecutionQueue.LoadAll(jobsDirectory))
+            {
+                if (!string.Equals(job.Status, "AwaitingAck", StringComparison.Ordinal)) continue;
+                acknowledgeAccepted(job.CommandId);
+                EdgeOrderExecutionQueue.Activate(job.CommandId, jobsDirectory, enqueueReport);
+                recovered++;
+                Console.WriteLine($"[ORDER-PULL] Da khoi phuc ACK cho command {job.CommandId:D}.");
+            }
+            return recovered;
         }
 
         internal static int PullOnce()
@@ -115,7 +144,7 @@ namespace IceBot.Workflow
                 return;
             }
 
-            EdgeDeploymentApi.AcknowledgeRejected(command.CommandId, "DeploymentInstallRejected", result.Message);
+            EdgeDeploymentApi.AcknowledgeDeploymentRejected(command.CommandId, "DeploymentInstallRejected", result.Message);
             Console.WriteLine("[DEPLOYMENT] Tu choi " + command.CommandId.ToString("D") + ": " + result.Message);
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -62,7 +63,7 @@ namespace IceBot.Workflow
             {
                 var directory = Path.Combine(AppConfig.GetReportOutboxDirectory(), "deployments");
                 if (!Directory.Exists(directory)) return;
-                foreach (var path in Directory.GetFiles(directory, "*.json").OrderBy(item => item, StringComparer.Ordinal))
+                foreach (var path in ListPendingInDeliveryOrder(directory))
                 {
                     DeploymentReportData report;
                     try
@@ -93,6 +94,23 @@ namespace IceBot.Workflow
                     }
                 }
             }
+        }
+
+        internal static IReadOnlyList<string> ListPendingInDeliveryOrder(string directory) =>
+            Directory.GetFiles(directory, "*.json")
+                .OrderBy(ReadSequenceForOrdering)
+                .ThenBy(item => item, StringComparer.Ordinal)
+                .ToArray();
+
+        private static long ReadSequenceForOrdering(string path)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<DeploymentReportData>(File.ReadAllText(path), JsonOptions)
+                    ?.SequenceNumber ?? long.MaxValue;
+            }
+            catch (JsonException) { return long.MaxValue; }
+            catch (IOException) { return long.MaxValue; }
         }
 
         private static void Quarantine(string path, Exception exception)

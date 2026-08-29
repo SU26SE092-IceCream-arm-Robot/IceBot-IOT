@@ -39,6 +39,14 @@ namespace IceBot.Workflow
         public List<ReceivedArtifact> Artifacts { get; set; } = new List<ReceivedArtifact>();
     }
 
+    internal delegate void ProductionReportSink(
+        DurableOrderJob job,
+        DurableProductionUnit unit,
+        string status,
+        bool physicalOutputMayHaveOccurred,
+        string? errorCode,
+        string? errorMessage);
+
     internal static class EdgeOrderExecutionQueue
     {
         private static readonly object Gate = new object();
@@ -92,7 +100,10 @@ namespace IceBot.Workflow
             }
         }
 
-        public static void Activate(Guid commandId, string jobsDirectory)
+        public static void Activate(Guid commandId, string jobsDirectory) =>
+            Activate(commandId, jobsDirectory, ProductionReportOutbox.Enqueue);
+
+        internal static void Activate(Guid commandId, string jobsDirectory, ProductionReportSink enqueueReport)
         {
             lock (Gate)
             {
@@ -101,11 +112,19 @@ namespace IceBot.Workflow
                 job.Status = "Pending";
                 Save(job, jobsDirectory);
                 foreach (var unit in job.Units)
-                    ProductionReportOutbox.Enqueue(job, unit, "Accepted", false, null, null);
+                    enqueueReport(job, unit, "Accepted", false, null, null);
             }
         }
 
         public static void RecoverInterruptedJobs(string jobsDirectory)
+        {
+            RecoverInterruptedJobs(jobsDirectory, (job, unit) =>
+                ProductionReportOutbox.Enqueue(job, unit, unit.Status, PhysicalOutputMayHaveOccurred(), unit.ErrorCode, unit.ErrorMessage));
+        }
+
+        internal static void RecoverInterruptedJobs(
+            string jobsDirectory,
+            Action<DurableOrderJob, DurableProductionUnit> enqueueRecoveryReport)
         {
             lock (Gate)
             {
@@ -126,7 +145,7 @@ namespace IceBot.Workflow
                         job.Status = "RequiresManualIntervention";
                         Save(job, jobsDirectory);
                         foreach (var unit in recovered)
-                            ProductionReportOutbox.Enqueue(job, unit, unit.Status, true, unit.ErrorCode, unit.ErrorMessage);
+                            enqueueRecoveryReport(job, unit);
                     }
                 }
             }
@@ -151,7 +170,13 @@ namespace IceBot.Workflow
             }
         }
 
-        public static DurableProductionUnit BeginNextUnit(DurableOrderJob selected, string jobsDirectory)
+        public static DurableProductionUnit BeginNextUnit(DurableOrderJob selected, string jobsDirectory) =>
+            BeginNextUnit(selected, jobsDirectory, ProductionReportOutbox.Enqueue);
+
+        internal static DurableProductionUnit BeginNextUnit(
+            DurableOrderJob selected,
+            string jobsDirectory,
+            ProductionReportSink enqueueReport)
         {
             lock (Gate)
             {
@@ -161,12 +186,19 @@ namespace IceBot.Workflow
                 unit.StartedAt = DateTimeOffset.UtcNow;
                 job.Status = "Running";
                 Save(job, jobsDirectory);
-                ProductionReportOutbox.Enqueue(job, unit, "Running", false, null, null);
+                enqueueReport(job, unit, "Running", false, null, null);
                 return unit;
             }
         }
 
-        public static void CompleteUnit(Guid commandId, Guid sourceJobId, string jobsDirectory)
+        public static void CompleteUnit(Guid commandId, Guid sourceJobId, string jobsDirectory) =>
+            CompleteUnit(commandId, sourceJobId, jobsDirectory, ProductionReportOutbox.Enqueue);
+
+        internal static void CompleteUnit(
+            Guid commandId,
+            Guid sourceJobId,
+            string jobsDirectory,
+            ProductionReportSink enqueueReport)
         {
             lock (Gate)
             {
@@ -176,7 +208,7 @@ namespace IceBot.Workflow
                 unit.CompletedAt = DateTimeOffset.UtcNow;
                 job.Status = job.Units.All(item => item.Status == "Completed") ? "Completed" : "Pending";
                 Save(job, jobsDirectory);
-                ProductionReportOutbox.Enqueue(job, unit, "Completed", true, null, null);
+                enqueueReport(job, unit, "Completed", PhysicalOutputMayHaveOccurred(), null, null);
             }
         }
 
@@ -192,9 +224,12 @@ namespace IceBot.Workflow
                 unit.ErrorMessage = error.Message;
                 job.Status = "Failed";
                 Save(job, jobsDirectory);
-                ProductionReportOutbox.Enqueue(job, unit, "Failed", true, unit.ErrorCode, unit.ErrorMessage);
+                ProductionReportOutbox.Enqueue(job, unit, "Failed", PhysicalOutputMayHaveOccurred(), unit.ErrorCode, unit.ErrorMessage);
             }
         }
+
+        internal static bool PhysicalOutputMayHaveOccurred() =>
+            AppConfig.RobotExecutionMode != Robot.RobotExecutionMode.Simulated;
 
         internal static IReadOnlyList<DurableOrderJob> LoadAll(string directory)
         {

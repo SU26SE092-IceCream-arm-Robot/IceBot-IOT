@@ -37,10 +37,7 @@ namespace IceBot.Api
 
             try
             {
-                using (var certificate = new X509Certificate2(
-                    settings.ExecutionClientCertificatePath,
-                    AppConfig.ExecutionClientCertificatePassword,
-                    X509KeyStorageFlags.DefaultKeySet))
+                using (var certificate = EdgeClientCertificateProvisioner.LoadForMtls(settings.ExecutionClientCertificatePath))
                 using (var handler = new HttpClientHandler())
                 {
                     handler.ClientCertificates.Add(certificate);
@@ -97,15 +94,15 @@ namespace IceBot.Api
 
                 var signature = string.Join("|", devices.Select(item =>
                     $"{item.SourceDeviceKey}:{item.DeviceId:D}:{item.RuntimeTargetCode}:{item.MachineModelCode}"));
-                var snapshotRevision = SiteConfigStore.GetReportedDevicesSnapshotRevision(signature);
+                var snapshot = SiteConfigStore.GetReportedDevicesSnapshotVersion(signature);
 
                 try
                 {
                     using (var content = new StringContent(JsonSerializer.Serialize(new
                     {
                         sourceExecutorId = settings.FullEdgeRuntimeId,
-                        snapshotRevision,
-                        observedAt = DateTimeOffset.UtcNow,
+                        snapshotRevision = snapshot.Revision,
+                        observedAt = snapshot.ObservedAt,
                         devices = devices.Select(item => new
                         {
                             sourceDeviceKey = item.SourceDeviceKey,
@@ -125,7 +122,7 @@ namespace IceBot.Api
                             return false;
                         }
 
-                        message = $"BE da nhan hardware snapshot revision {snapshotRevision} ({devices.Length} device).";
+                        message = $"BE da nhan hardware snapshot revision {snapshot.Revision} ({devices.Length} device).";
                         return true;
                     }
                 }
@@ -309,10 +306,7 @@ namespace IceBot.Api
 
             try
             {
-                var certificate = new X509Certificate2(
-                    settings.ExecutionClientCertificatePath,
-                    AppConfig.ExecutionClientCertificatePassword,
-                    X509KeyStorageFlags.DefaultKeySet);
+                var certificate = EdgeClientCertificateProvisioner.LoadForMtls(settings.ExecutionClientCertificatePath);
                 var handler = new HttpClientHandler();
                 handler.ClientCertificates.Add(certificate);
                 client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };

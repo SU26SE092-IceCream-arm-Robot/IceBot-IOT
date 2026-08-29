@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using IceBot.Config;
 using IceBot.Robot;
+using IceBot.Workflow;
 using Xunit;
 
 namespace IceBot.Harness.Tests
@@ -63,6 +64,23 @@ namespace IceBot.Harness.Tests
                 Environment.SetEnvironmentVariable("ICEBOT_ROBOT_EXECUTION_MODE", originalMode);
                 Environment.SetEnvironmentVariable("ICEBOT_SIMULATED_FAIL_STEP", originalStep);
                 File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void Simulator_AlsoSimulatesPeripheralsAndReportsNoPhysicalOutput()
+        {
+            var original = Environment.GetEnvironmentVariable("ICEBOT_ROBOT_EXECUTION_MODE");
+            try
+            {
+                Environment.SetEnvironmentVariable("ICEBOT_ROBOT_EXECUTION_MODE", "Simulated");
+
+                Assert.True(WorkflowRunner.IsPeripheralSimulationEnabled);
+                Assert.False(EdgeOrderExecutionQueue.PhysicalOutputMayHaveOccurred());
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("ICEBOT_ROBOT_EXECUTION_MODE", original);
             }
         }
 

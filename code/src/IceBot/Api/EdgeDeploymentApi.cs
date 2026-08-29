@@ -82,6 +82,11 @@ namespace IceBot.Api
 
         public static void AcknowledgeRejected(Guid commandId, string code, string message)
         {
+            Acknowledge(commandId, "Rejected", false, code, message, false);
+        }
+
+        public static void AcknowledgeDeploymentRejected(Guid commandId, string code, string message)
+        {
             Acknowledge(commandId, "Rejected", false, code, message);
         }
 
@@ -191,10 +196,7 @@ namespace IceBot.Api
         private static T Send<T>(string relativePath, object body)
         {
             ValidateConfiguration(out var baseUri, out var endpointId, out var certificatePath);
-            var certificate = new X509Certificate2(
-                certificatePath,
-                AppConfig.ExecutionClientCertificatePassword,
-                X509KeyStorageFlags.DefaultKeySet);
+            var certificate = EdgeClientCertificateProvisioner.LoadForMtls(certificatePath);
             if (!certificate.HasPrivateKey)
                 throw new InvalidOperationException("Execution client certificate does not contain a private key.");
 
@@ -222,19 +224,33 @@ namespace IceBot.Api
             string status,
             bool localStatePersisted,
             string? rejectionCode = null,
-            string? rejectionMessage = null)
+            string? rejectionMessage = null,
+            bool? physicalOutputMayHaveOccurred = null)
         {
             Send<object>(
                 $"commands/{commandId:D}/ack",
-                new
-                {
-                    ackStatus = status,
-                    acknowledgedAt = DateTimeOffset.UtcNow,
-                    rejectionCode,
-                    rejectionMessage,
-                    physicalOutputMayHaveOccurred = false,
-                    localStatePersisted
-                });
+                BuildAcknowledgementBody(status, localStatePersisted, rejectionCode,
+                    rejectionMessage, physicalOutputMayHaveOccurred));
+        }
+
+        internal static IReadOnlyDictionary<string, object?> BuildAcknowledgementBody(
+            string status,
+            bool localStatePersisted,
+            string? rejectionCode,
+            string? rejectionMessage,
+            bool? physicalOutputMayHaveOccurred)
+        {
+            var body = new Dictionary<string, object?>
+            {
+                ["ackStatus"] = status,
+                ["acknowledgedAt"] = DateTimeOffset.UtcNow,
+                ["rejectionCode"] = rejectionCode,
+                ["rejectionMessage"] = rejectionMessage,
+                ["localStatePersisted"] = localStatePersisted
+            };
+            if (physicalOutputMayHaveOccurred.HasValue)
+                body["physicalOutputMayHaveOccurred"] = physicalOutputMayHaveOccurred.Value;
+            return body;
         }
 
         private static void ValidateConfiguration(out Uri baseUri, out Guid endpointId, out string certificatePath)

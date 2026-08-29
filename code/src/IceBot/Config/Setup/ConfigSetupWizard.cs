@@ -112,6 +112,53 @@ namespace IceBot.Config
             PrintSummary(settings);
         }
 
+        public static void RunBackendSettings()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== CAU HINH BACKEND ===");
+            Console.WriteLine("Nhan ENTER de giu gia tri hien tai.");
+            Console.WriteLine();
+
+            var settings = SiteConfigStore.Load();
+            settings.BeApiUrl = Prompt("Backend API URL HTTPS qua NetBird", settings.BeApiUrl);
+            SiteConfigStore.Save(settings);
+            Console.WriteLine("[OK] Da luu cau hinh Backend.");
+        }
+
+        public static void RunRobotSettings()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== CAU HINH ROBOT ===");
+            Console.WriteLine("Nhan ENTER de giu gia tri hien tai.");
+            Console.WriteLine();
+
+            var settings = SiteConfigStore.Load();
+            settings.RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(settings.RobotIp) ? AppConfig.DefaultRobotIp : settings.RobotIp);
+            settings.PrimaryRobotSourceDeviceKey = Prompt("Source device key", settings.PrimaryRobotSourceDeviceKey);
+            settings.PrimaryRobotRuntimeTargetCode = Prompt("Runtime target code", settings.PrimaryRobotRuntimeTargetCode);
+            settings.PrimaryRobotMachineModelCode = Prompt("Machine model code", settings.PrimaryRobotMachineModelCode);
+            SiteConfigStore.Save(settings);
+            Console.WriteLine("[OK] Da luu cau hinh robot.");
+        }
+
+        public static void RunMachinePortSettings()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== CAU HINH CONG COM ===");
+            Console.WriteLine("Nhan ENTER de giu gia tri hien tai; nhap '-' de xoa cong da luu.");
+            Console.WriteLine();
+
+            var settings = SiteConfigStore.Load();
+            foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
+            {
+                var current = settings.GetMachinePort(trigger.MachineType);
+                var port = Prompt($"COM port {trigger.DisplayName}", current);
+                if (port == "-") settings.MachinePorts.Remove(trigger.MachineType);
+                else if (!string.IsNullOrWhiteSpace(port)) settings.MachinePorts[trigger.MachineType] = port;
+            }
+            SiteConfigStore.Save(settings);
+            Console.WriteLine("[OK] Da luu cau hinh cong COM.");
+        }
         internal static void PreserveBackendDeviceIdentities(SiteSettings current, SiteSettings updated)
         {
             updated.KioskCode = current.KioskCode;
@@ -169,8 +216,7 @@ namespace IceBot.Config
         {
             var hasValue = !string.IsNullOrWhiteSpace(current);
             Console.Write($"{label}{(hasValue ? " [****]" : "")}: ");
-            var input = Console.ReadLine()?.Trim() ?? string.Empty;
-            return string.IsNullOrEmpty(input) ? current : input;
+            return ConsoleSecretReader.Read(current);
         }
     }
 }

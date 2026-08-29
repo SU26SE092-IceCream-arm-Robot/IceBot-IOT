@@ -18,10 +18,10 @@ Copy-Item -LiteralPath $builtAssembly -Destination $packagedAssembly -Force
 $sha256 = (Get-FileHash -LiteralPath $packagedAssembly -Algorithm SHA256).Hash.ToLowerInvariant()
 $manifest = [ordered]@{
     schemaVersion = 1
-    machineType = "cup_dropping"
+    machineType = "bt_cup_l90"
     assembly = $assemblyName
     entryType = "IceBot.Driver.CupDropping.CupDroppingDriver"
-    driverVersion = "1.0.0"
+    driverVersion = "1.0.1"
     sha256 = $sha256
 }
 $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputDirectory "driver.json") -Encoding UTF8

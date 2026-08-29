@@ -27,8 +27,9 @@ dotnet test harness/IceBot.Harness.Tests           # unit tests for pure logic (
 
 ## Key invariants (don't break these)
 
-- **Every `.lua` step belongs to exactly one machine identifier** (`MachineRegistry`). No
-  step is machine-less.
+- Production `.lua` files are constrained `ICEBOT_WORKFLOW_V1` artifacts interpreted by Edge.
+  They may contain zero or more explicit `TriggerDevice(machineType, command)` instructions;
+  artifact filenames no longer implicitly trigger a machine.
 - **`IMachineModule`** = every machine (identity: `MachineType`, `DisplayName`,
   `StepNames`). **`IMachineTrigger : IMachineModule`** = only machines wired over serial
   (adds `Trigger(comPort)` **and** `TestConnection(comPort)` — both mandatory on the interface).
@@ -45,13 +46,11 @@ dotnet test harness/IceBot.Harness.Tests           # unit tests for pure logic (
   separate hardware to control (pure arm motion, e.g. a tray-placement position) is exempt —
   it implements only `IMachineModule`, no `IMachineTrigger`.
 - **`robot_home` is a teaching point saved on the robot controller (Fairino app), NOT a `.lua`
-  file.** `FairinoLuaExecutor.MoveToTeachingPoint` reads it via SDK `GetRobotTeachingPoint` +
-  `MoveJ`. `WorkflowRunner` returns there at the start and end of every queue run.
-- **Peripheral trigger fires AFTER the step's `.lua` runs** (arm moves into position first,
-  then IceBot sends the RS485 command). They are not alternatives.
-- Each production `.lua` is a simple start→end path (no round-trip), so chaining files
-  back-to-back is naturally continuous — no merge step needed. `workflow/lay_coc.lua` is a
-  round-trip DEMO, not a template.
+  file.** Edge reads it via SDK `GetRobotTeachingPoint` + `MoveJ`; `WorkflowRunner` returns there
+  at the start and end of every plan.
+- Edge composes every BE-ordered artifact into one finite typed execution plan before hardware
+  access. `MoveJ`/`MoveL`/DO calls go directly through the Fairino C# SDK; `TriggerDevice` goes
+  through the matching driver DLL. Production never uses `LuaUpload`/`ProgramRun`.
 - **`SerialFrameCodec` checksum/framing is safety-critical** — a wrong byte silently corrupts a
   hardware command. Covered by harness tests against the documented example
   (`04 07 aa 01 00 B6 ff`). Run `dotnet test` after touching it.
@@ -63,10 +62,10 @@ dotnet test harness/IceBot.Harness.Tests           # unit tests for pure logic (
 request body (`OrderRequest`: `orderId` + `steps` = ordered list of `.lua` file names).
 IceBot does **not** map order contents (flavor/topping/qty) to step names and does **not**
 reorder `steps` — there is no machine-position/ordering logic left in IceBot at all (order
-is already correct as sent). IceBot's job is only: validate every named file exists in the
-local `workflow/` folder (400 `missing_lua_file` if not), then hand `steps` as-is to
-`OrderQueue.Enqueue` → a single background worker thread calls `WorkflowRunner.RunQueue` (kept
-off the HTTP thread, and serialized — the arm can't run two orders at once). Still open:
+is already correct as sent). IceBot validates every named file exists in local `workflow/`,
+preserves BE order and hands it to `OrderQueue.Enqueue`. The single background worker calls
+`WorkflowRunner.RunQueue`, which composes, validates and dispatches the plan instruction by
+instruction (off the HTTP thread and serialized — the arm can't run two orders at once). Still open:
 POSTing completion/failure status back to BE.
 
 ## Store login

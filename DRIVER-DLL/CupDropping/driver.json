@@ -1,8 +1,8 @@
 ﻿{
     "schemaVersion":  1,
-    "machineType":  "cup_dropping",
+    "machineType":  "bt_cup_l90",
     "assembly":  "IceBot.Driver.CupDropping.dll",
     "entryType":  "IceBot.Driver.CupDropping.CupDroppingDriver",
-    "driverVersion":  "1.0.0",
-    "sha256":  "e05fb14250bbfbc0c14b5cbe159cdf08167c5962b0c3478d5588cabd342d495a"
+    "driverVersion":  "1.0.1",
+    "sha256":  "b916fd49772d0ccb89db79ac08d46d9a4a4d8e2c74e43ddace0e477eab54a5b2"
 }

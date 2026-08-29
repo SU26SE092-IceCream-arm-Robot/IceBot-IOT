@@ -16,12 +16,16 @@ namespace IceBot.Machines
         public static IReadOnlyList<string> PluginErrors => PluginResult.Errors;
 
         private static readonly Dictionary<string, IMachineModule> ByStepName = BuildStepIndex();
+        private static readonly Dictionary<string, IMachineModule> ByMachineType = BuildMachineTypeIndex();
 
         public static bool TryGetModule(string stepFileName, out IMachineModule module)
         {
             var key = Path.GetFileNameWithoutExtension(stepFileName);
             return ByStepName.TryGetValue(key, out module!);
         }
+
+        public static bool TryGetModuleByMachineType(string machineType, out IMachineModule module) =>
+            ByMachineType.TryGetValue(MachineTypeCanonicalizer.Canonicalize(machineType), out module!);
 
         private static IReadOnlyList<IMachineModule> BuildModules()
         {
@@ -46,6 +50,13 @@ namespace IceBot.Machines
                     map[step] = module;
                 }
             }
+            return map;
+        }
+
+        private static Dictionary<string, IMachineModule> BuildMachineTypeIndex()
+        {
+            var map = new Dictionary<string, IMachineModule>(StringComparer.OrdinalIgnoreCase);
+            foreach (var module in Modules) map[module.MachineType] = module;
             return map;
         }
     }

@@ -9,7 +9,7 @@ namespace IceBot.Driver.CupDropping
     // for the actual serial protocol.
     public sealed class CupDroppingDriver : IMachineTrigger, IMachineDiagnostics
     {
-        public string MachineType => "cup_dropping";
+        public string MachineType => "bt_cup_l90";
 
         public string DisplayName => "May tha coc";
 

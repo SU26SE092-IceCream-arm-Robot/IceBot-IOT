@@ -94,6 +94,15 @@ namespace IceBot.Workflow
                 exception is IOException;
         }
 
+        internal static IReadOnlyList<string> InstallVerifiedBundle(
+            byte[] bundleBytes,
+            IReadOnlyCollection<DeploymentArtifactData> artifacts,
+            string workflowDir)
+        {
+            Directory.CreateDirectory(workflowDir);
+            var installed = ExtractVerifiedBundle(bundleBytes, artifacts, workflowDir, null);
+            return installed.SavedFiles;
+        }
         private static InstalledBundle InstallVerifiedBundle(
             byte[] bundleBytes,
             IReadOnlyCollection<DeploymentArtifactData> artifacts,
@@ -102,9 +111,20 @@ namespace IceBot.Workflow
             var workflowRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "workflow");
             var releasesDirectory = Path.Combine(workflowRoot, "releases");
             Directory.CreateDirectory(releasesDirectory);
+            return ExtractVerifiedBundle(bundleBytes, artifacts, releasesDirectory, deploymentId);
+        }
+
+        private static InstalledBundle ExtractVerifiedBundle(
+            byte[] bundleBytes,
+            IReadOnlyCollection<DeploymentArtifactData> artifacts,
+            string releasesDirectory,
+            Guid? deploymentId)
+        {
             var expected = artifacts.ToDictionary(item => item.RobotArtifactId);
             var stagingDir = Path.Combine(releasesDirectory, ".staging-" + Guid.NewGuid().ToString("N"));
-            var activeDirectory = Path.Combine(releasesDirectory, deploymentId.ToString("D") + "-" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            var activeDirectory = deploymentId.HasValue
+                ? Path.Combine(releasesDirectory, deploymentId.Value.ToString("D") + "-" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                : releasesDirectory;
             Directory.CreateDirectory(stagingDir);
             try
             {
@@ -143,7 +163,15 @@ namespace IceBot.Workflow
                     var fileName = Path.GetFileName(source);
                     saved.Add(fileName);
                 }
-                Directory.Move(stagingDir, activeDirectory);
+                if (deploymentId.HasValue)
+                {
+                    Directory.Move(stagingDir, activeDirectory);
+                }
+                else
+                {
+                    foreach (var source in Directory.GetFiles(stagingDir))
+                        File.Copy(source, Path.Combine(activeDirectory, Path.GetFileName(source)), true);
+                }
                 return new InstalledBundle(activeDirectory, saved);
             }
             finally

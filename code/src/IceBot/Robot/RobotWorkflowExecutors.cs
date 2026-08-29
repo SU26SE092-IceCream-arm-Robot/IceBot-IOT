@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using IceBot.Config;
+using IceBot.Workflow.Execution;
 
 namespace IceBot.Robot
 {
@@ -16,6 +17,9 @@ namespace IceBot.Robot
         void Connect();
         void MoveToTeachingPoint(string pointName);
         void RunScript(string localLuaPath);
+        void MoveJ(WorkflowInstruction instruction);
+        void MoveL(WorkflowInstruction instruction);
+        void SetDo(int index, int state, bool toolOutput);
     }
 
     internal static class RobotWorkflowExecutorFactory
@@ -61,6 +65,21 @@ namespace IceBot.Robot
                 throw new InvalidOperationException($"Simulated failure at Lua step {_stepNo}.");
         }
 
+        public void MoveJ(WorkflowInstruction instruction) => SimulateInstruction("MoveJ");
+        public void MoveL(WorkflowInstruction instruction) => SimulateInstruction("MoveL");
+        public void SetDo(int index, int state, bool toolOutput) =>
+            SimulateInstruction($"{(toolOutput ? "SetToolDO" : "SetDO")}({index}, {state})");
+
+        private void SimulateInstruction(string description)
+        {
+            EnsureConnected();
+            _stepNo++;
+            Console.WriteLine($"[SIMULATOR] Step {_stepNo}: {description}.");
+            if (AppConfig.SimulatedStepDelayMilliseconds > 0)
+                Thread.Sleep(AppConfig.SimulatedStepDelayMilliseconds);
+            if (AppConfig.SimulatedFailStep == _stepNo)
+                throw new InvalidOperationException($"Simulated failure at workflow step {_stepNo}.");
+        }
         public void Dispose() => _connected = false;
 
         private void EnsureConnected()

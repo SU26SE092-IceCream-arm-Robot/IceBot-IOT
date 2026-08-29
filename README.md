@@ -6,13 +6,13 @@ IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng
 
 ## Trạng thái quan trọng
 
-- `Setup.exe` là bootstrapper cài đặt: kiểm tra .NET Framework, cài NetBird, copy ứng dụng, tạo thư mục/quyền và shortcut.
+- `IceBot-Setup.exe` là bootstrapper cài đặt: kiểm tra .NET Framework, cài NetBird, copy ứng dụng, tạo thư mục/quyền và shortcut.
 - `IceBot.exe` là runtime sản xuất: tự mở server, kết nối NetBird và bắt đầu pull Order từ BE bằng mTLS. Không cần đăng nhập tài khoản cửa hàng để chạy.
 - `InitIceBot.exe` dành cho kỹ thuật viên: đăng nhập, khởi tạo Edge, cấu hình, đăng ký máy ngoại vi và kiểm tra phần cứng.
 - Đăng nhập thật với BE, đăng ký Kiosk/Execution Endpoint, cấp mTLS, kích hoạt Kiosk và heartbeat đã được triển khai.
 - mTLS `ExecuteOrder` đã có queue bền vững, kiểm tra đúng Kiosk/Endpoint/release/Lua, ACK `Accepted`, chạy lần lượt từng cây và gửi trạng thái về BE.
-- API cũ `POST /api/orders` có thể nhận danh sách tên file Lua và đưa vào hàng đợi chạy robot.
-- Đồng bộ Full Edge deployment tải bundle phát hành từ Backend, kiểm tra checksum rồi stage/activate trước khi nhận order. Nó chỉ chạy sau khi endpoint đã provision và đường HTTPS mTLS riêng cho Edge đã sẵn sàng.
+- API local cũ `POST /api/orders` đã bị loại bỏ; production chỉ có một lifecycle chuẩn là outbound mTLS command pull.
+- Đồng bộ Full Edge deployment tải bundle phát hành từ Backend, kiểm tra checksum rồi stage/activate trước khi nhận order. Runtime cũng pull `DeployConfiguration` cùng với các command khác; kỹ thuật viên không chép Lua thủ công vào thư mục workflow.
 - Trạng thái từng cây (`Accepted`, `Running`, `Completed`, `Failed`, `RequiresManualIntervention`) được lưu vào outbox bền vững và gửi về BE qua mTLS.
 
 ## Kiến trúc
@@ -20,7 +20,7 @@ IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng
 Dự án dùng **Modular Monolith theo nhóm chức năng**. Toàn bộ runtime vẫn được triển khai thành một ứng dụng Edge, nhưng code được chia theo trách nhiệm:
 
 ```text
-Setup.exe → InitIceBot.exe → IceBot.exe
+IceBot-Setup.exe → InitIceBot.exe → IceBot.exe
         │
         ├── Api             đăng nhập, API quản trị và mTLS
         ├── Config          kết nối, khởi tạo và lưu cấu hình
@@ -64,51 +64,65 @@ IceBot-IOT/
 │   │   │       └── Provisioning/       cài Full Edge bundle
 │   │   ├── IceBot.Driver.Abstractions/ contract công khai cho plugin
 │   │   ├── InitIceBot/                  entry point công cụ kỹ thuật
-│   │   └── IceBot.Setup/                bootstrapper tạo Setup.exe
+│   │   └── IceBot.Setup/                bootstrapper tạo IceBot-Setup.exe
 │   ├── test-workflow/                   Lua mẫu để test robot
 │   └── workflow/                        Lua production, site-local/gitignored
 ├── driver-sdk/                          hướng dẫn và template driver
-├── DRIVER-DLL/                          package driver build sẵn, không tự cài vào Edge
+├── DRIVER-DLL/                          package driver build sẵn, được nhúng vào bộ cài Edge
 ├── harness/                             test tự động
-├── context/PROJECT_CONTEXT.md           nguồn sự thật chi tiết của dự án
+├── context/                             context, architecture và test Lua
+│   ├── PROJECT_CONTEXT.md                nguồn sự thật chi tiết của dự án
+│   ├── GLOBAL_WORKING_CONTEXT.md        quy tắc làm việc chung
+│   ├── lua-tests/                        Lua dùng cho kiểm thử
+│   ├── protocols/                        protocol thiết bị
+│   ├── Hardware_Architecture/            tài liệu kiến trúc phần cứng
+│   └── System_Architecture/              tài liệu kiến trúc hệ thống
 ├── deploy/installer/                    script đóng gói Setup + payload
 ├── deploy/cloudflare/, deploy/duckdns/  legacy, không dùng trong flow mới
-├── docs/                                tài liệu giao thức phần cứng
 └── firmware/                            firmware liên quan
 ```
+
+## Tài liệu tham chiếu
+
+- Project context: `context/PROJECT_CONTEXT.md`
+- Global working context: `context/GLOBAL_WORKING_CONTEXT.md`
+- Protocols: `context/protocols/`
+- Hardware Architecture: `context/Hardware_Architecture/`
+- System Architecture: `context/System_Architecture/`
+- Lua test files: `context/lua-tests/`
 
 ## Yêu cầu
 
 - Windows 10/11.
 - Máy build cần .NET SDK hỗ trợ `.NET Framework 4.7.2` và `.NET 8`.
-- Máy Edge không cần SDK; `Setup.exe` tự kiểm tra .NET Framework runtime và cài NetBird.
+- Máy Edge không cần SDK; `IceBot-Setup.exe` tự kiểm tra .NET Framework runtime và cài NetBird.
 - Edge và Fairino FR5 cùng LAN; IP mặc định của Fairino là `192.168.58.2`.
-- USB-RS485/cổng COM và driver tương ứng cho các máy ngoại vi.
+- Cổng serial và driver tương ứng cho từng máy ngoại vi; transport có thể là RS232 hoặc RS485 theo protocol thiết bị.
 - Tài khoản cửa hàng do BE cấp và Kiosk Code riêng được in trên vỏ máy.
 
 ## Build và chạy
 
 ```powershell
 .\code\scripts\restore-fairino-sdk-dependencies.ps1
-dotnet build code/IceBot-IOT.sln
+dotnet build code/IceBot-IOT.sln --configuration Release
 ```
 
 Fairino C# SDK phụ thuộc assembly legacy `CookComputing.XmlRpcV2`. Package đã được lưu cùng
-repository tại `code/lib/fairino-csharp-sdk/packages`; chạy script restore một lần sau clean clone
+repository tại `code/lib/fairino-csharp-sdk-robot3.7.8/packages`; chạy script restore một lần sau clean clone
 trước khi build với `--no-restore`.
 
-Sau khi build Debug:
+Sau khi build Release:
 
 ```powershell
 # Runtime sản xuất: server + nhận Order
-code/src/IceBot/bin/Debug/net472/IceBot.exe
+code/src/IceBot/bin/Release/net472/IceBot.exe
 
 # Công cụ cấu hình và test dành cho kỹ thuật viên
-code/src/IceBot/bin/Debug/net472/InitIceBot.exe
+code/src/IceBot/bin/Release/net472/InitIceBot.exe
 ```
 
 `IceBot.exe serve` là alias tường minh của chế độ runtime. Hai file EXE phải nằm cùng thư mục để
-dùng chung `config/`, `certificates/`, `workflow/`, `test-workflow/` và `data/`. Driver là ngoại lệ:
+dùng chung `config/`, `certificates/`, `workflow/` và `data/`; các Lua kiểm thử nằm trong `context/lua-tests/`. Driver là ngoại lệ:
 cả bản dev và production đều đọc từ `C:\ProgramData\IceBot\drivers`.
 
 ### Tạo package cài đặt
@@ -117,7 +131,9 @@ cả bản dev và production đều đọc từ `C:\ProgramData\IceBot\drivers`
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\installer\build-package.ps1
 ```
 
-Package được tạo tại `artifacts/installer/IceBot-win-x64/`, gồm `Setup.exe` self-contained và thư mục `payload/`. Phải phân phối **cả thư mục**, không chỉ copy riêng `Setup.exe`.
+File cài đặt duy nhất được tạo tại `artifacts/installer/IceBot-win-x64/IceBot-Setup.exe`. Runtime, Fairino SDK `robot3.7.8`, driver `bt_cup_l90` và driver máy kem đều được nhúng trong file; chỉ cần phân phối file EXE này.
+
+Payload chỉ chứa runtime bất biến. Script đóng gói loại `config/`, `certificates/`, `data/`, `drivers/` và `workflow/` của máy build để không nhúng token, PFX, Order hay deployment cục bộ. Installer từ chối bundle chứa các thư mục mutable này.
 
 Máy Windows đã có .NET Framework 4.7.2+ thì không cần bộ cài framework. Để tạo package offline đầy đủ, truyền thêm đường dẫn bộ cài .NET Framework và NetBird:
 
@@ -132,32 +148,36 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\installer\build
 Flow chuẩn:
 
 ```text
-Setup.exe → InitIceBot.exe → IceBot.exe
+IceBot-Setup.exe → InitIceBot.exe → IceBot.exe
 ```
 
-### 1. `Setup.exe` — cài môi trường
+### 1. `IceBot-Setup.exe` — cài môi trường
 
 Chạy bằng quyền Administrator. Setup sẽ:
 
 1. Kiểm tra .NET Framework 4.7.2+; nếu thiếu, chạy bộ cài offline trong `prerequisites/`.
 2. Cài NetBird từ installer offline; nếu không có thì dùng `winget`.
 3. Mở hộp thoại để người dùng chọn thư mục cài đặt; mặc định là `C:\Program Files\IceBot`.
-4. Tạo dữ liệu ứng dụng trong thư mục cài và tạo kho driver dùng chung
+4. Xác minh SHA-256 của Fairino SDK và hai driver, tạo dữ liệu ứng dụng và cài driver vào kho dùng chung
    `C:\ProgramData\IceBot\drivers`; chỉ cấp quyền ghi cần thiết cho tài khoản Windows đang cài đặt.
+   Thư mục đích dùng chính `machineType` trong manifest (`bt_cup_l90`, `ice_cream`); khi nâng cấp,
+   Setup loại thư mục legacy trùng `machineType` để registry không phụ thuộc thứ tự duyệt filesystem.
 5. Tạo shortcut `IceBot` và `Init IceBot` trên Desktop/Start Menu.
+6. Từ chối cài/nâng cấp nếu `IceBot.exe` hoặc `InitIceBot.exe` còn chạy, tránh trộn binary cũ và mới.
 
 Setup không đăng nhập, không nhận Kiosk Code/NetBird key, không đăng ký Edge và không tự chạy hệ thống bán hàng.
 Nếu đóng hoặc hủy hộp thoại chọn thư mục, Setup dừng mà chưa thay đổi file. Khi triển khai tự động,
-có thể bỏ qua hộp thoại bằng `Setup.exe --install-dir "D:\IceBot"`.
+có thể bỏ qua hộp thoại bằng `IceBot-Setup.exe --install-dir "D:\IceBot"`. Dùng `IceBot-Setup.exe --validate-only` để chỉ xác minh bundle mà không cài đặt.
 
 ### 2. `InitIceBot.exe` — khởi tạo Edge
 
 Kỹ thuật viên thực hiện:
 
 1. Đăng nhập bằng tài khoản cửa hàng.
-2. Chọn **Cấu hình → Khởi tạo Edge mới**.
+2. Chọn **Cấu hình → Thiết lập Edge lần đầu → Bắt đầu / tiếp tục thiết lập tự động**.
 3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code.
 4. Nhập NetBird setup key.
+5. Xác nhận Robot IP, hardware profile và nhập cổng COM riêng cho từng máy ngoại vi.
 
 Các bước còn lại chạy tự động:
 
@@ -178,7 +198,7 @@ Sau khi khởi tạo thành công, chạy `IceBot.exe`. Runtime không cài depe
 
 ## Trách nhiệm của từng chương trình
 
-### `Setup.exe`
+### `IceBot-Setup.exe`
 
 - Chỉ cài môi trường và application payload.
 - Có manifest yêu cầu quyền Administrator.
@@ -198,17 +218,32 @@ Login thất bại trong `InitIceBot.exe` không làm dừng một `IceBot.exe` 
 
 ### `InitIceBot.exe`
 
-Chỉ hiển thị menu sau khi đăng nhập tài khoản cửa hàng thành công.
+Chỉ hiển thị menu sau khi đăng nhập tài khoản cửa hàng thành công. Menu cấu hình được nhóm theo tác vụ để kỹ thuật viên không phải chọn giữa các thao tác trùng nhau:
 
 ```text
 1. Cau hinh
-   1. Khoi tao Edge moi
-   2. Cau hinh NetBird
-   3. Cau hinh he thong
-   4. Xem cau hinh hien tai
-   5. Dong bo deployment Lua tu BE (mTLS)
-   6. Dang ky may ngoai vi voi BE
-   7. Danh sach may ngoai vi
+   1. Thiet lap Edge lan dau
+      1. Bat dau / tiep tuc thiet lap tu dong
+      2. Kiem tra dieu kien va tien do thiet lap
+   2. Cau hinh ket noi
+      1. Backend API URL
+      2. NetBird
+      3. Kiem tra ket noi Backend qua mTLS
+      4. Xem thong tin chung chi mTLS
+   3. Cau hinh thiet bi
+      1. Cau hinh Robot
+      2. Quan ly may ngoai vi
+         1. Danh sach thiet bi
+         2. Dang ky thiet bi moi voi Backend
+         3. Kiem tra ket noi Serial
+      3. Cau hinh cong COM
+      4. Bao cao lai hardware profile
+   4. Xem trang thai cau hinh
+   5. Cong cu nang cao
+      1. Dong bo deployment ngay
+      2. Gui lai hardware snapshot
+      3. Gui lai report dang cho
+      4. Gui heartbeat va readiness ngay
 2. Test may
    1. Test tay Robot
    2. Test ket noi may ngoai vi (Serial)
@@ -217,6 +252,7 @@ Chỉ hiển thị menu sau khi đăng nhập tài khoản cửa hàng thành c�
 
 Mục đồng bộ Lua dùng để cài hoặc kiểm tra lại một bản phát hành cấu hình đã được Backend tạo. Trong vận hành bình thường, `IceBot.exe` cũng pull `DeployConfiguration` cùng với các command khác; kỹ thuật viên không chép Lua thủ công vào thư mục workflow.
 
+Menu tách hai mức: `SETUP HOÀN TẤT` kiểm tra Kiosk, Execution Endpoint, Full Edge Runtime, Backend HTTPS, NetBird, PFX mTLS, Robot IP và hardware profile; `SẴN SÀNG SẢN XUẤT` yêu cầu thêm release/deployment cùng thư mục workflow active hợp lệ. Đồng bộ deployment thủ công và gửi lại report chỉ nằm trong **Công cụ nâng cao**; runtime production vẫn tự nhận command và retry report.
 ## Cấu hình và danh tính
 
 Cấu hình site nằm trong `config/icebot.site.env` cạnh file EXE và không được commit. Các giá trị quan trọng:
@@ -233,7 +269,7 @@ Cấu hình site nằm trong `config/icebot.site.env` cạnh file EXE và không
 | `MACHINE_PORTS` | Ánh xạ `MachineType:COM` cho máy ngoại vi |
 | `MACHINE_DEVICE_IDS` | Ánh xạ `MachineType:DeviceId` do BE cấp |
 
-Password PFX chỉ đọc từ biến môi trường `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD`, không lưu vào file cấu hình. Có thể override cấu hình bằng các biến môi trường mang tiền tố `ICEBOT_`.
+PFX dùng mật khẩu từ `ICEBOT_EXECUTION_CLIENT_CERT_PASSWORD` nếu được cấp. Nếu không, Edge tạo mật khẩu ngẫu nhiên và lưu bản mã hóa bằng Windows DPAPI theo tài khoản vận hành tại file `.password.dpapi`; mật khẩu không được ghi vào site config. PFX passwordless cũ được mã hóa lại khi tái sử dụng. Khi dùng mTLS trên .NET Framework, PFX được load bằng Windows user key store (`UserKeySet | Exportable`) để Schannel có thể sử dụng private key; không dùng `EphemeralKeySet`.
 
 `InitIceBot.exe` tạo PFX RSA-3072 cùng private key tại Edge (mặc định `certificates/icebot-edge-client.pfx`) và chỉ gửi SHA-256 fingerprint để Backend provision endpoint. Private key/PFX không rời Edge; Backend dùng fingerprint đã provision để xác thực request mTLS.
 
@@ -252,45 +288,39 @@ BE
   → kiểm tra schema 3/4/5, Kiosk, Endpoint, release và checksum Lua
   → lưu payload bất biến tại data/order-inbox/{CommandId}.json
   → tạo job từng cây tại data/order-jobs/{CommandId}.json
-  → giới hạn 4 cây/Order và 10 cây đang chờ/chạy
-  → ACK Accepted
+  → giới hạn 4 cây/Order và chỉ một phiên khách hàng chưa hoàn tất tại một thời điểm
+  → ACK Accepted; nếu runtime dừng ở cửa sổ ACK, lần khởi động sau replay ACK từ durable job rồi kích hoạt queue
   → chạy tuần tự từng cây, mỗi cây là một workflow home-to-home
   → lưu tiến độ và gửi report qua data/report-outbox
 ```
 
 Nếu Edge khởi động lại giữa lúc một cây đang chạy, hệ thống không tự làm lại cây đó mà chuyển sang `RequiresManualIntervention` và dừng các đơn sau để tránh bán trùng.
 
-### Local HTTP API — luồng cũ
+### API order local cũ
 
-| Method | Path | Trạng thái |
-|---|---|---|
-| `GET` | `/health` | Đã triển khai |
-| `POST` | `/api/orders` | Nhận `orderId` + danh sách `steps`, kiểm tra Lua và đưa vào worker |
-| `POST` | `/api/provision` | Stub |
-
-Với `/api/orders`, Edge chạy đúng thứ tự file mà BE gửi, không tự map sản phẩm hoặc sắp xếp lại. `OrderQueue` chỉ có một worker nên không có hai Order cùng điều khiển tay máy.
-
+`POST /api/orders`, `OrderQueue` và lifecycle nhận order inbound đã bị loại bỏ. Runtime production chỉ nhận `ExecuteOrder` bằng outbound mTLS pull; không tạo lại local API như một lifecycle thứ hai.
 ## Lua và robot
 
 Mỗi file `.lua` là một bước chuyển động của tay máy. Khi thực thi một sản phẩm:
 
 1. Kết nối Fairino tại `192.168.58.2`.
-2. Đi tới teaching point `robot_home` lưu trong Fairino controller.
+2. Đi tới teaching point `IceBot_Home` lưu trong Fairino controller.
 3. Với từng bước: `LuaUpload → ProgramLoad → ProgramRun` và chờ hoàn thành.
 4. Nếu module của bước implements `IMachineTrigger`, gọi driver RS485 ngay sau khi tay máy đến vị trí.
-5. Sau toàn bộ workflow, quay lại `robot_home`.
+5. Sau toàn bộ workflow, quay lại `IceBot_Home`.
 
-`robot_home` không phải file Lua. Lua production nằm trong `workflow/` tại máy Edge và không được commit.
+`IceBot_Home` không phải file Lua. Lua production nằm trong `workflow/` tại máy Edge và không được commit.
+
+Trên controller Web 3.7.7, nếu XML-RPC trả `143`/`-4` dù điểm `IceBot_Home` đã được xác minh, runtime dùng bộ tọa độ fallback đã kiểm thử và chỉ áp dụng cho đúng tên điểm này.
 
 ### Đồng bộ Lua
 
-Code provisioning pull `DeployConfiguration` bằng mTLS, tải ZIP từ object storage, kiểm tra kích thước/SHA-256 và chỉ cài bundle hợp lệ. Một deployment chỉ có thể Active sau khi Edge đã stage đủ file, xác nhận checksum và gửi report `Installed` rồi `Active` về Backend.
-
-Order mTLS dùng trực tiếp `{RobotArtifactId}.lua` theo contract deployment mới. API local cũ vẫn dùng tên file để tương thích.
+Code provisioning hỗ trợ pull `DeployConfiguration` bằng mTLS, tải ZIP từ object storage, kiểm tra kích thước/SHA-256 và chỉ cài bundle hợp lệ. MinIO production dùng `https://artifacts.internal.icebot.io.vn`; Edge đã tải và xác minh bundle thật thành công. ACK deployment không gửi `physicalOutputMayHaveOccurred`; trường này chỉ được gửi với giá trị `false` khi Edge từ chối `ExecuteOrder` trước sản xuất. Report deployment được flush theo `SequenceNumber` để luôn gửi `Installed` trước `Active`.
+Order mTLS dùng trực tiếp `{RobotArtifactId}.lua` theo contract deployment mới.
 
 ## Máy ngoại vi và plugin driver
 
-Máy ngoại vi giao tiếp trực tiếp với Edge qua RS485. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ plugin DLL sau khi Lua hoàn tất.
+Máy ngoại vi được Edge điều khiển trực tiếp phải có serial transport và protocol điều khiển được mô tả, cùng Edge plugin driver tương ứng; transport có thể là RS232 hoặc RS485 theo từng thiết bị. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ plugin DLL sau khi Lua hoàn tất. RS485 là lớp vật lý; protocol lệnh và frame có thể riêng theo từng thiết bị.
 
 Core `code/src/IceBot/Machines/` hiện chỉ còn plugin loader và registry. Không có code giao thức
 hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục
@@ -305,9 +335,10 @@ DRIVER-DLL/CupDropping/
 └── IceBot.Driver.CupDropping.dll
 ```
 
-Muốn sử dụng máy thả cốc, kỹ thuật viên copy nguyên package trên vào
-`C:\ProgramData\IceBot\drivers\cup-dropping\` rồi restart IceBot. Setup chỉ tạo kho driver dùng
-chung này ở trạng thái trống và không tự cài bất kỳ driver máy ngoại vi nào.
+`IceBot-Setup.exe` tự xác minh rồi cài package máy thả cốc vào
+`C:\ProgramData\IceBot\drivers\bt_cup_l90\` và package máy kem vào
+`C:\ProgramData\IceBot\drivers\ice_cream\`. Khi cài lại/nâng cấp, Setup dùng `machineType` làm tên
+thư mục chuẩn và dọn các thư mục legacy có cùng `machineType`; plugin bên thứ ba khác không bị xóa.
 
 Để thêm hoặc thay máy mà không sửa source IceBot, tạo plugin target `net472` dựa trên `IceBot.Driver.Abstractions`, sau đó cài:
 
@@ -323,10 +354,10 @@ Driver phải có public entry type, constructor không tham số và implement 
 IceBot sau khi cài hoặc thay plugin. Xem `driver-sdk/README.md`, template trong
 `driver-sdk/IceBot.Driver.Template` và driver thật trong `driver-sdk/IceBot.Driver.CupDropping`.
 
-Driver máy kem tích hợp cũ đã bị xóa khỏi core. Muốn điều khiển máy kem, cần build và nạp một
-plugin DLL riêng theo contract trên.
+Driver máy kem tích hợp cũ đã bị xóa khỏi core; plugin DLL máy kem hiện được build độc lập và
+được nhúng/cài cùng `IceBot-Setup.exe` theo đúng contract trên.
 
-Đăng ký máy với BE tại **InitIceBot → Cấu hình → Đăng ký máy ngoại vi với BE**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ và hiển thị máy nào chưa đăng ký.
+Đăng ký máy với BE tại **InitIceBot → Cấu hình → Cấu hình thiết bị → Quản lý máy ngoại vi → Đăng ký thiết bị mới với Backend**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ và hiển thị máy nào chưa đăng ký.
 
 `MACHINE_DEVICE_IDS` chỉ dùng cho máy ngoại vi được Edge điều khiển trực tiếp, chẳng hạn máy thả cốc qua RS485. Nó không phải là danh sách toàn bộ thiết bị vật lý của kiosk.
 
@@ -343,8 +374,12 @@ Edge chỉ report phần cứng robot mà nó thực sự điều khiển (`repo
 ## Kiểm thử
 
 ```powershell
-dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj
+dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj --configuration Release --no-restore
 ```
+
+Trong `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, Edge mô phỏng cả tay robot và lệnh `TriggerDevice`: vẫn kiểm tra plugin/machine type nhưng không mở COM và không gọi driver vật lý. Edge báo capability `ROBOT_ARM` tại workcell `ARM_PRIMARY` và `safety=Safe` để Backend dispatch cùng contract với production release; log readiness cũng in rõ `safety` và `mode` đã gửi. Menu test serial quét `TriggerDevice` trong Lua active (không dựa vào tên artifact UUID) rồi chỉ gọi `TestConnection` trên COM đã cấu hình. Alias Lua `icemachine` được ánh xạ về driver `ice_cream`; report hoàn tất/thất bại gửi `physicalOutputMayHaveOccurred=false`. Hardware snapshot không đổi sẽ tái sử dụng cùng `snapshotRevision` và `observedAt` để retry idempotent, tránh HTTP 409 từ Backend. Trong physical mode, mỗi readiness probe kết nối Fairino và chỉ báo `safety=Safe`/capability `ROBOT_ARM` sau khi SDK communication bình thường, E-stop bằng 0, SI0/SI1 bằng 0 và cả mã lỗi chính/phụ bằng 0. Lỗi đọc telemetry hoặc bất kỳ tín hiệu không an toàn nào sẽ báo `Unknown`/`Unsafe` và không công bố capability.
+
+Lần xác minh gần nhất: **123/123 test passed**, gồm smoke test điều hướng menu Cấu hình của `InitIceBot`, capability/safety dispatch simulated và physical Fairino đã xác minh telemetry, discovery máy ngoại vi từ Lua active, simulator ngoại vi, alias machine type, hardware snapshot idempotency. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
 
 ## Các phần chưa hoàn thành
 

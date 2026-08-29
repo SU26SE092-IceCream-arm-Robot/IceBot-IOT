@@ -138,8 +138,7 @@ namespace IceBot.Api
         {
             var hasValue = !string.IsNullOrWhiteSpace(current);
             Console.Write($"{label}{(hasValue ? " [****]" : "")}: ");
-            var input = Console.ReadLine()?.Trim() ?? string.Empty;
-            return string.IsNullOrEmpty(input) ? current : input;
+            return ConsoleSecretReader.Read(current);
         }
     }
 }

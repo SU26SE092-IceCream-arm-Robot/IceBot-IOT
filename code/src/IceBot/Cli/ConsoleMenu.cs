@@ -24,9 +24,7 @@ namespace IceBot.Cli
                 SafeClear();
                 PrintBanner();
                 var settings = SiteConfigStore.Load();
-                Console.WriteLine(settings.IsConfigured
-                    ? "Trang thai cau hinh: OK"
-                    : "Trang thai cau hinh: CHUA DU (chon 1)");
+                Console.WriteLine(GetConfigurationStatusLabel(settings));
                 Console.WriteLine();
                 Console.WriteLine("1. Cau hinh");
                 Console.WriteLine("2. Test may");
@@ -55,71 +53,242 @@ namespace IceBot.Cli
             }
         }
 
-        private static void RunConfigMenu()
+        internal static void RunConfigMenu()
         {
             while (true)
             {
                 SafeClear();
                 PrintBanner();
                 var settings = SiteConfigStore.Load();
-                Console.WriteLine(settings.IsConfigured
-                    ? "Trang thai cau hinh: OK"
-                    : "Trang thai cau hinh: CHUA DU");
+                Console.WriteLine(GetConfigurationStatusLabel(settings));
                 Console.WriteLine();
                 Console.WriteLine("CAU HINH");
-                Console.WriteLine("1. Khoi tao Edge moi (login, NetBird, dang ky BE)");
-                Console.WriteLine("2. Cau hinh NetBird");
-                Console.WriteLine("3. Cau hinh he thong (robot IP, tai khoan cua hang, cong COM)");
-                Console.WriteLine("4. Xem cau hinh hien tai");
-                Console.WriteLine("5. Dong bo deployment Lua tu BE (mTLS)");
-                Console.WriteLine("6. Dang ky may ngoai vi voi BE");
-                Console.WriteLine("7. Danh sach may ngoai vi");
+                Console.WriteLine("1. Thiet lap Edge lan dau");
+                Console.WriteLine("2. Cau hinh ket noi");
+                Console.WriteLine("3. Cau hinh thiet bi");
+                Console.WriteLine("4. Xem trang thai cau hinh");
+                Console.WriteLine("5. Cong cu nang cao");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
                 var input = Console.ReadLine();
                 if (input == null) return;
-                var choice = input.Trim();
 
-                switch (choice)
+                switch (input.Trim())
                 {
-                    case "1":
-                        EdgeInitializationWizard.Run();
-                        Pause();
-                        break;
-                    case "2":
-                        ConfigSetupWizard.RunNetBird();
-                        Pause();
-                        break;
-                    case "3":
-                        ConfigSetupWizard.RunSystemSettings();
-                        Pause();
-                        break;
-                    case "4":
-                        ConfigSetupWizard.PrintSummary(settings);
-                        Pause();
-                        break;
-                    case "5":
-                        WorkflowProvisioner.RunInteractive();
-                        Pause();
-                        break;
-                    case "6":
-                        StoreAuth.RequireLogin();
-                        PeripheralDeviceRegistrationWizard.Run();
-                        Pause();
-                        break;
-                    case "7":
-                        PeripheralDeviceRegistrationWizard.PrintDeviceList();
-                        Pause();
-                        break;
-                    case "0":
-                        return;
-                    default:
-                        Console.WriteLine("Lua chon khong hop le.");
-                        Pause();
-                        break;
+                    case "1": RunFirstTimeSetupMenu(); break;
+                    case "2": RunConnectionConfigMenu(); break;
+                    case "3": RunDeviceConfigMenu(); break;
+                    case "4": PrintConfigurationStatus(); Pause(); break;
+                    case "5": RunAdvancedToolsMenu(); break;
+                    case "0": return;
+                    default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }
             }
+        }
+
+        private static void RunFirstTimeSetupMenu()
+        {
+            while (true)
+            {
+                SafeClear();
+                PrintBanner();
+                Console.WriteLine("THIET LAP EDGE LAN DAU");
+                Console.WriteLine("1. Bat dau / tiep tuc thiet lap tu dong");
+                Console.WriteLine("2. Kiem tra dieu kien va tien do thiet lap");
+                Console.WriteLine("0. Quay lai");
+                Console.WriteLine();
+                Console.Write("Chon: ");
+                var input = Console.ReadLine();
+                if (input == null) return;
+                switch (input.Trim())
+                {
+                    case "1": EdgeInitializationWizard.Run(); Pause(); break;
+                    case "2": PrintConfigurationStatus(); Pause(); break;
+                    case "0": return;
+                    default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
+                }
+            }
+        }
+
+        private static void RunConnectionConfigMenu()
+        {
+            while (true)
+            {
+                SafeClear();
+                PrintBanner();
+                Console.WriteLine("CAU HINH KET NOI");
+                Console.WriteLine("1. Backend API URL");
+                Console.WriteLine("2. NetBird");
+                Console.WriteLine("3. Kiem tra ket noi Backend qua mTLS");
+                Console.WriteLine("4. Xem thong tin chung chi mTLS");
+                Console.WriteLine("0. Quay lai");
+                Console.WriteLine();
+                Console.Write("Chon: ");
+                var input = Console.ReadLine();
+                if (input == null) return;
+                switch (input.Trim())
+                {
+                    case "1": ConfigSetupWizard.RunBackendSettings(); Pause(); break;
+                    case "2": ConfigSetupWizard.RunNetBird(); Pause(); break;
+                    case "3": TestBackendConnection(); Pause(); break;
+                    case "4": PrintCertificateStatus(); Pause(); break;
+                    case "0": return;
+                    default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
+                }
+            }
+        }
+
+        private static void RunDeviceConfigMenu()
+        {
+            while (true)
+            {
+                SafeClear();
+                PrintBanner();
+                Console.WriteLine("CAU HINH THIET BI");
+                Console.WriteLine("1. Cau hinh Robot");
+                Console.WriteLine("2. Quan ly may ngoai vi");
+                Console.WriteLine("3. Cau hinh cong COM");
+                Console.WriteLine("4. Bao cao lai hardware profile");
+                Console.WriteLine("0. Quay lai");
+                Console.WriteLine();
+                Console.Write("Chon: ");
+                var input = Console.ReadLine();
+                if (input == null) return;
+                switch (input.Trim())
+                {
+                    case "1": ConfigSetupWizard.RunRobotSettings(); Pause(); break;
+                    case "2": RunPeripheralManagementMenu(); break;
+                    case "3": ConfigSetupWizard.RunMachinePortSettings(); Pause(); break;
+                    case "4": ReportHardwareProfile(); Pause(); break;
+                    case "0": return;
+                    default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
+                }
+            }
+        }
+
+        private static void RunPeripheralManagementMenu()
+        {
+            while (true)
+            {
+                SafeClear();
+                PrintBanner();
+                Console.WriteLine("QUAN LY MAY NGOAI VI");
+                Console.WriteLine("1. Danh sach thiet bi");
+                Console.WriteLine("2. Dang ky thiet bi moi voi Backend");
+                Console.WriteLine("3. Kiem tra ket noi Serial");
+                Console.WriteLine("0. Quay lai");
+                Console.WriteLine();
+                Console.Write("Chon: ");
+                var input = Console.ReadLine();
+                if (input == null) return;
+                switch (input.Trim())
+                {
+                    case "1": PeripheralDeviceRegistrationWizard.PrintDeviceList(); Pause(); break;
+                    case "2": StoreAuth.RequireLogin(); PeripheralDeviceRegistrationWizard.Run(); Pause(); break;
+                    case "3": RunPeripheralConnectionTestMode(); break;
+                    case "0": return;
+                    default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
+                }
+            }
+        }
+
+        private static void RunAdvancedToolsMenu()
+        {
+            while (true)
+            {
+                SafeClear();
+                PrintBanner();
+                Console.WriteLine("CONG CU NANG CAO");
+                Console.WriteLine("1. Dong bo deployment ngay");
+                Console.WriteLine("2. Gui lai hardware snapshot");
+                Console.WriteLine("3. Gui lai report dang cho");
+                Console.WriteLine("4. Gui heartbeat va readiness ngay");
+                Console.WriteLine("0. Quay lai");
+                Console.WriteLine();
+                Console.Write("Chon: ");
+                var input = Console.ReadLine();
+                if (input == null) return;
+                switch (input.Trim())
+                {
+                    case "1": WorkflowProvisioner.RunInteractive(); Pause(); break;
+                    case "2": ReportHardwareProfile(); Pause(); break;
+                    case "3": FlushPendingReports(); Pause(); break;
+                    case "4": TestBackendConnection(); Pause(); break;
+                    case "0": return;
+                    default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
+                }
+            }
+        }
+
+        private static void TestBackendConnection()
+        {
+            Console.WriteLine();
+            var heartbeat = EdgeMtlsProbe.SendHeartbeatAndReportedDevices(out var heartbeatMessage);
+            Console.WriteLine((heartbeat ? "[OK] " : "[ERROR] ") + heartbeatMessage);
+            var readiness = EdgeMtlsProbe.SendReadiness(out var readinessMessage);
+            Console.WriteLine((readiness ? "[OK] " : "[ERROR] ") + readinessMessage);
+        }
+
+        private static void ReportHardwareProfile()
+        {
+            Console.WriteLine();
+            var success = EdgeMtlsProbe.SendReportedDevices(out var message);
+            Console.WriteLine((success ? "[OK] " : "[ERROR] ") + message);
+        }
+
+        private static void FlushPendingReports()
+        {
+            Console.WriteLine();
+            ProductionReportOutbox.Flush();
+            DeploymentReportOutbox.Flush();
+            Console.WriteLine("[OK] Da hoan tat mot luot gui lai report. Report loi mang van duoc giu de thu lai.");
+        }
+
+        private static void PrintCertificateStatus()
+        {
+            var settings = SiteConfigStore.Load();
+            Console.WriteLine();
+            Console.WriteLine("=== CHUNG CHI mTLS ===");
+            Console.WriteLine($"Duong dan : {(string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) ? "(chua dat)" : settings.ExecutionClientCertificatePath)}");
+            Console.WriteLine($"Ton tai    : {(!string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) && File.Exists(settings.ExecutionClientCertificatePath) ? "CO" : "KHONG")}");
+            Console.WriteLine("Mat khau   : bien moi truong hoac DPAPI theo tai khoan Windows; khong luu trong site config");
+        }
+
+        private static void PrintConfigurationStatus()
+        {
+            var settings = SiteConfigStore.Load();
+            Console.WriteLine();
+            Console.WriteLine("=== TRANG THAI CAU HINH EDGE ===");
+            PrintCheck("Kiosk identity", settings.KioskId != Guid.Empty, settings.KioskCode);
+            PrintCheck("Execution endpoint", settings.ExecutionEndpointId != Guid.Empty, settings.ExecutionEndpointId == Guid.Empty ? string.Empty : settings.ExecutionEndpointId.ToString("D"));
+            PrintCheck("Full Edge runtime", settings.FullEdgeRuntimeId != Guid.Empty, settings.FullEdgeRuntimeId == Guid.Empty ? string.Empty : settings.FullEdgeRuntimeId.ToString("D"));
+            PrintCheck("Backend HTTPS", EdgeSetupReadiness.IsHttpsUrl(settings.BeApiUrl), settings.BeApiUrl);
+            PrintCheck("NetBird setup key", !string.IsNullOrWhiteSpace(settings.NetBirdSetupKey), string.Empty);
+            PrintCheck("Client certificate", !string.IsNullOrWhiteSpace(settings.ExecutionClientCertificatePath) && File.Exists(settings.ExecutionClientCertificatePath), settings.ExecutionClientCertificatePath);
+            PrintCheck("Robot IP", !string.IsNullOrWhiteSpace(settings.RobotIp), settings.RobotIp);
+            PrintCheck("Robot hardware profile", !string.IsNullOrWhiteSpace(settings.PrimaryRobotSourceDeviceKey) && !string.IsNullOrWhiteSpace(settings.PrimaryRobotRuntimeTargetCode) && !string.IsNullOrWhiteSpace(settings.PrimaryRobotMachineModelCode), $"{settings.PrimaryRobotRuntimeTargetCode}/{settings.PrimaryRobotMachineModelCode}");
+            PrintCheck("Active deployment", settings.ActiveConfigurationDeploymentId != Guid.Empty, settings.ActiveConfigurationDeploymentId == Guid.Empty ? string.Empty : settings.ActiveConfigurationDeploymentId.ToString("D"));
+            PrintCheck("Active workflow", !string.IsNullOrWhiteSpace(settings.ActiveWorkflowDirectory) && Directory.Exists(settings.ActiveWorkflowDirectory), settings.ActiveWorkflowDirectory);
+            Console.WriteLine();
+            if (!EdgeSetupReadiness.IsSetupComplete(settings))
+                Console.WriteLine("[SETUP CHUA HOAN TAT] Hay xu ly cac muc WARN cua Setup o tren.");
+            else if (!EdgeSetupReadiness.IsProductionReady(settings))
+                Console.WriteLine("[SETUP HOAN TAT] Chua co deployment Lua hop le; chua san sang san xuat.");
+            else
+                Console.WriteLine("[SAN SANG SAN XUAT] Setup va deployment da day du.");
+        }
+
+        private static void PrintCheck(string label, bool success, string detail)
+        {
+            Console.WriteLine($"[{(success ? "OK" : "WARN")}] {label,-24}{(string.IsNullOrWhiteSpace(detail) ? string.Empty : ": " + detail)}");
+        }
+
+        internal static string GetConfigurationStatusLabel(SiteSettings settings)
+        {
+            if (EdgeSetupReadiness.IsProductionReady(settings)) return "Trang thai: SAN SANG SAN XUAT";
+            if (EdgeSetupReadiness.IsSetupComplete(settings)) return "Trang thai: SETUP HOAN TAT - CHUA CO DEPLOYMENT";
+            return "Trang thai: SETUP CHUA HOAN TAT";
         }
 
         private static void RunTestMenu()
@@ -240,9 +409,14 @@ namespace IceBot.Cli
             Console.WriteLine();
 
             var settings = SiteConfigStore.Load();
-            if (!settings.IsConfigured)
+            if (!EdgeSetupReadiness.IsSetupComplete(settings))
             {
-                Console.WriteLine("[WARN] Chua cau hinh day du. Vao menu Cau hinh -> muc 1 de nhap NetBird.");
+                Console.WriteLine("[WARN] Setup Edge chua hoan tat. Chay InitIceBot.exe -> Cau hinh -> Thiet lap Edge lan dau.");
+                Console.WriteLine();
+            }
+            else if (!EdgeSetupReadiness.IsProductionReady(settings))
+            {
+                Console.WriteLine("[WARN] Setup da hoan tat nhung chua co deployment Lua hop le; Order pull se chua the san xuat.");
                 Console.WriteLine();
             }
 

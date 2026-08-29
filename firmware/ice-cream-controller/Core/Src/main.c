@@ -630,6 +630,20 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
     HAL_UART_Receive_IT(&huart1, &rxBuf[rxIndex], 1);
 }
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance != USART1)
+    {
+        return;
+    }
+
+    __HAL_UART_CLEAR_OREFLAG(&huart1);
+    rxIndex = 0;
+    rxExpectedLen = 0;
+    rxFrameReady = 0;
+    HAL_UART_Receive_IT(&huart1, &rxBuf[0], 1);
+}
 /* USER CODE END 4 */
 
 /**
