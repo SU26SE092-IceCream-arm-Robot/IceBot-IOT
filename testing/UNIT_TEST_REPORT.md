@@ -1,267 +1,258 @@
-# IceBot-IOT Unit Test Report
+# IceBot-IOT Test Document
 
-- Generated: 2026-08-29
-- Configuration: Release
+- Generated: 2026-08-29 17:55:46
 - Framework: xUnit / .NET Framework 4.7.2
 - Total: 123
 - Passed: 123
 - Failed: 0
 - Skipped: 0
-- Evidence: `harness/IceBot.Harness.Tests/TestResults/PB10ConfigTests.trx`
-
-## Command
-
-```powershell
-dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj --configuration Release --no-restore
-```
 
 ## Scope
 
-The run covers deterministic application, configuration-menu, command-validation, workflow, persistence, simulator, and peripheral-driver tests. Live Backend, NetBird, Fairino hardware, STM32 hardware, and physical serial ports are outside this unit-test run.
+This document summarizes deterministic unit tests for the current IceBot Edge application. Live BE, NetBird, robot, serial ports, and peripheral hardware are outside this unit-test run.
 
-## Summary by suite
+## Summary by function
 
-| Suite | Function | Total | Passed | Failed |
+| Code | Function | Total | Passed | Failed |
 |---|---|---:|---:|---:|
-| AuthenticationAndConnectivityTests | Authentication and NetBird validation | 4 | 4 | 0 |
-| ConfigSetupWizardTests | Configuration identity preservation | 2 | 2 | 0 |
-| ConfigurationMenuTests | Init configuration menu navigation | 1 | 1 | 0 |
-| EdgeClientCertificateProvisionerTests | mTLS client certificate, DPAPI migration and Schannel handshake | 4 | 4 | 0 |
-| EdgeDeploymentApiTests | Deployment command and acknowledgement contract | 5 | 5 | 0 |
-| EdgeOrderExecutionQueueTests | Durable single-session production queue and simulated lifecycle | 8 | 8 | 0 |
-| EdgeOrderInboxTests | mTLS ExecuteOrder validation | 13 | 13 | 0 |
-| ExecutionEndpointRegistrationTests | Kiosk and execution endpoint contracts | 13 | 13 | 0 |
-| FullEdgeConfigurationInstallerTests | Verified Lua release installation and ordered deployment reports | 4 | 4 | 0 |
-| IceCreamDriverTests | Ice-cream STM32 driver protocol | 7 | 7 | 0 |
-| IceCreamFirmwareContractTests | STM32 actuator direction, PB0/PB10 EXTI and limit safety contract | 3 | 3 | 0 |
-| MachinePluginLoaderTests | Peripheral driver plugin loading | 12 | 12 | 0 |
-| OrderRequestTests | Legacy local payload rejection | 3 | 3 | 0 |
-| PeripheralDeviceRegistrationTests | Peripheral device registration | 3 | 3 | 0 |
-| ProductionReportOutboxTests | Production report outbox | 1 | 1 | 0 |
-| RobotDeviceDiscoveryTests | Robot hardware discovery | 2 | 2 | 0 |
-| SimulatedRobotWorkflowExecutorTests | Simulated robot and peripheral execution | 4 | 4 | 0 |
-| SiteSettingsTests | Site settings, setup, verified Fairino readiness safety/capability dispatch, active-Lua peripheral discovery and idempotent hardware snapshots | 12 | 12 | 0 |
-| WorkflowExecutionPlanTests | Typed Lua workflow plan and machine-type aliases | 20 | 20 | 0 |
+| CONFIG-MENU | InitIceBot configuration menu navigation | 1 | 1 | 0 |
+| ENDPOINT | Kiosk and execution endpoint contracts | 13 | 13 | 0 |
+| CONFIG-ID | Configuration identity preservation | 2 | 2 | 0 |
+| AUTH-NET | Authentication and NetBird validation | 4 | 4 | 0 |
+| WORKFLOW-PLAN | Lua composition and Edge instruction dispatch | 20 | 20 | 0 |
+| ICE-CREAM-BLL | Ice-cream STM32 driver protocol and safe cycle | 7 | 7 | 0 |
+| ICE-FIRMWARE | STM32 actuator direction and limit-switch contract | 3 | 3 | 0 |
+| MTLS-ORDER | mTLS ExecuteOrder validation | 13 | 13 | 0 |
+| SITE-CFG | Site settings and device mapping | 14 | 14 | 0 |
+| DRIVER-DLL | Peripheral driver plugin loading | 12 | 12 | 0 |
+| LOCAL-ORDER | Legacy local Order contract | 3 | 3 | 0 |
+| ORDER-QUEUE | Durable production queue | 8 | 8 | 0 |
+| LUA-INSTALL | Verified Lua bundle installation | 4 | 4 | 0 |
+| DEPLOY-API | Full Edge deployment command contract | 5 | 5 | 0 |
+| DEVICE | Peripheral device registration contract | 3 | 3 | 0 |
+| SIM-ROBOT | Simulated robot and peripheral execution | 4 | 4 | 0 |
+| ROBOT-DISCOVERY | Robot hardware discovery | 2 | 2 | 0 |
+| REPORT-OUT | Production report outbox | 1 | 1 | 0 |
+| MTLS-CERT | mTLS client certificate | 4 | 4 | 0 |
 
-## Detailed results
+## CONFIG-MENU - InitIceBot configuration menu navigation
 
-### Authentication and NetBird validation
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| CONFIG-MENU-TC01 | ConfigMenu ShowsFiveTaskBasedGroupsAndReturns | The expected value or identifier is returned. | Normal | Passed | 00:00:00.0030000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.AuthenticationAndConnectivityTests.Login_RejectsMissingCredentialsWithoutCallingBackend(account: "", password: "password") | Passed | 00:00:00.2680000 |
-| IceBot.Harness.Tests.AuthenticationAndConnectivityTests.Login_RejectsMissingCredentialsWithoutCallingBackend(account: "store", password: "") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.AuthenticationAndConnectivityTests.NetBirdRunUp_RejectsMissingSetupKeyWithoutStartingProcess | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.AuthenticationAndConnectivityTests.Refresh_RejectsMissingTokenWithoutCallingBackend | Passed | 00:00:00.0010000 |
+## ENDPOINT - Kiosk and execution endpoint contracts
 
-### Configuration identity preservation
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| ENDPOINT-TC01 | NormalizeKioskCode RejectsValuesUnsafeForBackendOrLocalConfig(input: "BAD=CODE") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| ENDPOINT-TC02 | NormalizeKioskCode RejectsValuesUnsafeForBackendOrLocalConfig(input: "A") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| ENDPOINT-TC03 | SelectUnambiguousProvisioningFullEdgeEndpoint RejectsAmbiguousProvisioningEndpoints | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0020000 |
+| ENDPOINT-TC04 | ParseKioskCreateResponse ReturnsBackendKioskId | The expected value or identifier is returned. | Normal | Passed | 00:00:00.0050000 |
+| ENDPOINT-TC05 | ParseCreateResponse UsesBackendError | The expected durable data is created without duplication. | Abnormal | Passed | 00:00:00.0010000 |
+| ENDPOINT-TC06 | ParseManagementResponse ReturnsActiveProfileIdentity | The expected value or identifier is returned. | Normal | Passed | 00:00:00.0230000 |
+| ENDPOINT-TC07 | ParseKioskManagementResponse RequiresActiveOperationalKioskData | All automated assertions pass. | Normal | Passed | 00:00:00.0030000 |
+| ENDPOINT-TC08 | BuildEndpointCode IsStableAndBackendSafe | All automated assertions pass. | Normal | Passed | 00:00:00.0020000 |
+| ENDPOINT-TC09 | NormalizeKioskCode RejectsValuesUnsafeForBackendOrLocalConfig(input: "") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| ENDPOINT-TC10 | SelectUnambiguousProvisioningFullEdgeEndpoint ReusesSingleSeededEndpoint | All automated assertions pass. | Normal | Passed | 00:00:00.0080000 |
+| ENDPOINT-TC11 | NormalizeKioskCode PreservesPrintedCodeAndUppercasesIt | The existing identity is preserved safely. | Normal | Passed | 00:00:00.0010000 |
+| ENDPOINT-TC12 | ParseCreateResponse ReturnsExecutionEndpointId | The expected value or identifier is returned. | Normal | Passed | 00:00:00.0110000 |
+| ENDPOINT-TC13 | SelectUnambiguousProvisioningFullEdgeEndpoint IgnoresOtherProfilesAndStates | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.ConfigSetupWizardTests.PreserveBackendDeviceIdentities_CopiesKioskAndDeviceMappings | Passed | 00:00:00.0020000 |
-| IceBot.Harness.Tests.ConfigSetupWizardTests.PreserveBackendDeviceIdentities_CreatesIndependentDictionary | Passed | 00:00:00.0010000 |
+## CONFIG-ID - Configuration identity preservation
 
-### Init configuration menu navigation
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| CONFIG-ID-TC01 | PreserveBackendDeviceIdentities CopiesKioskAndDeviceMappings | The existing identity is preserved safely. | Normal | Passed | 00:00:00.0100000 |
+| CONFIG-ID-TC02 | PreserveBackendDeviceIdentities CreatesIndependentDictionary | The expected durable data is created without duplication. | Normal | Passed | 00:00:00.0090000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.ConfigurationMenuTests.ConfigMenu_ShowsFiveTaskBasedGroupsAndReturns | Passed | 00:00:00.0030000 |
+## AUTH-NET - Authentication and NetBird validation
 
-### mTLS client certificate
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| AUTH-NET-TC01 | Refresh RejectsMissingTokenWithoutCallingBackend | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| AUTH-NET-TC02 | NetBirdRunUp RejectsMissingSetupKeyWithoutStartingProcess | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| AUTH-NET-TC03 | Login RejectsMissingCredentialsWithoutCallingBackend(account: "store", password: "") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| AUTH-NET-TC04 | Login RejectsMissingCredentialsWithoutCallingBackend(account: "", password: "password") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.EdgeClientCertificateProvisionerTests.Ensure_CreatesReusableClientPfxAndSha256Fingerprint | Passed | 00:00:00.4180000 |
-| IceBot.Harness.Tests.EdgeClientCertificateProvisionerTests.Ensure_MigratesPasswordlessPfxToDpapiProtectedPassword | Passed | 00:00:00.1610000 |
-| IceBot.Harness.Tests.EdgeClientCertificateProvisionerTests.Ensure_RejectsExistingCertificateWithoutPrivateKey | Passed | 00:00:00.1410000 |
-| IceBot.Harness.Tests.EdgeClientCertificateProvisionerTests.LoadForMtls_ProvidesPrivateKeyUsableByWindowsSchannel | Passed | 00:00:01.2740000 |
+## WORKFLOW-PLAN - Lua composition and Edge instruction dispatch
 
-### Deployment command contract
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| WORKFLOW-PLAN-TC01 | HomeFallback RejectsUnexpectedPointOrError(pointName: "icebot home", errorCode: 143) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC02 | HomeFallback AppliesOnlyToVerifiedPointOnController37(errorCode: -4) | All automated assertions pass. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC03 | execute(\"bad\")") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC04 | HomeFallback RejectsUnexpectedPointOrError(pointName: "IceBot Home", errorCode: -2) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC05 | Compose PreservesBackendArtifactOrder | The existing identity is preserved safely. | Normal | Passed | 00:00:00.0270000 |
+| WORKFLOW-PLAN-TC06 | MachineTypeCanonicalizer NormalizesKnownAliasAndWhitespace(input: " bt cup l90 ", expected: "bt cup l90") | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC07 | Parse FairinoStudioOutputBuildsTypedExecutionPlan | All automated assertions pass. | Normal | Passed | 00:00:00.3420000 |
+| WORKFLOW-PLAN-TC08 | Parse RejectsUnsafeOrUnboundedWorkflow(lua: "MoveJ({1,2,3,4,5,6}, 0, 0, 0, 30, -1, -1)") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC09 | Parse CycleLoopExpandsToFiniteInstructions | All automated assertions pass. | Normal | Passed | 00:00:00.0090000 |
+| WORKFLOW-PLAN-TC10 | HomeFallback RejectsUnexpectedPointOrError(pointName: "Other Home", errorCode: 143) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC11 | Compose RejectsArtifactPathTraversal | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC12 | clock() -"···) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC13 | RuntimeHomePoint UsesVerifiedFallbackIdentity | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC14 | MachineTypeCanonicalizer NormalizesKnownAliasAndWhitespace(input: "icemachine", expected: "ice cream") | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC15 | HomeFallback RejectsUnexpectedPointOrError(pointName: "IceBot Home", errorCode: 142) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC16 | HomeFallback AppliesOnlyToVerifiedPointOnController37(errorCode: 143) | All automated assertions pass. | Abnormal | Passed | 00:00:00.0130000 |
+| WORKFLOW-PLAN-TC17 | Execute DispatchesEveryInstructionInOrder | All automated assertions pass. | Normal | Passed | 00:00:00.0050000 |
+| WORKFLOW-PLAN-TC18 | Parse RejectsUnsafeOrUnboundedWorkflow(lua: "SetToolDO(2, 1, 0, 0)") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0020000 |
+| WORKFLOW-PLAN-TC19 | MachineTypeCanonicalizer NormalizesKnownAliasAndWhitespace(input: "ICE cream", expected: "ICE cream") | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| WORKFLOW-PLAN-TC20 | Parse RejectsUnsafeOrUnboundedWorkflow(lua: "SetDO(16, 1, 0)") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.EdgeDeploymentApiTests.BuildAcknowledgementBody_IncludesPhysicalEvidenceOnlyForRejectedOrder | Passed | 00:00:00.0020000 |
-| IceBot.Harness.Tests.EdgeDeploymentApiTests.ParseFullEdgeDeployment_AcceptsCompletePayload | Passed | 00:00:01.0290000 |
-| IceBot.Harness.Tests.EdgeDeploymentApiTests.ParseFullEdgeDeployment_RejectsIncompletePayload(json: "{}") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeDeploymentApiTests.ParseFullEdgeDeployment_RejectsIncompletePayload(json: "null") | Passed | 00:00:00.0020000 |
-| IceBot.Harness.Tests.EdgeDeploymentApiTests.ParseFullEdgeDeployment_RejectsWrongCommandType | Passed | 00:00:00.0010000 |
+## ICE-CREAM-BLL - Ice-cream STM32 driver protocol and safe cycle
 
-### Durable single-session production queue
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| ICE-CREAM-BLL-TC01 | Trigger DownRunsUntilLowerLimitOnly | All automated assertions pass. | Boundary | Passed | 00:00:00.0030000 |
+| ICE-CREAM-BLL-TC02 | Trigger RejectsFaultBeforeMotorMotion | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0030000 |
+| ICE-CREAM-BLL-TC03 | SerialFrameCodec BuildsVerifiedControllerFrames | All automated assertions pass. | Normal | Passed | 00:00:00.0020000 |
+| ICE-CREAM-BLL-TC04 | SerialFrameCodec RejectsCorruptChecksum | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.1200000 |
+| ICE-CREAM-BLL-TC05 | Trigger UpRunsUntilUpperLimitOnly | All automated assertions pass. | Boundary | Passed | 00:00:00.0170000 |
+| ICE-CREAM-BLL-TC06 | Trigger RejectedUpAttemptsEmergencyStop | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0060000 |
+| ICE-CREAM-BLL-TC07 | Driver ExposesCanonicalMachineIdentity | All automated assertions pass. | Normal | Passed | 00:00:00.0050000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.ExecuteOrderLifecycle_ValidatesPersistsExecutesAndCompletesInOrder | Passed | 00:00:00.1000000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.NextRunnable_StopsQueueWhenAnyJobRequiresManualIntervention | Passed | 00:00:00.0490000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.RecoverAwaitingAcknowledgements_ReplaysAckAndActivatesDurableJob | Passed | 00:00:00.0690000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.RecoverInterruptedJobs_MarksRunningUnitForManualInterventionAndReportsOnce | Passed | 00:00:00.0560000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.TryAdmit_AllowsOnlyOneCustomerSessionUntilCompletion | Passed | 00:00:00.0220000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.TryAdmit_CreatesOneDurableJobPerUnitWithConsecutiveUnitNumbers | Passed | 00:00:00.0800000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.TryAdmit_IsIdempotentByCommandId | Passed | 00:00:00.0210000 |
-| IceBot.Harness.Tests.EdgeOrderExecutionQueueTests.ValidateForThisEdge_RejectsAnotherKiosk | Passed | 00:00:00.0010000 |
+## ICE-FIRMWARE - STM32 actuator direction and limit-switch contract
 
-### mTLS ExecuteOrder validation
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| ICE-FIRMWARE-TC01 | Firmware MapsCommandsToMeasuredPhysicalDirections | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| ICE-FIRMWARE-TC02 | Firmware StopsAndRejectsPhysicalUpAtUpperLimitButKeepsDownAvailable | Invalid or unsafe input is rejected as expected. | Boundary | Passed | 00:00:00.0050000 |
+| ICE-FIRMWARE-TC03 | Firmware ConfiguresUpperLimitAsActiveLowExtiInput | All automated assertions pass. | Boundary | Passed | 00:00:00.0130000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.EdgeOrderInboxTests.OrderedArtifacts_UsesBindingOrderThenRunOrder | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.TryStore_DeduplicatesByCommandId | Passed | 00:00:00.0380000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.Validate_AcceptsAllBackendSupportedSchemaVersions(schemaVersion: 3) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.Validate_AcceptsAllBackendSupportedSchemaVersions(schemaVersion: 4) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.Validate_AcceptsAllBackendSupportedSchemaVersions(schemaVersion: 5) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.Validate_AcceptsBackendSchema5ExecuteOrder | Passed | 00:00:00.0040000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.Validate_RejectsNonPositiveQuantity | Passed | 00:00:01.0590000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.ValidateForThisEdge_AcceptsMatchingIdentityReleaseAndLuaChecksum | Passed | 00:00:00.0350000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.ValidateForThisEdge_RejectsAnotherEndpoint | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.ValidateForThisEdge_RejectsExpiredCommand | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.ValidateForThisEdge_RejectsInactiveRelease | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.ValidateForThisEdge_RejectsInstalledLuaWithWrongChecksum | Passed | 00:00:00.0070000 |
-| IceBot.Harness.Tests.EdgeOrderInboxTests.ValidateForThisEdge_RejectsMoreThanFourUnits | Passed | 00:00:00.0020000 |
+## MTLS-ORDER - mTLS ExecuteOrder validation
 
-### Kiosk and execution endpoint contracts
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| MTLS-ORDER-TC01 | Validate AcceptsAllBackendSupportedSchemaVersions(schemaVersion: 5) | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.0090000 |
+| MTLS-ORDER-TC02 | Validate AcceptsAllBackendSupportedSchemaVersions(schemaVersion: 3) | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.0010000 |
+| MTLS-ORDER-TC03 | ValidateForThisEdge RejectsInstalledLuaWithWrongChecksum | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0100000 |
+| MTLS-ORDER-TC04 | TryStore DeduplicatesByCommandId | All automated assertions pass. | Normal | Passed | 00:00:00.0760000 |
+| MTLS-ORDER-TC05 | Validate RejectsNonPositiveQuantity | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0400000 |
+| MTLS-ORDER-TC06 | ValidateForThisEdge AcceptsMatchingIdentityReleaseAndLuaChecksum | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.0440000 |
+| MTLS-ORDER-TC07 | Validate AcceptsAllBackendSupportedSchemaVersions(schemaVersion: 4) | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.0010000 |
+| MTLS-ORDER-TC08 | Validate AcceptsBackendSchema5ExecuteOrder | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.0010000 |
+| MTLS-ORDER-TC09 | ValidateForThisEdge RejectsAnotherEndpoint | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| MTLS-ORDER-TC10 | OrderedArtifacts UsesBindingOrderThenRunOrder | All automated assertions pass. | Normal | Passed | 00:00:00.0030000 |
+| MTLS-ORDER-TC11 | ValidateForThisEdge RejectsInactiveRelease | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0040000 |
+| MTLS-ORDER-TC12 | ValidateForThisEdge RejectsExpiredCommand | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0070000 |
+| MTLS-ORDER-TC13 | ValidateForThisEdge RejectsMoreThanFourUnits | Invalid or unsafe input is rejected as expected. | Boundary | Passed | 00:00:00.0030000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.BuildEndpointCode_IsStableAndBackendSafe | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.NormalizeKioskCode_PreservesPrintedCodeAndUppercasesIt | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.NormalizeKioskCode_RejectsValuesUnsafeForBackendOrLocalConfig(input: "") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.NormalizeKioskCode_RejectsValuesUnsafeForBackendOrLocalConfig(input: "A") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.NormalizeKioskCode_RejectsValuesUnsafeForBackendOrLocalConfig(input: "BAD=CODE") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.ParseCreateResponse_ReturnsExecutionEndpointId | Passed | 00:00:00.6950000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.ParseCreateResponse_UsesBackendError | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.ParseKioskCreateResponse_ReturnsBackendKioskId | Passed | 00:00:00.0130000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.ParseKioskManagementResponse_RequiresActiveOperationalKioskData | Passed | 00:00:00.0040000 |
-| IceBot.Harness.Tests.ExecutionEndpointRegistrationTests.ParseManagementResponse_ReturnsActiveProfileIdentity | Passed | 00:00:00.0040000 |
+## SITE-CFG - Site settings and device mapping
 
-### Verified Lua release installation
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| SITE-CFG-TC01 | ReportedDevicesSnapshot ConflictRecoveryAlwaysCreatesNextRevision | The expected durable data is created without duplication. | Normal | Passed | 00:00:00.0200000 |
+| SITE-CFG-TC02 | SetupCompletion IsIndependentFromDeploymentReadiness | All automated assertions pass. | Normal | Passed | 00:00:00.0720000 |
+| SITE-CFG-TC03 | DeviceIdSerialization IgnoresInvalidEntriesAndIsCaseInsensitive | All automated assertions pass. | Abnormal | Passed | 00:00:00.0010000 |
+| SITE-CFG-TC04 | ActiveWorkflowPeripheralDiscovery UsesTriggerDeviceMachineTypesInsteadOfArtifactFileNames | All automated assertions pass. | Normal | Passed | 00:00:00.4100000 |
+| SITE-CFG-TC05 | IsConfigured RequiresBothNetBirdKeyAndPublicUrl | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| SITE-CFG-TC06 | ReadinessSafetyProfile UsesSafeForSimulationOrVerifiedPhysicalTelemetry | All automated assertions pass. | Normal | Passed | 00:00:00.0070000 |
+| SITE-CFG-TC07 | ReportedDevicesSnapshot IncrementsVersionWhenContentChanges | All automated assertions pass. | Boundary | Passed | 00:00:00.0010000 |
+| SITE-CFG-TC08 | MachineLookups AreCaseInsensitiveAndUnknownReturnsEmpty | The expected value or identifier is returned. | Abnormal | Passed | 00:00:00.0020000 |
+| SITE-CFG-TC09 | ReadinessCapabilityProfile SimulatedModeReportsAvailableRobotArm | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| SITE-CFG-TC10 | DeviceIdSerialization SkipsEmptyIdsAndMachineTypes | All automated assertions pass. | Abnormal | Passed | 00:00:00.0010000 |
+| SITE-CFG-TC11 | ReportedDevicesSnapshot NormalizesTimestampToPostgresMicrosecondPrecision | All automated assertions pass. | Normal | Passed | 00:00:00.0020000 |
+| SITE-CFG-TC12 | ReportedDevicesSnapshot ReusesRevisionAndObservedAtForSameContent | All automated assertions pass. | Boundary | Passed | 00:00:00.0020000 |
+| SITE-CFG-TC13 | ReadinessCapabilityProfile PhysicalModeDoesNotClaimUnverifiedCapability | All automated assertions pass. | Normal | Passed | 00:00:00.0030000 |
+| SITE-CFG-TC14 | ReadinessCapabilityProfile PhysicalModeReportsRobotOnlyWhenSafetyIsVerified | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.FullEdgeConfigurationInstallerTests.DeploymentReportOutbox_OrdersInstalledBeforeActiveByDurableSequence | Passed | 00:00:00.1360000 |
-| IceBot.Harness.Tests.FullEdgeConfigurationInstallerTests.InstallVerifiedBundle_InstallsGuidLuaAndManifest | Passed | 00:00:00.1200000 |
-| IceBot.Harness.Tests.FullEdgeConfigurationInstallerTests.InstallVerifiedBundle_RejectsArtifactChecksumMismatchWithoutActivatingLua | Passed | 00:00:00.0100000 |
-| IceBot.Harness.Tests.FullEdgeConfigurationInstallerTests.InstallVerifiedBundle_RejectsUnexpectedArchiveEntry | Passed | 00:00:00.0040000 |
+## DRIVER-DLL - Peripheral driver plugin loading
 
-### Ice-cream STM32 driver protocol
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| DRIVER-DLL-TC01 | Load RejectsTamperedDllBySha256 | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.3960000 |
+| DRIVER-DLL-TC02 | Load ValidDllPackageCreatesDriver | The expected durable data is created without duplication. | Normal | Passed | 00:00:01.5340000 |
+| DRIVER-DLL-TC03 | dll", entryType: "Type", version: "1", sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"···) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC04 | Load PackagedCupDroppingDriver IsValidAndLoadable | All automated assertions pass. | Normal | Passed | 00:00:00.0030000 |
+| DRIVER-DLL-TC05 | dll", entryType: "Type", version: "1", sha: "not-a-checksum") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC06 | Load MissingDirectoryIsEmptyAndSafe | All automated assertions pass. | Abnormal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC07 | ValidateManifest RejectsAssemblyTraversal | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC08 | exe", entryType: "Type", version: "1", sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"···) | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC09 | DriverDirectory UsesSharedProgramDataLocation | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC10 | Load PackagedIceCreamDriver IsValidAndLoadable | All automated assertions pass. | Normal | Passed | 00:00:00.0060000 |
+| DRIVER-DLL-TC11 | ValidateModule RejectsMachineTypeUnsafeForConfigSerialization | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| DRIVER-DLL-TC12 | ValidateManifest AcceptsSchemaOneContract | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.0010000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.IceCreamDriverTests.Driver_ExposesCanonicalMachineIdentity | Passed | 00:00:00.0080000 |
-| IceBot.Harness.Tests.IceCreamDriverTests.SerialFrameCodec_BuildsVerifiedControllerFrames | Passed | 00:00:00.0260000 |
-| IceBot.Harness.Tests.IceCreamDriverTests.SerialFrameCodec_RejectsCorruptChecksum | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.IceCreamDriverTests.Trigger_RejectedUpAttemptsEmergencyStop | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.IceCreamDriverTests.Trigger_RejectsFaultBeforeMotorMotion | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.IceCreamDriverTests.Trigger_DownRunsUntilLowerLimitOnly | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.IceCreamDriverTests.Trigger_UpRunsUntilUpperLimitOnly | Passed | 00:00:00.3150000 |
+## LOCAL-ORDER - Legacy local Order contract
 
-### Peripheral driver plugin loading
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| LOCAL-ORDER-TC01 | lua\"]}") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0110000 |
+| LOCAL-ORDER-TC02 | Validate RejectsLegacyLocalApiPayloads(json: "{}") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| LOCAL-ORDER-TC03 | Validate RejectsLegacyLocalApiPayloads(json: "not-json") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.6340000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.MachinePluginLoaderTests.DriverDirectory_UsesSharedProgramDataLocation | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.Load_MissingDirectoryIsEmptyAndSafe | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.Load_PackagedCupDroppingDriver_IsValidAndLoadable | Passed | 00:00:00.0040000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.Load_PackagedIceCreamDriver_IsValidAndLoadable | Passed | 00:00:00.0040000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.Load_RejectsTamperedDllBySha256 | Passed | 00:00:00.2140000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.Load_ValidDllPackageCreatesDriver | Passed | 00:00:00.4000000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.ValidateManifest_AcceptsSchemaOneContract | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.ValidateManifest_RejectsAssemblyTraversal | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.ValidateManifest_RejectsUnsupportedOrUnsafeContracts(schema: 1, machine: "machine", assembly: "Driver.dll", entryType: "Type", version: "1", sha: "not-a-checksum") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.ValidateManifest_RejectsUnsupportedOrUnsafeContracts(schema: 1, machine: "machine", assembly: "Driver.exe", entryType: "Type", version: "1", sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"···) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.ValidateManifest_RejectsUnsupportedOrUnsafeContracts(schema: 2, machine: "machine", assembly: "Driver.dll", entryType: "Type", version: "1", sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"···) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.MachinePluginLoaderTests.ValidateModule_RejectsMachineTypeUnsafeForConfigSerialization | Passed | 00:00:00.0010000 |
+## ORDER-QUEUE - Durable production queue
 
-### Legacy local payload rejection
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| ORDER-QUEUE-TC01 | TryAdmit CreatesOneDurableJobPerUnitWithConsecutiveUnitNumbers | The expected durable data is created without duplication. | Normal | Passed | 00:00:00.7760000 |
+| ORDER-QUEUE-TC02 | TryAdmit AllowsOnlyOneCustomerSessionUntilCompletion | All automated assertions pass. | Normal | Passed | 00:00:00.0300000 |
+| ORDER-QUEUE-TC03 | NextRunnable StopsQueueWhenAnyJobRequiresManualIntervention | All automated assertions pass. | Normal | Passed | 00:00:00.0560000 |
+| ORDER-QUEUE-TC04 | RecoverInterruptedJobs MarksRunningUnitForManualInterventionAndReportsOnce | All automated assertions pass. | Normal | Passed | 00:00:00.1110000 |
+| ORDER-QUEUE-TC05 | ExecuteOrderLifecycle ValidatesPersistsExecutesAndCompletesInOrder | All automated assertions pass. | Normal | Passed | 00:00:00.1930000 |
+| ORDER-QUEUE-TC06 | ValidateForThisEdge RejectsAnotherKiosk | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0020000 |
+| ORDER-QUEUE-TC07 | RecoverAwaitingAcknowledgements ReplaysAckAndActivatesDurableJob | All automated assertions pass. | Normal | Passed | 00:00:00.1370000 |
+| ORDER-QUEUE-TC08 | TryAdmit IsIdempotentByCommandId | All automated assertions pass. | Boundary | Passed | 00:00:00.0300000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.OrderRequestTests.Validate_RejectsLegacyLocalApiPayloads(json: "{\"orderId\":\"ORD-1\",\"steps\":[\"one.lua\"]}") | Passed | 00:00:00.0040000 |
-| IceBot.Harness.Tests.OrderRequestTests.Validate_RejectsLegacyLocalApiPayloads(json: "{}") | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.OrderRequestTests.Validate_RejectsLegacyLocalApiPayloads(json: "not-json") | Passed | 00:00:00.6180000 |
+## LUA-INSTALL - Verified Lua bundle installation
 
-### Peripheral device registration
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| LUA-INSTALL-TC01 | InstallVerifiedBundle RejectsArtifactChecksumMismatchWithoutActivatingLua | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0180000 |
+| LUA-INSTALL-TC02 | InstallVerifiedBundle InstallsGuidLuaAndManifest | All automated assertions pass. | Normal | Passed | 00:00:00.6330000 |
+| LUA-INSTALL-TC03 | InstallVerifiedBundle RejectsUnexpectedArchiveEntry | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0070000 |
+| LUA-INSTALL-TC04 | DeploymentReportOutbox OrdersInstalledBeforeActiveByDurableSequence | All automated assertions pass. | Normal | Passed | 00:00:00.0800000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.PeripheralDeviceRegistrationTests.MachineDeviceIds_RoundTripByStableMachineType | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.PeripheralDeviceRegistrationTests.ParseRegistrationResponse_ReturnsBackendDeviceId | Passed | 00:00:00.0150000 |
-| IceBot.Harness.Tests.PeripheralDeviceRegistrationTests.ParseRegistrationResponse_UsesBackendErrorMessage | Passed | 00:00:00.6200000 |
+## DEPLOY-API - Full Edge deployment command contract
 
-### Production report outbox
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| DEPLOY-API-TC01 | ParseFullEdgeDeployment RejectsWrongCommandType | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0020000 |
+| DEPLOY-API-TC02 | ParseFullEdgeDeployment AcceptsCompletePayload | Valid input is accepted and required data is retained. | Normal | Passed | 00:00:00.7120000 |
+| DEPLOY-API-TC03 | ParseFullEdgeDeployment RejectsIncompletePayload(json: "{}") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0010000 |
+| DEPLOY-API-TC04 | ParseFullEdgeDeployment RejectsIncompletePayload(json: "null") | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0020000 |
+| DEPLOY-API-TC05 | BuildAcknowledgementBody IncludesPhysicalEvidenceOnlyForRejectedOrder | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0020000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.ProductionReportOutboxTests.Enqueue_PersistsCompletePerUnitReportWithStableSequence | Passed | 00:00:00.4750000 |
+## DEVICE - Peripheral device registration contract
 
-### Robot hardware discovery
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| DEVICE-TC01 | ParseRegistrationResponse UsesBackendErrorMessage | All automated assertions pass. | Abnormal | Passed | 00:00:00.6300000 |
+| DEVICE-TC02 | MachineDeviceIds RoundTripByStableMachineType | All automated assertions pass. | Normal | Passed | 00:00:00.0030000 |
+| DEVICE-TC03 | ParseRegistrationResponse ReturnsBackendDeviceId | The expected value or identifier is returned. | Normal | Passed | 00:00:00.0610000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.RobotDeviceDiscoveryTests.ConfiguredDiscovery_RejectsIncompleteHardwareConfiguration | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.RobotDeviceDiscoveryTests.ConfiguredDiscovery_UsesConfiguredProfileAndOptionalBackendDeviceMapping | Passed | 00:00:00.3010000 |
+## SIM-ROBOT - Simulated robot and peripheral execution
 
-### Simulated robot executor
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| SIM-ROBOT-TC01 | Simulator AlsoSimulatesPeripheralsAndReportsNoPhysicalOutput | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| SIM-ROBOT-TC02 | Simulator FailsAtConfiguredStep | All automated assertions pass. | Normal | Passed | 00:00:00.1560000 |
+| SIM-ROBOT-TC03 | Factory UsesSimulatorOnlyWhenExplicitlyConfigured | All automated assertions pass. | Normal | Passed | 00:00:00.8670000 |
+| SIM-ROBOT-TC04 | Simulator RunsOpaqueExistingLuaWithoutContactingRobot | All automated assertions pass. | Abnormal | Passed | 00:00:00.1570000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.SimulatedRobotWorkflowExecutorTests.Factory_UsesSimulatorOnlyWhenExplicitlyConfigured | Passed | 00:00:00.8080000 |
-| IceBot.Harness.Tests.SimulatedRobotWorkflowExecutorTests.Simulator_FailsAtConfiguredStep | Passed | 00:00:00.1620000 |
-| IceBot.Harness.Tests.SimulatedRobotWorkflowExecutorTests.Simulator_RunsOpaqueExistingLuaWithoutContactingRobot | Passed | 00:00:00.1700000 |
-| IceBot.Harness.Tests.SimulatedRobotWorkflowExecutorTests.Simulator_AlsoSimulatesPeripheralsAndReportsNoPhysicalOutput | Passed | 00:00:00.0010000 |
+## ROBOT-DISCOVERY - Robot hardware discovery
 
-### Site settings and device mapping
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| ROBOT-DISCOVERY-TC01 | ConfiguredDiscovery UsesConfiguredProfileAndOptionalBackendDeviceMapping | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| ROBOT-DISCOVERY-TC02 | ConfiguredDiscovery RejectsIncompleteHardwareConfiguration | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0040000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.SiteSettingsTests.DeviceIdSerialization_IgnoresInvalidEntriesAndIsCaseInsensitive | Passed | 00:00:00.0400000 |
-| IceBot.Harness.Tests.SiteSettingsTests.DeviceIdSerialization_SkipsEmptyIdsAndMachineTypes | Passed | 00:00:00.0020000 |
-| IceBot.Harness.Tests.SiteSettingsTests.IsConfigured_RequiresBothNetBirdKeyAndPublicUrl | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.SiteSettingsTests.MachineLookups_AreCaseInsensitiveAndUnknownReturnsEmpty | Passed | 00:00:00.0130000 |
-| IceBot.Harness.Tests.SiteSettingsTests.SetupCompletion_IsIndependentFromDeploymentReadiness | Passed | 00:00:00.4010000 |
-| IceBot.Harness.Tests.SiteSettingsTests.ReportedDevicesSnapshot_ReusesRevisionAndObservedAtForSameContent | Passed | 00:00:00.0270000 |
-| IceBot.Harness.Tests.SiteSettingsTests.ReportedDevicesSnapshot_IncrementsVersionWhenContentChanges | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.SiteSettingsTests.ReadinessSafetyProfile_UsesSafeForSimulationOrVerifiedPhysicalTelemetry | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.SiteSettingsTests.ReadinessCapabilityProfile_PhysicalModeReportsRobotOnlyWhenSafetyIsVerified | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.SiteSettingsTests.ActiveWorkflowPeripheralDiscovery_UsesTriggerDeviceMachineTypesInsteadOfArtifactFileNames | Passed | 00:00:00.0010000 |
+## REPORT-OUT - Production report outbox
 
-### Typed Lua workflow plan
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| REPORT-OUT-TC01 | Enqueue PersistsCompletePerUnitReportWithStableSequence | All automated assertions pass. | Normal | Passed | 00:00:00.7930000 |
 
-| Test | Result | Duration |
-|---|---|---:|
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Compose_PreservesBackendArtifactOrder | Passed | 00:00:00.0240000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Compose_RejectsArtifactPathTraversal | Passed | 00:00:00.0030000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Execute_DispatchesEveryInstructionInOrder | Passed | 00:00:00.0040000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.HomeFallback_AppliesOnlyToVerifiedPointOnController37(errorCode: 143) | Passed | 00:00:00.0050000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.HomeFallback_AppliesOnlyToVerifiedPointOnController37(errorCode: -4) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.HomeFallback_RejectsUnexpectedPointOrError(pointName: "IceBot_Home", errorCode: 142) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.HomeFallback_RejectsUnexpectedPointOrError(pointName: "icebot_home", errorCode: 143) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.HomeFallback_RejectsUnexpectedPointOrError(pointName: "IceBot_Home", errorCode: -2) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.HomeFallback_RejectsUnexpectedPointOrError(pointName: "Other_Home", errorCode: 143) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_CycleLoopExpandsToFiniteInstructions | Passed | 00:00:00.0160000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_FairinoStudioOutputBuildsTypedExecutionPlan | Passed | 00:00:00.5420000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_RejectsUnsafeOrUnboundedWorkflow(lua: "local start_time = os.clock()\nwhile (os.clock() -"···) | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_RejectsUnsafeOrUnboundedWorkflow(lua: "MoveJ({1,2,3,4,5,6}, 0, 0, 0, 30, -1, -1)") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_RejectsUnsafeOrUnboundedWorkflow(lua: "os.execute(\"bad\")") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_RejectsUnsafeOrUnboundedWorkflow(lua: "SetDO(16, 1, 0)") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.Parse_RejectsUnsafeOrUnboundedWorkflow(lua: "SetToolDO(2, 1, 0, 0)") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.RuntimeHomePoint_UsesVerifiedFallbackIdentity | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.MachineTypeCanonicalizer_NormalizesKnownAliasAndWhitespace(input: "icemachine", expected: "ice_cream") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.MachineTypeCanonicalizer_NormalizesKnownAliasAndWhitespace(input: "ICE_cream", expected: "ICE_cream") | Passed | 00:00:00.0010000 |
-| IceBot.Harness.Tests.WorkflowExecutionPlanTests.MachineTypeCanonicalizer_NormalizesKnownAliasAndWhitespace(input: " bt_cup_l90 ", expected: "bt_cup_l90") | Passed | 00:00:00.0010000 |
+## MTLS-CERT - mTLS client certificate
+
+| ID | Scenario | Expected result | Type | Result | Duration |
+|---|---|---|---|---|---|
+| MTLS-CERT-TC01 | Ensure MigratesPasswordlessPfxToDpapiProtectedPassword | All automated assertions pass. | Normal | Passed | 00:00:00.1670000 |
+| MTLS-CERT-TC02 | Ensure RejectsExistingCertificateWithoutPrivateKey | Invalid or unsafe input is rejected as expected. | Abnormal | Passed | 00:00:00.0930000 |
+| MTLS-CERT-TC03 | Ensure CreatesReusableClientPfxAndSha256Fingerprint | The expected durable data is created without duplication. | Normal | Passed | 00:00:00.2820000 |
+| MTLS-CERT-TC04 | LoadForMtls ProvidesPrivateKeyUsableByWindowsSchannel | All automated assertions pass. | Normal | Passed | 00:00:01.7970000 |
 
 ## Result
 
-All 119 tests passed. No unit test was skipped or failed.
-
-### STM32 actuator firmware contract
-
-The harness validates the checked-in STM32 firmware source contract and the Edge plugin serial contract, including 0.1-second duration encoding. These tests do not energize the motor or replace physical hardware verification.
-
-The protocol contract tests include 1.2-second (`12`) and 1.6-second (`16`) duration encodings. The latest run also validates PB0 upper-limit and PB10 lower-limit wiring contracts, 20% default PWM, directional UP/DOWN trigger routing, and limit-driven Edge behavior. Physical motor/limit-switch travel was not exercised in this host run.
-
-| Test | Result |
-|---|---|
-| IceBot.Harness.Tests.IceCreamFirmwareContractTests.Firmware_MapsCommandsToMeasuredPhysicalDirections | Passed |
-| IceBot.Harness.Tests.IceCreamFirmwareContractTests.Firmware_ConfiguresUpperLimitAsActiveLowExtiInput | Passed |
-| IceBot.Harness.Tests.IceCreamFirmwareContractTests.Firmware_StopsAndRejectsPhysicalUpAtUpperLimitButKeepsDownAvailable | Passed |
-
-Run evidence: `harness/IceBot.Harness.Tests/TestResults/FirmwareContractTests.trx`
+All 123 tests passed.

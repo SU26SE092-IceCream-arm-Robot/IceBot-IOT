@@ -19,6 +19,10 @@ $catalog = [ordered]@{
     EdgeOrderExecutionQueueTests=@('ORDER-QUEUE','Durable production queue')
     ProductionReportOutboxTests=@('REPORT-OUT','Production report outbox')
     WorkflowExecutionPlanTests=@('WORKFLOW-PLAN','Lua composition and Edge instruction dispatch')
+    ConfigurationMenuTests=@('CONFIG-MENU','InitIceBot configuration menu navigation')
+    IceCreamFirmwareContractTests=@('ICE-FIRMWARE','STM32 actuator direction and limit-switch contract')
+    RobotDeviceDiscoveryTests=@('ROBOT-DISCOVERY','Robot hardware discovery')
+    SimulatedRobotWorkflowExecutorTests=@('SIM-ROBOT','Simulated robot and peripheral execution')
 }
 function Test-Type([string]$name) {
     if ($name -match 'Limit|Four|Ten|Boundary') { return 'Boundary' }
