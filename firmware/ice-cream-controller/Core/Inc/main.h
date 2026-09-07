@@ -61,6 +61,10 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define RS485_DE_Pin GPIO_PIN_4
 #define RS485_DE_GPIO_Port GPIOA
+#define UPPER_LIMIT_SWITCH_Pin GPIO_PIN_0
+#define UPPER_LIMIT_SWITCH_GPIO_Port GPIOB
+#define LOWER_LIMIT_SWITCH_Pin GPIO_PIN_10
+#define LOWER_LIMIT_SWITCH_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

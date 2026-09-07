@@ -48,7 +48,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 // Ice Cream Machine (Custom STM32 Controller) Serial Communication Protocol V0.2
-// See docs/Ice Cream Machine (Custom STM32 Controller) Serial Communication Protocol V0.1.md
+// See context/protocols/Ice Cream Machine Serial Communication Protocol.md
 #define RX_BUF_SIZE 16
 static uint8_t rxBuf[RX_BUF_SIZE];
 static volatile uint8_t rxIndex = 0;
@@ -65,6 +65,8 @@ typedef enum { MOTOR_STOP_STATE = 0, MOTOR_UP, MOTOR_DOWN } MotorDir;
 static volatile MotorDir currentDir = MOTOR_STOP_STATE;
 static volatile uint32_t stopDeadline = 0;
 static volatile uint8_t hasDeadline = 0;
+static volatile uint8_t upperLimitActive = 0;
+static volatile uint8_t lowerLimitActive = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,9 +85,11 @@ static void ProcessFrame(const uint8_t *frame, uint8_t len);
 static void Protocol_Poll(void);
 static void Motor_SetPwm(TIM_HandleTypeDef *htim, uint32_t channel, uint8_t dutyPercent);
 static uint8_t Motor_Stop(void);
-static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationSeconds);
-static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationSeconds);
+static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationTenths);
+static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationTenths);
 static void Motor_Poll(void);
+static uint8_t UpperLimit_IsActive(void);
+static uint8_t LowerLimit_IsActive(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -130,6 +134,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
   Motor_Stop();
+  upperLimitActive = UpperLimit_IsActive();
+  lowerLimitActive = LowerLimit_IsActive();
   HAL_UART_Receive_IT(&huart1, &rxBuf[0], 1);
   /* USER CODE END 2 */
 
@@ -412,6 +418,22 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(RS485_DE_GPIO_Port, &GPIO_InitStruct);
 
+  /* Configure upper limit switch: NO to GND, external pull-up to 3.3 V. */
+  GPIO_InitStruct.Pin = UPPER_LIMIT_SWITCH_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(UPPER_LIMIT_SWITCH_GPIO_Port, &GPIO_InitStruct);
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  /* Configure lower limit switch: NO to GND, external pull-up to 3.3 V. */
+  GPIO_InitStruct.Pin = LOWER_LIMIT_SWITCH_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LOWER_LIMIT_SWITCH_GPIO_Port, &GPIO_InitStruct);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
   /* USER CODE END MX_GPIO_Init_2 */
@@ -475,8 +497,8 @@ static uint8_t Motor_Stop(void)
     return 1;
 }
 
-// speedPercent 0 = use MCU default (60%); durationSeconds 0 = run until an explicit Stop.
-static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationSeconds)
+// speedPercent 0 = use MCU default (20%); durationTenths 0 = run until the matching limit switch.
+static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationTenths)
 {
     if (currentDir == MOTOR_DOWN)
     {
@@ -484,14 +506,20 @@ static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationSeconds)
     }
     if (speedPercent == 0)
     {
-        speedPercent = 60;
+        speedPercent = 20;
     }
-    Motor_SetPwm(&htim3, TIM_CHANNEL_4, 0);
-    Motor_SetPwm(&htim1, TIM_CHANNEL_1, speedPercent);
-    currentDir = MOTOR_UP;
-    if (durationSeconds > 0)
+    if (UpperLimit_IsActive())
     {
-        stopDeadline = HAL_GetTick() + (uint32_t)durationSeconds * 1000;
+        Motor_Stop();
+        return 0; // physical upper limit is active
+    }
+    /* PB1/TIM3_CH4 is physical UP; PA8/TIM1_CH1 is physical DOWN. */
+    Motor_SetPwm(&htim1, TIM_CHANNEL_1, 0);
+    Motor_SetPwm(&htim3, TIM_CHANNEL_4, speedPercent);
+    currentDir = MOTOR_UP;
+    if (durationTenths > 0)
+    {
+        stopDeadline = HAL_GetTick() + (uint32_t)durationTenths * 100;
         hasDeadline = 1;
     }
     else
@@ -501,7 +529,7 @@ static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationSeconds)
     return 1;
 }
 
-static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationSeconds)
+static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationTenths)
 {
     if (currentDir == MOTOR_UP)
     {
@@ -509,14 +537,20 @@ static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationSeconds)
     }
     if (speedPercent == 0)
     {
-        speedPercent = 60;
+        speedPercent = 20;
     }
-    Motor_SetPwm(&htim1, TIM_CHANNEL_1, 0);
-    Motor_SetPwm(&htim3, TIM_CHANNEL_4, speedPercent);
-    currentDir = MOTOR_DOWN;
-    if (durationSeconds > 0)
+    if (LowerLimit_IsActive())
     {
-        stopDeadline = HAL_GetTick() + (uint32_t)durationSeconds * 1000;
+        Motor_Stop();
+        return 0; // physical lower limit is active
+    }
+    /* PA8/TIM1_CH1 is physical DOWN. */
+    Motor_SetPwm(&htim3, TIM_CHANNEL_4, 0);
+    Motor_SetPwm(&htim1, TIM_CHANNEL_1, speedPercent);
+    currentDir = MOTOR_DOWN;
+    if (durationTenths > 0)
+    {
+        stopDeadline = HAL_GetTick() + (uint32_t)durationTenths * 100;
         hasDeadline = 1;
     }
     else
@@ -526,8 +560,26 @@ static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationSeconds)
     return 1;
 }
 
+
+static uint8_t UpperLimit_IsActive(void)
+{
+    return (HAL_GPIO_ReadPin(UPPER_LIMIT_SWITCH_GPIO_Port, UPPER_LIMIT_SWITCH_Pin) == GPIO_PIN_RESET) ? 1U : 0U;
+}
+
+static uint8_t LowerLimit_IsActive(void)
+{
+    return (HAL_GPIO_ReadPin(LOWER_LIMIT_SWITCH_GPIO_Port, LOWER_LIMIT_SWITCH_Pin) == GPIO_PIN_RESET) ? 1U : 0U;
+}
+
 static void Motor_Poll(void)
 {
+    upperLimitActive = UpperLimit_IsActive();
+    lowerLimitActive = LowerLimit_IsActive();
+    if ((upperLimitActive && currentDir == MOTOR_UP) || (lowerLimitActive && currentDir == MOTOR_DOWN))
+    {
+        Motor_Stop();
+        return;
+    }
     if (hasDeadline && (int32_t)(HAL_GetTick() - stopDeadline) >= 0)
     {
         Motor_Stop();
@@ -599,7 +651,20 @@ static void Protocol_Poll(void)
     ProcessFrame(frame, len);
 }
 
-// HAL callback — fires once per received byte (we re-arm 1 byte at a time).
+// Stop the matching direction when either limit input becomes active.
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == UPPER_LIMIT_SWITCH_Pin || GPIO_Pin == LOWER_LIMIT_SWITCH_Pin)
+    {
+        upperLimitActive = UpperLimit_IsActive();
+        lowerLimitActive = LowerLimit_IsActive();
+        if ((upperLimitActive && currentDir == MOTOR_UP) || (lowerLimitActive && currentDir == MOTOR_DOWN))
+        {
+            Motor_Stop();
+        }
+    }
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance != USART1)

@@ -371,6 +371,25 @@ Kiosk
 
 Edge chỉ report phần cứng robot mà nó thực sự điều khiển (`reported-devices`), readiness và execution. Khi có sensor cho máy kem, sensor gateway có thể gửi inventory observation vào các `IngredientDispenserStateId` đã được Backend cấu hình. Chế độ `Simulated` chỉ giả lập sensor gateway này cho Development; nó không khẳng định Edge điều khiển máy kem.
 
+## STM32 actuator: UP/DOWN và công tắc giới hạn
+
+Firmware tại `firmware/ice-cream-controller/` điều khiển motor qua BTS7960 và nhận lệnh từ Edge qua RS485, 115200 baud, 8N1.
+
+| Chức năng | Chân STM32 | Hành vi |
+|---|---|---|
+| UP | PB1 / TIM3_CH4 | Chạy lên, dừng khi upper kích hoạt |
+| DOWN | PA8 / TIM1_CH1 | Chạy xuống, dừng khi lower kích hoạt |
+| Upper | PB0 / EXTI0 | LOW chặn UP, vẫn cho phép DOWN để nhả |
+| Lower | PB10 / EXTI10 | LOW chặn DOWN, vẫn cho phép UP để nhả |
+
+Mỗi công tắc nối **COM → GPIO tương ứng, NO → GND STM32**, điện trở **4,7 kΩ từ GPIO lên 3,3 V**; NC để hở và bọc cách điện. Thả công tắc là HIGH, nhấn là LOW. Ghi chú cũ đấu NC xuống GND không đúng với cấu hình nhấn để kích hoạt LOW này. Công tắc thuộc miền nguồn STM32, không nối vào nguồn motor 24 V.
+
+Firmware xử lý cả hai chân trong callback ngắt và vòng lặp. PWM mặc định là 20%; thời gian lệnh tính theo 0,1 giây, giá trị `0` chạy đến giới hạn tương ứng hoặc STOP. Gửi STOP trước khi đổi chiều. Giữ công tắc chặn lệnh cùng chiều; thả cho phép nhận lệnh mới nhưng không tự chạy lại. Edge dùng hai trigger riêng `TriggerDevice("ice_cream", "UP")` và `TriggerDevice("ice_cream", "DOWN")`.
+
+Ngày 2026-09-07, firmware Release đã nạp qua ST-Link và xác minh Flash thành công. GPIO upper/lower đã được đọc trực tiếp ở cả trạng thái nhấn và thả; người vận hành xác nhận UP/DOWN chạy thực tế thành công sau các lần thử công tắc. STOP và Standby được kiểm tra qua RS485. COM7 chỉ là cổng trên máy test, không phải mặc định triển khai. Chưa ghi nhận ACK từ chối trong phép thử giữ liên tục công tắc; trạng thái Busy chỉ phản ánh lệnh firmware, không chứng minh motor đang quay.
+
+Hiện tượng chạm tay vào NC đang hở làm dừng motor đã được ghi nhận nhưng chưa xác định nguyên nhân. Bọc cách điện chân hở và thử bằng cần công tắc. Chi tiết bằng chứng và giới hạn kiểm thử: [project context](context/PROJECT_CONTEXT.md).
+
 ## Kiểm thử
 
 ```powershell
@@ -379,7 +398,7 @@ dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj --configu
 
 Trong `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, Edge mô phỏng cả tay robot và lệnh `TriggerDevice`: vẫn kiểm tra plugin/machine type nhưng không mở COM và không gọi driver vật lý. Edge báo capability `ROBOT_ARM` tại workcell `ARM_PRIMARY` và `safety=Safe` để Backend dispatch cùng contract với production release; log readiness cũng in rõ `safety` và `mode` đã gửi. Menu test serial quét `TriggerDevice` trong Lua active (không dựa vào tên artifact UUID) rồi chỉ gọi `TestConnection` trên COM đã cấu hình. Alias Lua `icemachine` được ánh xạ về driver `ice_cream`; report hoàn tất/thất bại gửi `physicalOutputMayHaveOccurred=false`. Hardware snapshot không đổi sẽ tái sử dụng cùng `snapshotRevision` và `observedAt` để retry idempotent, tránh HTTP 409 từ Backend. Trong physical mode, mỗi readiness probe kết nối Fairino và chỉ báo `safety=Safe`/capability `ROBOT_ARM` sau khi SDK communication bình thường, E-stop bằng 0, SI0/SI1 bằng 0 và cả mã lỗi chính/phụ bằng 0. Lỗi đọc telemetry hoặc bất kỳ tín hiệu không an toàn nào sẽ báo `Unknown`/`Unsafe` và không công bố capability.
 
-Lần xác minh gần nhất: **123/123 test passed**, gồm smoke test điều hướng menu Cấu hình của `InitIceBot`, capability/safety dispatch simulated và physical Fairino đã xác minh telemetry, discovery máy ngoại vi từ Lua active, simulator ngoại vi, alias machine type, hardware snapshot idempotency. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
+Lần xác minh gần nhất: **125/125 test passed**, gồm 5 firmware contract test cho mapping UP/DOWN, GPIO/EXTI và bảo vệ giới hạn, cùng các test Edge/driver hiện có. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
 
 ### Phạm vi kiểm thử
 
@@ -390,7 +409,7 @@ Các loại kiểm thử đã thực hiện:
 - Kiểm thử giao tiếp serial, frame và checksum.
 - Firmware contract test cho mapping motor, PWM và công tắc giới hạn.
 - Kiểm thử mô phỏng Edge và kiểm thử phần cứng thực tế bằng ST-Link/serial.
-- Kết quả gần nhất: 123 test passed.
+- Kết quả gần nhất: 125 test passed.
 
 ## Các phần chưa hoàn thành
 

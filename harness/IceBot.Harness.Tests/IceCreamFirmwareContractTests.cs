@@ -61,6 +61,33 @@ namespace IceBot.Harness.Tests
             Assert.Contains("LowerLimit_IsActive()", source);
         }
 
+        [Fact]
+        public void Firmware_HandlesBothLimitInterruptsAndStopsOnlyMatchingDirection()
+        {
+            var callback = Between(Read(@"Core\Src\main.c"),
+                "void HAL_GPIO_EXTI_Callback", "void HAL_UART_RxCpltCallback");
+
+            Assert.Contains("GPIO_Pin == UPPER_LIMIT_SWITCH_Pin || GPIO_Pin == LOWER_LIMIT_SWITCH_Pin", callback);
+            Assert.Contains("upperLimitActive = UpperLimit_IsActive();", callback);
+            Assert.Contains("lowerLimitActive = LowerLimit_IsActive();", callback);
+            Assert.Contains("(upperLimitActive && currentDir == MOTOR_UP) || (lowerLimitActive && currentDir == MOTOR_DOWN)", callback);
+            Assert.Contains("Motor_Stop();", callback);
+        }
+
+        [Fact]
+        public void Firmware_RejectsMatchingLimitButAllowsOppositeDirection()
+        {
+            var source = Read(@"Core\Src\main.c");
+            var up = Between(source, "static uint8_t Motor_RunUp", "static uint8_t Motor_RunDown");
+            var down = Between(source, "static uint8_t Motor_RunDown", "static uint8_t UpperLimit_IsActive");
+
+            Assert.Contains("if (UpperLimit_IsActive())", up);
+            Assert.DoesNotContain("LowerLimit_IsActive()", up);
+            Assert.Contains("if (LowerLimit_IsActive())", down);
+            Assert.Contains("return 0; // physical lower limit is active", down);
+            Assert.DoesNotContain("UpperLimit_IsActive()", down);
+        }
+
         private static string Between(string source, string start, string end)
         {
             var startIndex = source.LastIndexOf(start, StringComparison.Ordinal);

@@ -1,5 +1,18 @@
 # IceBot-IOT Test Document
 
+## STM32 limit EXTI verification — 2026-09-07
+
+- Scope: handle both PB0 upper and PB10 lower in the GPIO EXTI callback; preserve matching-direction stopping/rejection and opposite-direction release.
+- Firmware tests: 5 total, 5 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~IceCreamFirmwareContractTests --logger "trx;LogFileName=LimitExtiRegression.trx"`.
+- Full harness: 125 total, 125 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --logger "trx;LogFileName=LimitExtiFull.trx"`.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/LimitExtiRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/LimitExtiFull.trx`.
+- Release build: `cmake --build --preset Release` succeeded; Flash 8256 bytes, RAM 1896 bytes.
+- STM32CubeProgrammer flashed `firmware/ice-cream-controller/build/Release/ice-cream-controller.elf` through ST-Link `37FF71064E573436E04B1343`; reported `Download verified successfully` and performed MCU software reset.
+- Subsequent manual session: GPIO reads confirmed HIGH/LOW/HIGH on release/press/release for both limits; the operator confirmed successful physical UP/DOWN operation and real-hardware testing after exercising the switches. STOP/Standby replies were verified. These are manual observations, separate from the automated test counts.
+- A rejected command with the matching switch continuously held was not captured. Touching an exposed NC terminal caused a reported stop; the cause was not isolated. See `context/PROJECT_CONTEXT.md` for the corrected COM-to-GPIO / NO-to-GND wiring and evidence limits.
+
+## Previous full report
+
 - Generated: 2026-08-29 17:55:46
 - Framework: xUnit / .NET Framework 4.7.2
 - Total: 123

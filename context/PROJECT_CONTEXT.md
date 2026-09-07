@@ -1,6 +1,6 @@
 # IceBot-IOT Project Context
 
-Last reviewed: 2026-08-29
+Last reviewed: 2026-09-07
 
 ## Purpose
 
@@ -283,7 +283,7 @@ Simulation may explicitly report simulated safety. Physical mode must not claim 
 .\code\scripts\restore-fairino-sdk-dependencies.ps1
 dotnet build .\code\IceBot-IOT.sln -c Release --no-restore
 dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore
-# Latest verified result: 123 passed, 0 failed, 0 skipped
+# Latest verified result: 125 passed, 0 failed, 0 skipped
 ```
 
 Run:
@@ -312,15 +312,26 @@ The manually calibrated physical travel from LOW to HIGH is approximately 8 seco
 A `KW12-071` mechanical limit switch is used for the physical upper limit, and the lower limit uses the same active-low topology on `PB10`:
 
 - STM32 `PB0/B0` connects directly to the upper switch `COM`; STM32 `PB10` connects directly to the lower switch `COM`.
-- Each switch `NC` connects to STM32 GND.
-- Switch `NO` is left open.
+- Each switch `NO` connects to STM32 GND; `NC` is left unwired and insulated.
+- Released means GPIO HIGH (inactive); pressed means GPIO LOW (active). Earlier notes saying NC-to-GND were incorrect for this active-low, press-to-stop setup.
 - A `4.7 kΩ` pull-up resistor connects STM32 `3.3 V` to `PB0/B0`; a second `4.7 kΩ` pull-up connects `3.3 V` to `PB10`.
 - The switch belongs entirely to the STM32 control power domain.
 - It must not connect to the 24 V motor domain, BTS7960 ground, `A8`, or `B1`.
 
-Firmware configures `PB0` as a GPIO/EXTI input with an active-low upper-limit signal. An active upper-limit signal must stop physical UP motion immediately and reject further physical UP commands, while physical DOWN motion remains available to release the switch.
+Firmware configures both `PB0/EXTI0` and `PB10/EXTI10` as pull-up GPIO inputs with interrupts on both edges. The GPIO callback handles both pins, and the main loop also polls both inputs. An active matching limit stops motion and rejects further commands in that direction; the opposite direction remains available to release the switch. Releasing a switch does not restart the motor automatically, but a new command in that direction is allowed. A limit event is not a permanent latched lockout.
 
 The updated firmware is flashed to the STM32. The upper switch provides automatic stopping and physical-UP protection; the lower switch provides automatic stopping and physical-DOWN protection. Each opposite direction remains available to release the corresponding switch.
+
+### Hardware verification on 2026-09-07
+
+- The Release firmware was flashed through ST-Link and passed Flash readback verification before MCU reset.
+- Direct GPIO reads confirmed both switches: released HIGH, held LOW, then HIGH after release.
+- Manual RS485 tests used 115200 baud, 8N1, PWM 20%, and duration `0`. COM7 was the port on the test PC, not a deployment default. UP and DOWN require separate explicit commands; send STOP before changing direction.
+- The operator confirmed successful physical UP/DOWN motion and successful real-hardware testing after exercising the limit switches. STOP replies and subsequent Standby status were verified over RS485. This is manual actuator validation, not an automated robot/order E2E test.
+- During DOWN, ST-Link showed TIM1 and its channel output enabled, CCR1 = 199 with ARR = 999 (approximately 20% PWM), the UP channel at zero, and PB10 HIGH. Protocol Busy is derived from `currentDir`; it is not measured motor movement or driver feedback.
+- A repeated command after pressing and releasing a switch was accepted, as intended. The conversation did not capture a rejected command while the matching switch was continuously held; do not describe that as physically verified.
+- Touching the exposed NC terminal was reported to stop motion. The cause (input transient, reset, or contact issue) was not isolated, despite a reported 4.7 kOhm pull-up. Insulate unused terminals and test with the mechanical lever; do not claim this susceptibility has been fixed.
+
 ## Session Context Loading
 
 At the beginning of every new session, load both context files before making changes:
@@ -339,7 +350,7 @@ For actuator firmware direction, limit-switch, or Edge trigger changes, the cont
 - Test project: `harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj`.
 - Firmware contract tests: `harness/IceBot.Harness.Tests/IceCreamFirmwareContractTests.cs`.
 - Unit-test report: `testing/UNIT_TEST_REPORT.md`.
-- Test result evidence: `harness/IceBot.Harness.Tests/TestResults/PB10ConfigTests.trx`.
+- Test result evidence: `harness/IceBot.Harness.Tests/TestResults/LimitExtiRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/LimitExtiFull.trx` (local test artifacts).
 
 When any project code changes, including Edge runtime, API, configuration/provisioning, deployment, order execution, robot workflow, peripheral driver, or STM32 firmware code changes:
 

@@ -207,6 +207,19 @@ void USART1_IRQHandler(void)
   HAL_UART_IRQHandler(&huart1);
 }
 
+/**
+  * @brief This function handles EXTI line0 interrupt.
+  */
+void EXTI0_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(UPPER_LIMIT_SWITCH_Pin);
+}
+
+void EXTI15_10_IRQHandler(void)
+{
+  HAL_GPIO_EXTI_IRQHandler(LOWER_LIMIT_SWITCH_Pin);
+}
+
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
