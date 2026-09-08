@@ -9,9 +9,17 @@ namespace IceBot
     {
         public static void Run()
         {
-            SiteConfigStore.Load();
-            StoreAuth.RequireLogin();
-            ConsoleMenu.Run();
+            while (true)
+            {
+                System.Console.WriteLine("INIT ICEBOT\n1. Cau hinh va kiem tra may (dang nhap)\n2. Nhat ky va su co (offline)\n0. Thoat");
+                var choice = System.Console.ReadLine();
+                if (choice == null || choice.Trim() == "0") return;
+                if (choice.Trim() == "2") { DiagnosticsMenu.Run(); continue; }
+                if (choice.Trim() != "1") continue;
+                SiteConfigStore.Load();
+                StoreAuth.RequireLogin();
+                ConsoleMenu.Run();
+            }
         }
     }
 }

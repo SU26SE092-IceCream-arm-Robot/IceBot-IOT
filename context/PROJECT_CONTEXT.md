@@ -67,6 +67,8 @@ Owns machine installation only: prerequisites, NetBird, immutable application fi
 
 ### InitIceBot.exe
 
+The entry menu exposes local read-only diagnostics before Backend login: **2. Nhat ky va su co (offline)** reads application events and per-unit order/attempt history, filters by local date and order number/ID, paginates results, and exports the filtered view to `data/diagnostic-exports/`. It does not initialize configuration, connect NetBird, or start production. Option 1 preserves the authenticated configuration/device-test flow. Partial/corrupt records appear as read errors and are not changed or deleted.
+
 Owns technician-authorized initialization:
 
 1. Persist the physical Kiosk Code.
@@ -291,7 +293,7 @@ Simulation may explicitly report simulated safety. Physical mode must not claim 
 .\code\scripts\restore-fairino-sdk-dependencies.ps1
 dotnet build .\code\IceBot-IOT.sln -c Release --no-restore
 dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore
-# Latest verified result: 130 passed, 0 failed, 0 skipped
+# Latest verified result: 131 passed, 0 failed, 0 skipped
 ```
 
 Run:

@@ -2,6 +2,8 @@
 
 ## Recovery after power loss or an application crash
 
+To inspect local logs, open `InitIceBot.exe` and select **2. Nhat ky va su co (offline)**. This entry does not require Backend login or start production. Choose application events, order history, or both; optionally filter by local date (`yyyy-MM-dd`) and order number/ID. Results show ten entries per page, including each unit's status and interruption history. Enter `e` after viewing to export all filtered results to `data/diagnostic-exports/`. Unreadable records are reported without modifying or deleting their source files. Configuration and device tests remain behind the existing login under option 1.
+
 Before manually reopening `IceBot.exe`, staff must remove the interrupted product and check the robot, peripherals and workcell, including the path to `IceBot_Home`. Launching the executable authorizes restarting the interrupted production unit from the beginning, without an additional confirmation button. Do not configure unattended application restart.
 
 Units already persisted as `Completed` are preserved. For a four-unit order interrupted during unit three after units one and two were saved, Edge remakes unit three and then makes unit four. A physically finished unit whose `Completed` state was not saved is still incomplete. Existing terminal `Failed` or legacy `RequiresManualIntervention` records remain blocked.

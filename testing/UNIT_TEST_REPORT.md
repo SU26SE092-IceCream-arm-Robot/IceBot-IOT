@@ -1,5 +1,14 @@
 # IceBot-IOT Test Document
 
+## InitIceBot local diagnostics — 2026-09-08
+
+- Scope: offline entry before login; read-only application events and per-unit attempt history; date/order filtering; pagination and filtered text export; malformed/partial record tolerance without changing production state.
+- Targeted: 1 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --filter FullyQualifiedName~LocalDiagnosticsTests --logger "trx;LogFileName=LocalDiagnosticsRegression.trx"`.
+- Full harness: 131 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --logger "trx;LogFileName=LocalDiagnosticsFull.trx"`.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/LocalDiagnosticsRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/LocalDiagnosticsFull.trx`.
+- Release solution build succeeded with zero warnings/errors using `dotnet build code/IceBot-IOT.sln -c Release --no-restore -m:1 -nr:false`.
+- Tested against the existing workspace; no live Backend or hardware actions were performed.
+
 ## Edge restart recovery — 2026-09-08
 
 - Scope: operator-launched restart remakes only interrupted Running units; preserves Completed units; retains local attempt history; validates stored Lua before execution; guards concurrent runtime instances; records session/crash diagnostics; recovers pending completion reports with an identical envelope.
