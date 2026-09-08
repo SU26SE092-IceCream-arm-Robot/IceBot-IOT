@@ -10,6 +10,19 @@ namespace IceBot
     {
         private static void Main(string[] args)
         {
+            using (var session = new RuntimeSession(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "logs")))
+            {
+                try { MainCore(args); }
+                catch (Exception ex)
+                {
+                    session.RecordFailure(ex);
+                    throw;
+                }
+            }
+        }
+
+        private static void MainCore(string[] args)
+        {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             SiteConfigStore.Load();
 

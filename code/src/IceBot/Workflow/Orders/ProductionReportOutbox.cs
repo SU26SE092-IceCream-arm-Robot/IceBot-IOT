@@ -36,6 +36,11 @@ namespace IceBot.Workflow
         public static void Enqueue(DurableOrderJob job, DurableProductionUnit unit, string status,
             bool physicalOutputMayHaveOccurred, string? errorCode, string? errorMessage)
         {
+            if (status == "Completed" && unit.CompletionReport != null)
+            {
+                Store(unit.CompletionReport, AppConfig.GetReportOutboxDirectory());
+                return;
+            }
             Enqueue(job, unit, status, physicalOutputMayHaveOccurred, errorCode, errorMessage,
                 AppConfig.GetReportOutboxDirectory(), SiteConfigStore.NextExecutionReportSequence());
         }
@@ -46,7 +51,14 @@ namespace IceBot.Workflow
         {
             lock (Gate)
             {
-                var report = new ProductionReportData
+                Store(Create(job, unit, status, physicalOutputMayHaveOccurred, errorCode, errorMessage, sequenceNumber), directory);
+            }
+        }
+
+        internal static ProductionReportData Create(DurableOrderJob job, DurableProductionUnit unit, string status,
+            bool physicalOutputMayHaveOccurred, string? errorCode, string? errorMessage, long sequenceNumber)
+        {
+                return new ProductionReportData
                 {
                     CommandId = job.CommandId,
                     SourceEventId = Guid.NewGuid(),
@@ -64,12 +76,24 @@ namespace IceBot.Workflow
                     ErrorCode = errorCode,
                     ErrorMessage = errorMessage
                 };
+        }
+
+        internal static void Store(ProductionReportData report, string directory)
+        {
+            lock (Gate)
+            {
                 Directory.CreateDirectory(directory);
                 var path = Path.Combine(directory, report.SequenceNumber.ToString("D20") + "-" + report.SourceEventId.ToString("N") + ".json");
                 var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+                if (File.Exists(path)) return;
                 try
                 {
-                    File.WriteAllText(temporary, JsonSerializer.Serialize(report, JsonOptions), new UTF8Encoding(false));
+                    var bytes = new UTF8Encoding(false).GetBytes(JsonSerializer.Serialize(report, JsonOptions));
+                    using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    {
+                        stream.Write(bytes, 0, bytes.Length);
+                        stream.Flush(true);
+                    }
                     File.Move(temporary, path);
                 }
                 finally { if (File.Exists(temporary)) File.Delete(temporary); }

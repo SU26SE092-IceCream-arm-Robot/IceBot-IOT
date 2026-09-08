@@ -198,11 +198,19 @@ Invariants:
 - referenced Lua must exist and match checksum;
 - duplicate delivery is idempotent by `CommandId`;
 - durable jobs left at `AwaitingAck` replay the idempotent Backend ACK after restart before queue activation;
-- interrupted `Running` work is not silently restarted;
-- uncertain physical output requires manual intervention;
+- after staff removes the interrupted product and checks the workcell, manually launching `IceBot.exe` authorizes restarting the interrupted `Running` unit from its beginning;
+- persisted `Completed` units are never remade; physical completion without persisted `Completed` is treated as incomplete;
+- each interrupted local attempt is retained on the unit with its start/detection time; retries keep the same cloud production identity and do not emit a terminal interruption report;
+- existing `Failed` or legacy `RequiresManualIntervention` jobs remain blocked; this policy handles process interruption, not arbitrary terminal failures;
 - report sequence numbers are persisted and monotonic.
 
 `ProductionReportOutbox` persists evidence before delivery and retries Accepted, Running, Completed, Failed, and manual-intervention outcomes.
+
+Startup recovery records interrupted attempts and selects the first remaining pending unit. For four units with the first two durably completed, it remakes unit three and then executes unit four. The operator must clear the failed product, verify robot/peripheral starting conditions and the existing Home movement path before manually launching the executable. Do not configure Windows startup, service recovery, or an external launcher to automatically restart production. There is no confirmation button or step-level resume.
+
+Before a unit starts, Edge rechecks Lua checksums, composes the execution plan, probes Fairino safety telemetry and calls required peripheral drivers' read-only connection tests. These tests do not prove the physical workcell is clear or that a peripheral is in a safe starting position. A failed preflight leaves the unit pending and retries the check without physical execution. A global named mutex prevents concurrent `IceBot.exe` processes.
+
+Job and production-outbox writes flush file contents to disk before replacement/publication. Completion stores the immutable report envelope with the job before publishing it to the outbox; interrupted publication replays the same event ID, sequence and payload. Local interruption history is stored in `data/order-jobs/*.json`. Session startup, clean shutdown and catchable crashes are logged in `data/logs/runtime-events.jsonl`; `session-state.txt` detects an unclean previous session, without asserting whether the cause was power loss or a process crash. No live hardware recovery validation is implied by unit tests.
 
 ## Robot Executors
 
@@ -283,7 +291,7 @@ Simulation may explicitly report simulated safety. Physical mode must not claim 
 .\code\scripts\restore-fairino-sdk-dependencies.ps1
 dotnet build .\code\IceBot-IOT.sln -c Release --no-restore
 dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore
-# Latest verified result: 125 passed, 0 failed, 0 skipped
+# Latest verified result: 130 passed, 0 failed, 0 skipped
 ```
 
 Run:
@@ -397,7 +405,7 @@ This directory currently contains test/demo variants such as `real-demo-1408.lua
 - Persist state/evidence before acknowledging irreversible work.
 - Keep robot execution serial until multi-customer operation is explicitly designed.
 - Keep README, this project context, unit tests, and `testing/UNIT_TEST_REPORT.md` synchronized with behavior changes.
-- Treat uncertain physical output as manual intervention, never blind retry.
+- For interrupted production, staff must clear the product and check the workcell before manually restarting IceBot.exe; restart then authorizes remaking the incomplete unit. Never bypass this operating procedure through unattended process restart.
 
 ## Technology
 

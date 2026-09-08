@@ -157,7 +157,7 @@ namespace IceBot.Harness.Tests
         }
 
         [Fact]
-        public void RecoverInterruptedJobs_MarksRunningUnitForManualInterventionAndReportsOnce()
+        public void RecoverInterruptedJobs_PreparesLocalRetryAndRecordsInterruptionOnce()
         {
             var directory = Path.Combine(Path.GetTempPath(), "icebot-order-recovery-test-" + Guid.NewGuid().ToString("N"));
             try
@@ -173,10 +173,12 @@ namespace IceBot.Harness.Tests
                 EdgeOrderExecutionQueue.RecoverInterruptedJobs(directory, (_, __) => reportCount++);
                 var recovered = EdgeOrderExecutionQueue.LoadAll(directory)[0];
 
-                Assert.Equal("RequiresManualIntervention", recovered.Status);
-                Assert.Equal("RequiresManualIntervention", recovered.Units[0].Status);
-                Assert.Equal("RuntimeRestartedDuringExecution", recovered.Units[0].ErrorCode);
+                Assert.Equal("Pending", recovered.Status);
+                Assert.Equal("Pending", recovered.Units[0].Status);
+                Assert.Equal("RuntimeRestartedDuringExecution", Assert.Single(recovered.Units[0].Interruptions).Reason);
                 Assert.Equal("Pending", recovered.Units[1].Status);
+                Assert.Equal(1, reportCount);
+                EdgeOrderExecutionQueue.RecoverInterruptedJobs(directory, (_, __) => reportCount++);
                 Assert.Equal(1, reportCount);
             }
             finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
@@ -198,6 +200,94 @@ namespace IceBot.Harness.Tests
                 Assert.Null(EdgeOrderExecutionQueue.NextRunnable(directory));
             }
             finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        }
+
+        [Fact]
+        public void RestartAfterTwoCompletedUnits_RetriesThirdThenFinishesFourth()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "icebot-retry-" + Guid.NewGuid().ToString("N"));
+            ProductionReportSink sink = (_, __, ___, ____, _____, ______) => { };
+            try
+            {
+                var order = BuildOrder(4);
+                order.OrderLines[0].ProductionUnitStartNo = 1;
+                EdgeOrderExecutionQueue.TryAdmit(order, directory);
+                EdgeOrderExecutionQueue.Activate(order.CommandId, directory, sink);
+                for (var index = 0; index < 2; index++)
+                {
+                    var next = EdgeOrderExecutionQueue.NextRunnable(directory)!;
+                    var unit = EdgeOrderExecutionQueue.BeginNextUnit(next, directory, sink);
+                    EdgeOrderExecutionQueue.CompleteUnit(order.CommandId, unit.SourceProductionJobId, directory, sink);
+                }
+                var third = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                Assert.Equal(3, third.ProductionUnitNo);
+                // No completion is persisted, even if the physical action has finished.
+                for (var restart = 0; restart < 2; restart++)
+                {
+                    EdgeOrderExecutionQueue.RecoverInterruptedJobs(directory, (_, __) => { });
+                    third = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                    Assert.Equal(3, third.ProductionUnitNo);
+                    Assert.Equal(restart + 2, third.Attempt);
+                }
+                Assert.Equal(2, third.Interruptions.Count);
+                EdgeOrderExecutionQueue.CompleteUnit(order.CommandId, third.SourceProductionJobId, directory, sink);
+                var fourth = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                Assert.Equal(4, fourth.ProductionUnitNo);
+                EdgeOrderExecutionQueue.CompleteUnit(order.CommandId, fourth.SourceProductionJobId, directory, sink);
+                EdgeOrderExecutionQueue.RecoverInterruptedJobs(directory, (_, __) => throw new Exception("Completed unit retried"));
+                Assert.Null(EdgeOrderExecutionQueue.NextRunnable(directory));
+                var saved = Assert.Single(EdgeOrderExecutionQueue.LoadAll(directory));
+                Assert.All(saved.Units, unit => Assert.Equal("Completed", unit.Status));
+                Assert.Equal(1, saved.Units[0].Attempt);
+                Assert.Equal(1, saved.Units[1].Attempt);
+            }
+            finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        }
+
+        [Fact]
+        public void CompletionReportFailure_PreservesCompletedUnitAndRecoversReport()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "icebot-report-recovery-" + Guid.NewGuid().ToString("N"));
+            ProductionReportSink sink = (_, __, ___, ____, _____, ______) => { };
+            try
+            {
+                var order = BuildOrder(1);
+                EdgeOrderExecutionQueue.TryAdmit(order, directory);
+                EdgeOrderExecutionQueue.Activate(order.CommandId, directory, sink);
+                var unit = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                Assert.Throws<IOException>(() => EdgeOrderExecutionQueue.CompleteUnit(order.CommandId, unit.SourceProductionJobId,
+                    directory, (_, __, ___, ____, _____, ______) => throw new IOException("outbox unavailable")));
+                EdgeOrderExecutionQueue.FailUnit(order.CommandId, unit.SourceProductionJobId, directory, new Exception("report failed"));
+                EdgeOrderExecutionQueue.RecoverInterruptedJobs(directory, (_, __) => throw new Exception("Must not retry"));
+                Assert.Equal("Completed", EdgeOrderExecutionQueue.LoadAll(directory)[0].Units[0].Status);
+                var reports = 0;
+                EdgeOrderExecutionQueue.RecoverCompletionReports(directory, (_, __, status, ___, ____, _____) =>
+                {
+                    Assert.Equal("Completed", status);
+                    reports++;
+                });
+                EdgeOrderExecutionQueue.RecoverCompletionReports(directory, (_, __, ___, ____, _____, ______) => reports++);
+                Assert.Equal(1, reports);
+            }
+            finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        }
+
+        [Fact]
+        public void Preflight_RejectsChangedOrMissingLuaBeforeExecution()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "icebot-preflight-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var artifact = new ReceivedArtifact { RobotArtifactId = Guid.NewGuid(), ArtifactChecksum = Sha256(Encoding.UTF8.GetBytes("WaitMs(1)")) };
+                var unit = new DurableProductionUnit { Artifacts = new List<ReceivedArtifact> { artifact } };
+                Assert.Throws<FileNotFoundException>(() => OrderExecutionPreflight.ValidateArtifacts(unit, directory));
+                File.WriteAllText(Path.Combine(directory, artifact.ScriptFileName), "WaitMs(1)", new UTF8Encoding(false));
+                OrderExecutionPreflight.ValidateArtifacts(unit, directory);
+                File.WriteAllText(Path.Combine(directory, artifact.ScriptFileName), "WaitMs(2)");
+                Assert.Throws<InvalidDataException>(() => OrderExecutionPreflight.ValidateArtifacts(unit, directory));
+            }
+            finally { Directory.Delete(directory, true); }
         }
 
         private static string Sha256(byte[] bytes)

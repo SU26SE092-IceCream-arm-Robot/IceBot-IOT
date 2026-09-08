@@ -37,6 +37,18 @@ namespace IceBot.Workflow
         public string? ErrorCode { get; set; }
         public string? ErrorMessage { get; set; }
         public List<ReceivedArtifact> Artifacts { get; set; } = new List<ReceivedArtifact>();
+        public int Attempt { get; set; }
+        public List<InterruptedProductionAttempt> Interruptions { get; set; } = new List<InterruptedProductionAttempt>();
+        public bool CompletionReportPending { get; set; }
+        public ProductionReportData? CompletionReport { get; set; }
+    }
+
+    internal sealed class InterruptedProductionAttempt
+    {
+        public int Attempt { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset DetectedAt { get; set; }
+        public string Reason { get; set; } = "RuntimeRestartedDuringExecution";
     }
 
     internal delegate void ProductionReportSink(
@@ -119,7 +131,7 @@ namespace IceBot.Workflow
         public static void RecoverInterruptedJobs(string jobsDirectory)
         {
             RecoverInterruptedJobs(jobsDirectory, (job, unit) =>
-                ProductionReportOutbox.Enqueue(job, unit, unit.Status, PhysicalOutputMayHaveOccurred(), unit.ErrorCode, unit.ErrorMessage));
+                Console.WriteLine($"[RECOVERY] {job.OrderNumber}, unit {unit.ProductionUnitNo}: interrupted attempt recorded; restart from beginning."));
         }
 
         internal static void RecoverInterruptedJobs(
@@ -134,15 +146,24 @@ namespace IceBot.Workflow
                     var recovered = new List<DurableProductionUnit>();
                     foreach (var unit in job.Units.Where(unit => unit.Status == "Running"))
                     {
-                        unit.Status = "RequiresManualIntervention";
-                        unit.ErrorCode = "RuntimeRestartedDuringExecution";
-                        unit.ErrorMessage = "Edge restarted while this production unit was running; automatic retry is unsafe.";
+                        unit.Attempt = Math.Max(1, unit.Attempt);
+                        unit.Interruptions.Add(new InterruptedProductionAttempt
+                        {
+                            Attempt = unit.Attempt,
+                            StartedAt = unit.StartedAt,
+                            DetectedAt = DateTimeOffset.UtcNow
+                        });
+                        unit.Status = "Pending";
+                        unit.StartedAt = null;
+                        unit.CompletedAt = null;
+                        unit.ErrorCode = null;
+                        unit.ErrorMessage = null;
                         recovered.Add(unit);
                         changed = true;
                     }
                     if (changed)
                     {
-                        job.Status = "RequiresManualIntervention";
+                        job.Status = "Pending";
                         Save(job, jobsDirectory);
                         foreach (var unit in recovered)
                             enqueueRecoveryReport(job, unit);
@@ -183,22 +204,26 @@ namespace IceBot.Workflow
                 var job = Load(JobPath(jobsDirectory, selected.CommandId));
                 var unit = job.Units.First(candidate => candidate.Status == "Pending");
                 unit.Status = "Running";
+                unit.Attempt++;
                 unit.StartedAt = DateTimeOffset.UtcNow;
                 job.Status = "Running";
                 Save(job, jobsDirectory);
-                enqueueReport(job, unit, "Running", false, null, null);
+                // A restart is a local attempt of the same logical production unit.
+                // Do not regress the cloud lifecycle or publish a terminal failure for it.
+                if (unit.Attempt == 1)
+                    enqueueReport(job, unit, "Running", false, null, null);
                 return unit;
             }
         }
 
         public static void CompleteUnit(Guid commandId, Guid sourceJobId, string jobsDirectory) =>
-            CompleteUnit(commandId, sourceJobId, jobsDirectory, ProductionReportOutbox.Enqueue);
+            CompleteUnit(commandId, sourceJobId, jobsDirectory, ProductionReportOutbox.Enqueue, true);
 
         internal static void CompleteUnit(
             Guid commandId,
             Guid sourceJobId,
             string jobsDirectory,
-            ProductionReportSink enqueueReport)
+            ProductionReportSink enqueueReport, bool persistReport = false)
         {
             lock (Gate)
             {
@@ -206,9 +231,31 @@ namespace IceBot.Workflow
                 var unit = job.Units.Single(item => item.SourceProductionJobId == sourceJobId);
                 unit.Status = "Completed";
                 unit.CompletedAt = DateTimeOffset.UtcNow;
+                unit.CompletionReportPending = true;
+                if (persistReport)
+                    unit.CompletionReport = ProductionReportOutbox.Create(job, unit, "Completed",
+                        PhysicalOutputMayHaveOccurred(), null, null, SiteConfigStore.NextExecutionReportSequence());
                 job.Status = job.Units.All(item => item.Status == "Completed") ? "Completed" : "Pending";
                 Save(job, jobsDirectory);
                 enqueueReport(job, unit, "Completed", PhysicalOutputMayHaveOccurred(), null, null);
+                unit.CompletionReportPending = false;
+                Save(job, jobsDirectory);
+            }
+        }
+
+        internal static void RecoverCompletionReports(string jobsDirectory, ProductionReportSink enqueueReport)
+        {
+            lock (Gate)
+            {
+                foreach (var job in LoadAll(jobsDirectory))
+                {
+                    foreach (var unit in job.Units.Where(item => item.Status == "Completed" && item.CompletionReportPending))
+                    {
+                        enqueueReport(job, unit, "Completed", PhysicalOutputMayHaveOccurred(), null, null);
+                        unit.CompletionReportPending = false;
+                        Save(job, jobsDirectory);
+                    }
+                }
             }
         }
 
@@ -218,6 +265,8 @@ namespace IceBot.Workflow
             {
                 var job = Load(JobPath(jobsDirectory, commandId));
                 var unit = job.Units.Single(item => item.SourceProductionJobId == sourceJobId);
+                // A reporting/storage exception after completion must not turn a finished unit into a failure.
+                if (unit.Status == "Completed") return;
                 unit.Status = "Failed";
                 unit.CompletedAt = DateTimeOffset.UtcNow;
                 unit.ErrorCode = "WorkflowExecutionFailed";
@@ -246,7 +295,12 @@ namespace IceBot.Workflow
             Directory.CreateDirectory(directory);
             var destination = JobPath(directory, job.CommandId);
             var temporary = destination + ".tmp-" + Guid.NewGuid().ToString("N");
-            File.WriteAllText(temporary, JsonSerializer.Serialize(job, JsonOptions), new UTF8Encoding(false));
+            var bytes = new UTF8Encoding(false).GetBytes(JsonSerializer.Serialize(job, JsonOptions));
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                stream.Write(bytes, 0, bytes.Length);
+                stream.Flush(true);
+            }
             try { if (File.Exists(destination)) File.Replace(temporary, destination, null); else File.Move(temporary, destination); }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
@@ -275,8 +329,10 @@ namespace IceBot.Workflow
                 {
                     ProductionReportOutbox.Flush();
                     DeploymentReportOutbox.Flush();
+                    EdgeOrderExecutionQueue.RecoverCompletionReports(AppConfig.GetOrderJobsDirectory(), ProductionReportOutbox.Enqueue);
                     var job = EdgeOrderExecutionQueue.NextRunnable(AppConfig.GetOrderJobsDirectory());
                     if (job == null) { _stop.WaitOne(TimeSpan.FromSeconds(2)); continue; }
+                    OrderExecutionPreflight.Validate(job.Units.First(item => item.Status == "Pending"));
                     var unit = EdgeOrderExecutionQueue.BeginNextUnit(job, AppConfig.GetOrderJobsDirectory());
                     Console.WriteLine($"[ORDER] Bat dau {job.OrderNumber}, cay {unit.ProductionUnitNo}.");
                     try

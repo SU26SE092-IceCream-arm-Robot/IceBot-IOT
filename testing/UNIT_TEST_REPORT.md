@@ -1,5 +1,15 @@
 # IceBot-IOT Test Document
 
+## Edge restart recovery — 2026-09-08
+
+- Scope: operator-launched restart remakes only interrupted Running units; preserves Completed units; retains local attempt history; validates stored Lua before execution; guards concurrent runtime instances; records session/crash diagnostics; recovers pending completion reports with an identical envelope.
+- Targeted tests: 13 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --filter "FullyQualifiedName~EdgeOrderExecutionQueueTests|FullyQualifiedName~RuntimeSessionTests" --logger "trx;LogFileName=RestartRecoveryRegression.trx"`.
+- Full harness: 130 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --logger "trx;LogFileName=RestartRecoveryFull.trx"`.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/RestartRecoveryRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/RestartRecoveryFull.trx`.
+- Release solution build: `dotnet build code/IceBot-IOT.sln -c Release --no-restore -m:1 -nr:false` succeeded, zero warnings/errors.
+- Initial sandbox run could not perform File.Replace in temporary test directories; verification above ran outside the sandbox and passed. Tests simulate interruption through persisted state and injected report failure; no power was cut and no physical device was commanded.
+- Validation uses the current workspace, which already contains unrelated uncommitted runtime/SDK/plugin changes. No clean-checkout or live Backend acceptance test was performed. Backend source was not modified.
+
 ## STM32 limit EXTI verification — 2026-09-07
 
 - Scope: handle both PB0 upper and PB10 lower in the GPIO EXTI callback; preserve matching-direction stopping/rejection and opposite-direction release.

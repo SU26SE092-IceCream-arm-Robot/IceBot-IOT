@@ -1,5 +1,13 @@
 # IceBot-IOT
 
+## Recovery after power loss or an application crash
+
+Before manually reopening `IceBot.exe`, staff must remove the interrupted product and check the robot, peripherals and workcell, including the path to `IceBot_Home`. Launching the executable authorizes restarting the interrupted production unit from the beginning, without an additional confirmation button. Do not configure unattended application restart.
+
+Units already persisted as `Completed` are preserved. For a four-unit order interrupted during unit three after units one and two were saved, Edge remakes unit three and then makes unit four. A physically finished unit whose `Completed` state was not saved is still incomplete. Existing terminal `Failed` or legacy `RequiresManualIntervention` records remain blocked.
+
+The runtime revalidates Lua checksums and checks robot safety telemetry and peripheral connectivity before execution. Connection checks do not verify that staff has removed the old product. Attempt history is retained in `data/order-jobs/*.json`; session/crash diagnostics are in `data/logs/runtime-events.jsonl` alongside `session-state.txt`. A power cut is inferred at the next startup, not logged at the instant power disappears. Interrupted local attempts do not create new Backend production jobs; this does not add remake inventory accounting to Backend.
+
 Ứng dụng Edge điều phối hệ thống bán kem tự động gồm máy tính Edge tại kiosk, tay máy Fairino FR5 và các máy ngoại vi. Trong dự án này, **Kiosk và máy Edge là cùng một máy vật lý**.
 
 IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng file Lua cho bộ điều khiển Fairino, sau đó gọi driver của máy ngoại vi tương ứng. Thứ tự bước sản xuất do Backend quyết định; Edge không tự sắp xếp lại.
