@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>IceBot.Driver.IceCream</AssemblyName>
+    <RootNamespace>IceBot.Driver.IceCream</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\code\src\IceBot.Driver.Abstractions\IceBot.Driver.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="IceBot.Harness.Tests" />
+  </ItemGroup>
+</Project>
