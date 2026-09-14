@@ -7,6 +7,7 @@ using IceBot.Config;
 using IceBot.Machines;
 using IceBot.Robot;
 using IceBot.Workflow;
+using IceBot.Workflow.Execution;
 
 namespace IceBot.Cli
 {
@@ -325,11 +326,9 @@ namespace IceBot.Cli
             }
         }
 
-        // Test may > 2: connection-only check for every peripheral machine this store actually
-        // has, per SiteSettings.ProvisionedSteps (recorded by WorkflowProvisioner whenever a
-        // provisioning call succeeds). Each provisioned step name is resolved back to its
-        // machine via MachineRegistry.TryGetModule — machines with no RS485 driver (e.g. pure
-        // arm-motion steps) are silently skipped, since there is nothing to connect to.
+        // Test may > 2 is connection-only. Full Edge bundles name artifacts by GUID, so discover
+        // TriggerDevice machine types from the active Lua files instead of treating artifact names
+        // as machine names. The older ProvisionedSteps fallback remains for legacy provisioning.
         public static void RunPeripheralConnectionTestMode()
         {
             PrintBanner();
@@ -337,17 +336,17 @@ namespace IceBot.Cli
             Console.WriteLine();
 
             var settings = SiteConfigStore.Load();
-            if (settings.ProvisionedSteps.Count == 0)
+            var machineTypes = new List<string>(ActiveWorkflowPeripheralDiscovery
+                .DiscoverMachineTypes(settings.ActiveWorkflowDirectory));
+            if (machineTypes.Count == 0)
             {
-                Console.WriteLine("Chua co Lua artifact nao duoc ghi nhan. Vao Cau hinh > 4 de dong bo deployment tu BE truoc.");
-                Pause();
-                return;
+                machineTypes.AddRange(settings.ProvisionedSteps);
             }
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var stepName in settings.ProvisionedSteps)
+            foreach (var machineType in machineTypes)
             {
-                if (!MachineRegistry.TryGetModule(stepName, out var module) || !(module is IMachineTrigger trigger))
+                if (!MachineRegistry.TryGetModuleByMachineType(machineType, out var module) || !(module is IMachineTrigger trigger))
                 {
                     continue;
                 }
@@ -360,18 +359,18 @@ namespace IceBot.Cli
                 var comPort = settings.GetMachinePort(trigger.MachineType);
                 if (string.IsNullOrWhiteSpace(comPort))
                 {
-                    Console.WriteLine($"{stepName} : disconnect (chua cau hinh cong COM)");
+                    Console.WriteLine($"{trigger.DisplayName} : disconnect (chua cau hinh cong COM)");
                     continue;
                 }
 
                 try
                 {
                     trigger.TestConnection(comPort);
-                    Console.WriteLine($"{stepName} : connect");
+                    Console.WriteLine($"{trigger.DisplayName} ({comPort}) : connect");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"{stepName} : disconnect ({ex.Message})");
+                    Console.WriteLine($"{trigger.DisplayName} ({comPort}) : disconnect ({ex.Message})");
                 }
             }
 

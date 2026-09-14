@@ -73,7 +73,7 @@ namespace IceBot.Workflow
             {
                 if (instruction.Kind != WorkflowInstructionKind.TriggerDevice) continue;
                 if (!IsTriggerCommand(instruction.Command))
-                    throw new InvalidDataException($"{instruction.SourceFile}:{instruction.SourceLine}: Command '{instruction.Command}' chua duoc ho tro; dung ON hoac TRIGGER.");
+                    throw new InvalidDataException($"{instruction.SourceFile}:{instruction.SourceLine}: Command '{instruction.Command}' chua duoc ho tro; dung UP, DOWN, ON hoac TRIGGER.");
                 if (!MachineRegistry.TryGetModuleByMachineType(instruction.MachineType, out var module))
                     throw new InvalidDataException($"{instruction.SourceFile}:{instruction.SourceLine}: Khong co driver cho machineType '{instruction.MachineType}'.");
                 if (!(module is IMachineTrigger))
@@ -85,7 +85,9 @@ namespace IceBot.Workflow
 
         private static bool IsTriggerCommand(string command) =>
             string.Equals(command, "ON", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(command, "TRIGGER", StringComparison.OrdinalIgnoreCase);
+            string.Equals(command, "TRIGGER", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(command, "UP", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(command, "DOWN", StringComparison.OrdinalIgnoreCase);
 
         internal static bool IsPeripheralSimulationEnabled =>
             AppConfig.RobotExecutionMode == RobotExecutionMode.Simulated;
@@ -107,7 +109,7 @@ namespace IceBot.Workflow
                     Console.WriteLine($"[SIMULATOR] Peripheral trigger simulated: {module.MachineType} {command}.");
                     return;
                 }
-                trigger.Trigger(SiteConfigStore.Load().GetMachinePort(trigger.MachineType));
+                trigger.Trigger(SiteConfigStore.Load().GetMachinePort(trigger.MachineType), command);
             }
         }
     }

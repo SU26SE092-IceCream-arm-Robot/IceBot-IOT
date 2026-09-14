@@ -14,7 +14,7 @@ namespace IceBot.Driver.Template
         public void TestConnection(string connectionName) =>
             throw new NotImplementedException("Implement the machine connection check.");
 
-        public void Trigger(string connectionName) =>
+        public void Trigger(string connectionName, string command) =>
             throw new NotImplementedException("Implement the machine command protocol.");
 
         public string GetStatusText(string connectionName) =>

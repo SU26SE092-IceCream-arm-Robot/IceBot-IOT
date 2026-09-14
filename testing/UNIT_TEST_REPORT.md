@@ -1,5 +1,15 @@
 # IceBot-IOT Test Document
 
+## Complete repository build verification — 2026-09-14
+
+- Scope: track the missing setup, machine canonicalization, and Fairino safety helpers; include readiness profiles and pending runtime/driver changes; synchronize the two-argument trigger contract and directional driver documentation.
+- Targeted: 46 total, 46 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --filter "FullyQualifiedName~SiteSettingsTests|FullyQualifiedName~WorkflowExecutionPlanTests|FullyQualifiedName~IceCreamDriverTests|FullyQualifiedName~IceCreamFirmwareContractTests|FullyQualifiedName~EdgeReadiness" --logger "trx;LogFileName=RepositorySyncRegression.trx"`.
+- Workspace full harness: 131 total, 131 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --logger "trx;LogFileName=RepositorySyncFull.trx"`.
+- Exported only staged Git files using `git checkout-index --all --prefix=artifacts/git-verification/` into an empty directory, with no existing build outputs or local configuration. Ran `code/scripts/restore-fairino-sdk-dependencies.ps1`, then `dotnet build code/IceBot-IOT.sln -c Release -m:1 -nr:false` there: succeeded, 0 errors, 4 existing Fairino SDK compiler warnings (CS0114, CS0169, twice CS0414).
+- Exported-source full harness: 131 total, 131 passed, 0 failed, 0 skipped. Command from the export directory: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj -c Release --no-restore -m:1 -nr:false --logger "trx;LogFileName=CleanRepositoryFull.trx"`.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/RepositorySyncRegression.trx`, `harness/IceBot.Harness.Tests/TestResults/RepositorySyncFull.trx`, and `artifacts/git-verification/harness/IceBot.Harness.Tests/TestResults/CleanRepositoryFull.trx` (local ignored artifacts).
+- Initial sandbox full run failed 8 tests because Windows certificate/file operations were restricted; the full runs above passed outside the sandbox. Initial workspace restore reported NU1900 because the NuGet vulnerability endpoint was inaccessible; restore in the exported-source verification succeeded outside the sandbox. Verification used this machine's installed SDK/targeting packs and NuGet cache; no live robot, serial peripheral, or Backend was exercised.
+
 ## InitIceBot local diagnostics — 2026-09-08
 
 - Scope: offline entry before login; read-only application events and per-unit attempt history; date/order filtering; pagination and filtered text export; malformed/partial record tolerance without changing production state.

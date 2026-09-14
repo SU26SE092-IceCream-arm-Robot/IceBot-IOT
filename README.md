@@ -10,15 +10,15 @@ Units already persisted as `Completed` are preserved. For a four-unit order inte
 
 The runtime revalidates Lua checksums and checks robot safety telemetry and peripheral connectivity before execution. Connection checks do not verify that staff has removed the old product. Attempt history is retained in `data/order-jobs/*.json`; session/crash diagnostics are in `data/logs/runtime-events.jsonl` alongside `session-state.txt`. A power cut is inferred at the next startup, not logged at the instant power disappears. Interrupted local attempts do not create new Backend production jobs; this does not add remake inventory accounting to Backend.
 
-Ứng dụng Edge điều phối hệ thống bán kem tự động gồm máy tính Edge tại kiosk, tay máy Fairino FR5 và các máy ngoại vi. Trong dự án này, **Kiosk và máy Edge là cùng một máy vật lý**.
+Ứng dụng Edge điều phối hệ thống bán kem tự động gồm máy tính Edge tại kiosk, tay máy Fairino FR5 và các máy ngoại vi. Flutter Kiosk App và Edge là hai ứng dụng riêng, có thể triển khai trên cùng thiết bị hoặc các thiết bị riêng biệt. Kiosk App chạy trên tablet hoặc máy tính có nền tảng được ứng dụng Flutter hỗ trợ, bao gồm Windows; Edge hiện chạy trên Windows. Kiosk App gửi đơn tới Backend; Edge pull lệnh từ Backend để thực thi.
 
-IceBot nhận Order từ Backend, lưu và điều phối workflow, gửi từng file Lua cho bộ điều khiển Fairino, sau đó gọi driver của máy ngoại vi tương ứng. Thứ tự bước sản xuất do Backend quyết định; Edge không tự sắp xếp lại.
+IceBot nhận Order từ Backend, lấy các tệp Lua đã lưu trên máy theo thứ tự Backend cung cấp, phân tích thành kế hoạch lệnh và thực thi qua Fairino SDK cùng plugin driver máy ngoại vi. Edge không tự sắp xếp lại thứ tự chương trình.
 
 ## Trạng thái quan trọng
 
 - `IceBot-Setup.exe` là bootstrapper cài đặt: kiểm tra .NET Framework, cài NetBird, copy ứng dụng, tạo thư mục/quyền và shortcut.
-- `IceBot.exe` là runtime sản xuất: tự mở server, kết nối NetBird và bắt đầu pull Order từ BE bằng mTLS. Không cần đăng nhập tài khoản cửa hàng để chạy.
-- `InitIceBot.exe` dành cho kỹ thuật viên: đăng nhập, khởi tạo Edge, cấu hình, đăng ký máy ngoại vi và kiểm tra phần cứng.
+- `IceBot.exe` là runtime sản xuất: kết nối NetBird và bắt đầu pull Order từ BE bằng mTLS. Không cần đăng nhập tài khoản cửa hàng để chạy.
+- `InitIceBot.exe` cung cấp xem log offline; kỹ thuật viên đăng nhập để khởi tạo Edge, cấu hình, đăng ký máy ngoại vi và kiểm tra phần cứng.
 - Đăng nhập thật với BE, đăng ký Kiosk/Execution Endpoint, cấp mTLS, kích hoạt Kiosk và heartbeat đã được triển khai.
 - mTLS `ExecuteOrder` đã có queue bền vững, kiểm tra đúng Kiosk/Endpoint/release/Lua, ACK `Accepted`, chạy lần lượt từng cây và gửi trạng thái về BE.
 - API local cũ `POST /api/orders` đã bị loại bỏ; production chỉ có một lifecycle chuẩn là outbound mTLS command pull.
@@ -36,8 +36,7 @@ IceBot-Setup.exe → InitIceBot.exe → IceBot.exe
         ├── Config          kết nối, khởi tạo và lưu cấu hình
         ├── Workflow        nhận Order, provisioning và thực thi
         ├── Machines        registry + driver máy ngoại vi
-        ├── Robot           giao tiếp Fairino
-        └── Networking      HTTP server cục bộ
+        └── Robot           giao tiếp Fairino
 ```
 
 Các pattern chính:
@@ -67,7 +66,6 @@ IceBot-IOT/
 │   │   │   │   ├── Setup/              wizard kỹ thuật viên
 │   │   │   │   └── Storage/            cấu hình cục bộ
 │   │   │   ├── Machines/               plugin loader/registry; không chứa driver thả cốc
-│   │   │   ├── Networking/             local HTTP API
 │   │   │   ├── Robot/                  Fairino Lua executor
 │   │   │   └── Workflow/
 │   │   │       ├── Orders/             receiver, inbox và queue
@@ -98,7 +96,7 @@ IceBot-IOT/
 - Global working context: `context/GLOBAL_WORKING_CONTEXT.md`
 - Protocols: `context/protocols/`
 - Hardware Architecture: `context/Hardware_Architecture/`
-- System Architecture: `context/System_Architecture/`
+- System Architecture: `context/System_Architecture/System_Architecture_Document.md`
 - Lua test files: `context/lua-tests/`
 
 ## Yêu cầu
@@ -124,7 +122,7 @@ trước khi build với `--no-restore`.
 Sau khi build Release:
 
 ```powershell
-# Runtime sản xuất: server + nhận Order
+# Runtime sản xuất: pull và thực thi Order
 code/src/IceBot/bin/Release/net472/IceBot.exe
 
 # Công cụ cấu hình và test dành cho kỹ thuật viên
@@ -204,7 +202,7 @@ Nếu endpoint đã `Active`, InitIceBot yêu cầu đúng PFX hiện có; khôn
 
 ### 3. `IceBot.exe` — vận hành bán hàng
 
-Sau khi khởi tạo thành công, chạy `IceBot.exe`. Runtime không cài dependency và không yêu cầu tài khoản cửa hàng; nó chỉ kết nối lại NetBird, mở server và bắt đầu nhận Order.
+Sau khi khởi tạo thành công, chạy `IceBot.exe`. Runtime kết nối lại NetBird, pull lệnh và thực thi đơn hàng mà không yêu cầu tài khoản cửa hàng. Nếu phiên trước bị gián đoạn, nhân viên phải xử lý sản phẩm dở và kiểm tra máy trước khi mở lại ứng dụng theo quy trình phục hồi ở đầu tài liệu.
 
 ## Trách nhiệm của từng chương trình
 
@@ -219,16 +217,28 @@ Sau khi khởi tạo thành công, chạy `IceBot.exe`. Runtime không cài depe
 
 - Không yêu cầu login hoặc refresh JWT.
 - Kiểm tra/kết nối NetBird nếu đã có setup key.
-- Mở local API tại `http://localhost:5080/`.
+- Phục hồi cây đang chạy bị gián đoạn khi nhân viên chủ động mở lại ứng dụng; giữ nguyên cây đã lưu `Completed`.
 - Bắt đầu pull `ExecuteOrder` từ BE mỗi 5 giây nếu đủ cấu hình mTLS.
-- Hiển thị cửa sổ CMD, PID, URL, trạng thái API/order pull và heartbeat log mỗi 30 giây.
+- Hiển thị cửa sổ CMD, PID, trạng thái order pull và báo cáo vận hành định kỳ mỗi 30 giây.
 - Nhập `exit` để dừng bình thường; nhập `test` để chạy workflow test đã cấu hình.
 
 Login thất bại trong `InitIceBot.exe` không làm dừng một `IceBot.exe` đang bán hàng.
 
 ### `InitIceBot.exe`
 
-Chỉ hiển thị menu sau khi đăng nhập tài khoản cửa hàng thành công. Menu cấu hình được nhóm theo tác vụ để kỹ thuật viên không phải chọn giữa các thao tác trùng nhau:
+Màn hình đầu tiên không yêu cầu đăng nhập:
+
+```text
+1. Cau hinh va kiem tra may (dang nhap)
+2. Nhat ky va su co (offline)
+   1. Nhat ky ung dung
+   2. Lich su don hang
+   3. Tat ca
+   0. Quay lai
+0. Thoat
+```
+
+Mục nhật ký hỗ trợ lọc theo ngày, mã đơn, xem chi tiết từng cây và xuất kết quả. Sau khi chọn mục 1 và đăng nhập thành công, menu quản trị hiển thị:
 
 ```text
 1. Cau hinh
@@ -304,19 +314,19 @@ BE
   → lưu tiến độ và gửi report qua data/report-outbox
 ```
 
-Nếu Edge khởi động lại giữa lúc một cây đang chạy, hệ thống không tự làm lại cây đó mà chuyển sang `RequiresManualIntervention` và dừng các đơn sau để tránh bán trùng.
+Nếu phiên trước dừng giữa lúc một cây đang chạy, nhân viên dọn sản phẩm dở và kiểm tra máy trước khi mở lại `IceBot.exe`. Edge lưu lịch sử gián đoạn và làm lại cây đó từ đầu sau khi kiểm tra điều kiện thực thi; các cây đã lưu `Completed` được giữ nguyên. Các job đã ghi `Failed` hoặc `RequiresManualIntervention` từ trước vẫn bị khóa. Lịch sử làm lại được lưu tại Edge và giữ cùng danh tính thực thi trên BE; gián đoạn này không phát báo cáo lỗi kết thúc lên BE.
 
 ### API order local cũ
 
 `POST /api/orders`, `OrderQueue` và lifecycle nhận order inbound đã bị loại bỏ. Runtime production chỉ nhận `ExecuteOrder` bằng outbound mTLS pull; không tạo lại local API như một lifecycle thứ hai.
 ## Lua và robot
 
-Mỗi file `.lua` là một bước chuyển động của tay máy. Khi thực thi một sản phẩm:
+Các tệp `.lua` cục bộ được phân tích thành kế hoạch lệnh theo thứ tự Backend cung cấp. Khi thực thi một sản phẩm:
 
-1. Kết nối Fairino tại `192.168.58.2`.
-2. Đi tới teaching point `IceBot_Home` lưu trong Fairino controller.
-3. Với từng bước: `LuaUpload → ProgramLoad → ProgramRun` và chờ hoàn thành.
-4. Nếu module của bước implements `IMachineTrigger`, gọi driver RS485 ngay sau khi tay máy đến vị trí.
+1. Kiểm tra checksum Lua, kế hoạch lệnh, telemetry an toàn robot và kết nối máy ngoại vi cần dùng.
+2. Kết nối Fairino tại IP đã cấu hình (mặc định `192.168.58.2`) và đi tới teaching point `IceBot_Home`.
+3. Thực thi tuần tự các lệnh chuyển động, đầu ra và chờ qua bộ thực thi Edge/Fairino SDK.
+4. Khi gặp `TriggerDevice`, gọi plugin driver tương ứng tại đúng vị trí trong kế hoạch và chờ hoàn tất.
 5. Sau toàn bộ workflow, quay lại `IceBot_Home`.
 
 `IceBot_Home` không phải file Lua. Lua production nằm trong `workflow/` tại máy Edge và không được commit.
@@ -328,9 +338,11 @@ Trên controller Web 3.7.7, nếu XML-RPC trả `143`/`-4` dù điểm `IceBot_H
 Code provisioning hỗ trợ pull `DeployConfiguration` bằng mTLS, tải ZIP từ object storage, kiểm tra kích thước/SHA-256 và chỉ cài bundle hợp lệ. MinIO production dùng `https://artifacts.internal.icebot.io.vn`; Edge đã tải và xác minh bundle thật thành công. ACK deployment không gửi `physicalOutputMayHaveOccurred`; trường này chỉ được gửi với giá trị `false` khi Edge từ chối `ExecuteOrder` trước sản xuất. Report deployment được flush theo `SequenceNumber` để luôn gửi `Installed` trước `Active`.
 Order mTLS dùng trực tiếp `{RobotArtifactId}.lua` theo contract deployment mới.
 
+Edge tải Lua khi đồng bộ deployment rồi sử dụng bản cục bộ cho các đơn tiếp theo. Lệnh đơn hàng tham chiếu danh sách artifact và thứ tự thực thi; Edge không tải lại Lua cho mỗi đơn. Khi có cập nhật deployment, Edge đồng bộ chương trình theo luồng triển khai.
+
 ## Máy ngoại vi và plugin driver
 
-Máy ngoại vi được Edge điều khiển trực tiếp phải có serial transport và protocol điều khiển được mô tả, cùng Edge plugin driver tương ứng; transport có thể là RS232 hoặc RS485 theo từng thiết bị. Lua chỉ đưa tay máy tới vị trí; tín hiệu vận hành thiết bị được gửi từ plugin DLL sau khi Lua hoàn tất. RS485 là lớp vật lý; protocol lệnh và frame có thể riêng theo từng thiết bị.
+Máy ngoại vi được Edge điều khiển trực tiếp phải có serial transport và protocol điều khiển được mô tả, cùng Edge plugin driver tương ứng; transport có thể là RS232 hoặc RS485 theo từng thiết bị. Các máy trong sơ đồ hệ thống dùng RS485. Plugin DLL gửi tín hiệu khi kế hoạch thực thi tới lệnh `TriggerDevice`. RS485 là lớp vật lý; protocol lệnh và frame có thể riêng theo từng thiết bị, nên chỉ có đầu nối RS485 chưa đủ để tích hợp.
 
 Core `code/src/IceBot/Machines/` hiện chỉ còn plugin loader và registry. Không có code giao thức
 hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục
@@ -408,7 +420,7 @@ dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj --configu
 
 Trong `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, Edge mô phỏng cả tay robot và lệnh `TriggerDevice`: vẫn kiểm tra plugin/machine type nhưng không mở COM và không gọi driver vật lý. Edge báo capability `ROBOT_ARM` tại workcell `ARM_PRIMARY` và `safety=Safe` để Backend dispatch cùng contract với production release; log readiness cũng in rõ `safety` và `mode` đã gửi. Menu test serial quét `TriggerDevice` trong Lua active (không dựa vào tên artifact UUID) rồi chỉ gọi `TestConnection` trên COM đã cấu hình. Alias Lua `icemachine` được ánh xạ về driver `ice_cream`; report hoàn tất/thất bại gửi `physicalOutputMayHaveOccurred=false`. Hardware snapshot không đổi sẽ tái sử dụng cùng `snapshotRevision` và `observedAt` để retry idempotent, tránh HTTP 409 từ Backend. Trong physical mode, mỗi readiness probe kết nối Fairino và chỉ báo `safety=Safe`/capability `ROBOT_ARM` sau khi SDK communication bình thường, E-stop bằng 0, SI0/SI1 bằng 0 và cả mã lỗi chính/phụ bằng 0. Lỗi đọc telemetry hoặc bất kỳ tín hiệu không an toàn nào sẽ báo `Unknown`/`Unsafe` và không công bố capability.
 
-Lần xác minh gần nhất: **125/125 test passed**, gồm 5 firmware contract test cho mapping UP/DOWN, GPIO/EXTI và bảo vệ giới hạn, cùng các test Edge/driver hiện có. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
+Lần xác minh gần nhất: **131/131 test passed** ngày 2026-09-08, gồm phục hồi từng cây, nhật ký offline, các test Edge/driver và 5 firmware contract test. Build Release thành công; test tự động không thay thế kiểm thử phục hồi trên phần cứng thật. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
 
 ### Phạm vi kiểm thử
 
@@ -419,7 +431,7 @@ Các loại kiểm thử đã thực hiện:
 - Kiểm thử giao tiếp serial, frame và checksum.
 - Firmware contract test cho mapping motor, PWM và công tắc giới hạn.
 - Kiểm thử mô phỏng Edge và kiểm thử phần cứng thực tế bằng ST-Link/serial.
-- Kết quả gần nhất: 125 test passed.
+- Kết quả gần nhất: 131 test passed.
 
 ## Các phần chưa hoàn thành
 

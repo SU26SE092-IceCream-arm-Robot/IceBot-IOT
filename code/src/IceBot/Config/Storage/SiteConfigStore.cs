@@ -150,7 +150,7 @@ namespace IceBot.Config
             {
                 var settings = Load();
                 var version = ResolveReportedDevicesSnapshotVersion(
-                    settings, signature, DateTimeOffset.UtcNow, out var changed);
+                    settings, signature, NormalizeSnapshotObservedAt(DateTimeOffset.UtcNow), out var changed);
                 if (changed) Save(settings);
                 return version;
             }
@@ -176,6 +176,40 @@ namespace IceBot.Config
 
         public static long GetReportedDevicesSnapshotRevision(string signature) =>
             GetReportedDevicesSnapshotVersion(signature).Revision;
+
+        // Backend retains snapshot revisions as immutable audit evidence. If it rejects a
+        // locally persisted revision because its historic content differs, Edge advances once
+        // and retries with a new version instead of weakening Backend conflict protection.
+        public static ReportedDevicesSnapshotVersion CreateNextReportedDevicesSnapshotVersion(string signature)
+        {
+            lock (SequenceGate)
+            {
+                var settings = Load();
+                var version = CreateNextReportedDevicesSnapshotVersion(
+                    settings, signature, NormalizeSnapshotObservedAt(DateTimeOffset.UtcNow));
+                Save(settings);
+                return version;
+            }
+        }
+
+        internal static ReportedDevicesSnapshotVersion CreateNextReportedDevicesSnapshotVersion(
+            SiteSettings settings, string signature, DateTimeOffset now)
+        {
+            settings.ReportedDevicesSnapshotRevision = Math.Max(0, settings.ReportedDevicesSnapshotRevision) + 1;
+            settings.ReportedDevicesSnapshotSignature = signature;
+            settings.ReportedDevicesSnapshotObservedAt = now;
+            return new ReportedDevicesSnapshotVersion(
+                settings.ReportedDevicesSnapshotRevision,
+                settings.ReportedDevicesSnapshotObservedAt.GetValueOrDefault());
+        }
+
+        // PostgreSQL timestamp with time zone persists microseconds. Persist and resend the
+        // same precision so an idempotent retry does not differ by sub-microsecond ticks.
+        internal static DateTimeOffset NormalizeSnapshotObservedAt(DateTimeOffset value)
+        {
+            var utc = value.ToUniversalTime();
+            return new DateTimeOffset(utc.Ticks - (utc.Ticks % 10), TimeSpan.Zero);
+        }
 
         public static void ApplyToEnvironment(SiteSettings settings)
         {

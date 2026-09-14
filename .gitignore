@@ -1,6 +1,9 @@
 bin/
 obj/
 artifacts/
+# Restored NuGet cache; the required Fairino package is vendored under code/lib.
+/code/packages/
+*.nupkg.sha512
 *.user
 *.suo
 .vs/
@@ -10,6 +13,12 @@ firmware/**/build/
 
 # Local config and workflow scripts (not pushed)
 .env/
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
 /workflow/
 code/workflow/
 

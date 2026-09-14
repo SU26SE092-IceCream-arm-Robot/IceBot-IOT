@@ -3,9 +3,10 @@
 External `IMachineTrigger` plugin for the STM32F103 RS485 controller documented in
 `context/protocols/Ice Cream Machine Serial Communication Protocol.md`.
 
-Default trigger cycle: status precheck, UP at 20% for 3 seconds, STOP, DOWN at 20% for 1 second,
-STOP, and final Standby verification. Any failure attempts an additional STOP before surfacing the
-error to the workflow.
+`Trigger(connectionName, command)` accepts separate `UP` and `DOWN` commands. After a status
+precheck, the driver moves in the requested direction at 20% with duration 0 until the matching
+limit returns the controller to Standby, then verifies the final status. It does not automatically
+move in the opposite direction. Any failure attempts STOP before surfacing the error to the workflow.
 
 Build the installable package:
 

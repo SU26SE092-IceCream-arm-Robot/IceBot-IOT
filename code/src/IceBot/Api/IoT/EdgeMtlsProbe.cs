@@ -75,7 +75,10 @@ namespace IceBot.Api
             }
         }
 
-        public static bool SendReportedDevices(out string message)
+        public static bool SendReportedDevices(out string message) =>
+            SendReportedDevices(out message, retriedAfterConflict: false);
+
+        private static bool SendReportedDevices(out string message, bool retriedAfterConflict)
         {
             var settings = SiteConfigStore.Load();
             if (!TryCreateClient(settings, out var client, out var baseUri, out message))
@@ -118,6 +121,13 @@ namespace IceBot.Api
                         var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         if (!response.IsSuccessStatusCode)
                         {
+                            if ((int)response.StatusCode == 409 && !retriedAfterConflict)
+                            {
+                                var replacement = SiteConfigStore.CreateNextReportedDevicesSnapshotVersion(signature);
+                                var retrySucceeded = SendReportedDevices(out var retryMessage, retriedAfterConflict: true);
+                                message = $"BE da tu choi revision {snapshot.Revision} do historic content khac; Edge da tao revision {replacement.Revision} va retry mot lan. {retryMessage}";
+                                return retrySucceeded;
+                            }
                             message = $"BE tu choi reported devices mTLS (HTTP {(int)response.StatusCode}): {body}";
                             return false;
                         }
@@ -165,6 +175,11 @@ namespace IceBot.Api
                     var pendingReports = ProductionReportOutbox.GetPendingCount();
                     var hasActiveWork = EdgeOrderExecutionQueue.HasActiveOrUnresolvedWork(localStateDirectory);
                     var readiness = storageWritable && freeSpaceBytes >= minimumFreeSpaceBytes ? "Ready" : "NotReady";
+                    var executionMode = AppConfig.RobotExecutionMode;
+                    var physicalSafety = executionMode == RobotExecutionMode.Fairino
+                        ? FairinoSafetyProbe.Read(AppConfig.RobotIp)
+                        : null;
+                    var safety = EdgeReadinessSafetyProfile.For(executionMode, physicalSafety);
                     var revision = SiteConfigStore.NextExecutionReadinessRevision();
 
                     using (var content = new StringContent(JsonSerializer.Serialize(new
@@ -176,7 +191,7 @@ namespace IceBot.Api
                         activity = hasActiveWork ? "Busy" : "Idle",
                         // Simulation is an explicit local test mode. A physical Fairino runtime
                         // must continue to report Unknown until it has trustworthy safety input.
-                        safety = AppConfig.RobotExecutionMode == RobotExecutionMode.Simulated ? "Safe" : "Unknown",
+                        safety,
                         physicalOutputState = "Unknown",
                         localPersistenceHealth = new
                         {
@@ -187,7 +202,7 @@ namespace IceBot.Api
                             pendingEventCount = pendingReports,
                             maximumPendingEventCount = 1000
                         },
-                        capabilities = Array.Empty<object>()
+                        capabilities = EdgeReadinessCapabilityProfile.For(executionMode, safety)
                     }), Encoding.UTF8, "application/json"))
                     using (var response = client.PostAsync(
                         new Uri(baseUri, $"api/v1/iot/execution-endpoints/{settings.ExecutionEndpointId:D}/readiness"),
@@ -200,7 +215,8 @@ namespace IceBot.Api
                             return false;
                         }
 
-                        message = $"BE da nhan readiness revision {revision}: {readiness}, {(hasActiveWork ? "Busy" : "Idle")}.";
+                        var safetyDetail = physicalSafety == null ? string.Empty : $" fairino={physicalSafety.Detail}";
+                        message = $"BE da nhan readiness revision {revision}: {readiness}, {(hasActiveWork ? "Busy" : "Idle")}, safety={safety}, mode={executionMode}.{safetyDetail}";
                         return true;
                     }
                 }

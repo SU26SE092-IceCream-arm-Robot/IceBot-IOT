@@ -1,6 +1,6 @@
 # IceBot-IOT Project Context
 
-Last reviewed: 2026-09-07
+Last reviewed: 2026-09-08
 
 ## Purpose
 
@@ -25,7 +25,9 @@ Implemented:
 - Durable `ExecuteOrder` pull, inbox, serialized execution, and report outbox.
 - Real Fairino and explicit simulated robot executors.
 - Optional external peripheral drivers loaded as validated plugins.
-- Built-in Ice Cream machine driver with directional UP/DOWN limit-controlled operation.
+- Bundled Ice Cream plugin driver with directional UP/DOWN limit-controlled operation.
+- Operator-launched recovery of interrupted units, retaining completed units and local attempt history.
+- Offline diagnostics in InitIceBot with date/order filtering, pagination and text export.
 - Optional simulated inventory observations for Development.
 - Cloud-to-Edge production order delivery through outbound mTLS polling, validated in the integrated hardware deployment.
 
@@ -109,7 +111,7 @@ Operator tokens are only for explicit human management actions. Automatic traffi
 
 ## Identity and Network
 
-The Kiosk and Edge PC are currently one physical installation, but identities remain separate:
+Flutter Kiosk App and Edge Runtime are separate applications that may run on the same device or separate devices. Kiosk App can run on a supported tablet or PC platform, including Windows; Edge currently runs on Windows. Kiosk App sends orders to Backend, and Edge pulls execution commands from Backend. Kiosk App does not directly command the robot or peripherals. Deployment on one device does not merge their identities:
 
 - `KioskId`: commercial/operational kiosk.
 - `ExecutionEndpointId`: command-delivery endpoint.
@@ -174,6 +176,8 @@ This proves declared routing compatibility and byte integrity only. It does not 
 
 ## Deployment Flow
 
+Edge downloads Lua artifacts from MinIO over HTTPS when synchronizing the kiosk deployment and retains them locally for subsequent orders. ExecuteOrder references the ordered artifacts, whose local names are `{RobotArtifactId}.lua`; it does not cause a fresh Lua download for each order. Program updates use the deployment synchronization flow. The production worker revalidates local checksums before execution.
+
 ```text
 Published release
   -> deployment command for ExecutionEndpoint
@@ -220,7 +224,7 @@ Job and production-outbox writes flush file contents to disk before replacement/
 
 ### Fairino
 
-`FairinoLuaExecutor` connects to the configured robot, uploads and runs each Lua artifact, and waits for completion. `WorkflowRunner` executes Backend order and handles the home teaching point around each production unit. IceBot-IOT does not generate or rewrite production Lua.
+`WorkflowRunner` parses the local Lua files into a typed execution plan in Backend-supplied order. `FairinoLuaExecutor` executes robot motion/output instructions through Fairino SDK over Ethernet; waits are handled by the Edge runtime and `TriggerDevice` invokes the corresponding peripheral plugin at its position in the plan. Opaque whole-file Lua execution is disabled in the current executor. The workflow moves to `IceBot_Home` before and after each production unit. IceBot-IOT does not generate or rewrite production Lua files.
 
 ### Simulated
 
@@ -382,7 +386,7 @@ Detailed serial protocol definitions are maintained separately under `context/pr
 
 - Hardware Architecture: `context/Hardware_Architecture/Hardware_Architecture_Document.md`
 - Hardware Architecture notes: `context/Hardware_Architecture/note.md`
-- System Architecture: `context/System_Architecture/system architecture.md`
+- System Architecture: `context/System_Architecture/System_Architecture_Document.md`
 - System Architecture diagrams: `context/System_Architecture/System Architecture.jpg` and `context/System_Architecture/System Architecture_2.jpg`
 
 Open the relevant protocol document when changing firmware, peripheral drivers, serial tests, or hardware wiring. Keep this context limited to project scope, implementation decisions, and verification rules.
@@ -413,6 +417,6 @@ This directory currently contains test/demo variants such as `real-demo-1408.lua
 
 - C# / .NET Framework 4.7.2 Edge runtime.
 - .NET 8 Windows installer.
-- Fairino C# SDK and controller Lua runtime.
+- Fairino C# SDK and Edge-side parsing/execution of supported Lua workflow instructions.
 - HTTPS/mTLS and NetBird.
 - Local filesystem durable inbox/job/outbox persistence.

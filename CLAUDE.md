@@ -41,7 +41,7 @@ dotnet test harness/IceBot.Harness.Tests           # unit tests for pure logic (
   `Machines/<Name>/` + one line in `MachineRegistry.Modules`; nothing else changes.
 - **Business rule: every peripheral machine triggers over RS485, and only RS485.** No DO/24V
   trigger fired from the Fairino control box — that path is gone. Any new machine needs its own
-  RS485 head + a host-side `<Name>Client.cs` driver + `<Name>Module.cs` implementing
+  RS485 interface, a documented device-control protocol, and an Edge plugin driver consisting of a host-side `<Name>Client.cs` + `<Name>Module.cs` implementing
   `IMachineTrigger` (see `Machines/CupDropping/` or `Machines/IceCream/`). A machine with no
   separate hardware to control (pure arm motion, e.g. a tray-placement position) is exempt —
   it implements only `IMachineModule`, no `IMachineTrigger`.

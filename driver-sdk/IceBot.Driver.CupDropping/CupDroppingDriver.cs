@@ -15,7 +15,7 @@ namespace IceBot.Driver.CupDropping
 
         public IReadOnlyCollection<string> StepNames { get; } = new[] { "cup_s" };
 
-        public void Trigger(string comPort)
+        public void Trigger(string comPort, string command)
         {
             using (var client = new CupDroppingMachineClient(comPort))
             {
