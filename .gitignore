@@ -8,6 +8,11 @@ artifacts/
 *.suo
 .vs/
 
+# Local editor and AI tooling
+/.vscode/
+/.agents/
+/plugins/
+
 # STM32CubeIDE / CMake build output (firmware)
 firmware/**/build/
 
