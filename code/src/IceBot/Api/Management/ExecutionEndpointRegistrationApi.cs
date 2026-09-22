@@ -241,7 +241,9 @@ namespace IceBot.Api
             var createResponse = SendWithRefresh(
                 HttpMethod.Post,
                 $"api/v1/management/kiosks/{kioskId:D}/execution-endpoints",
-                new { endpointCode, executionProfile = 1 });
+                // Backend configures KioskExecutionProfile with JsonStringEnumConverter
+                // (integer enum values are deliberately rejected), so send the enum name.
+                new { endpointCode, executionProfile = "FullEdge" });
             return ParseCreate(createResponse);
         }
 
