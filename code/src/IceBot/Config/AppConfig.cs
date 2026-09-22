@@ -27,9 +27,6 @@ namespace IceBot.Config
         public static string NetBirdSetupKey =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_NETBIRD_SETUP_KEY"), SiteConfigStore.Load().NetBirdSetupKey);
 
-        public static string PublicUrl =>
-            FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_PUBLIC_URL"), SiteConfigStore.Load().PublicUrl, "https://your-shop.example.com");
-
         public static string BeApiUrl =>
             FirstNonEmpty(Environment.GetEnvironmentVariable("ICEBOT_BE_API_URL"), SiteConfigStore.Load().BeApiUrl);
 

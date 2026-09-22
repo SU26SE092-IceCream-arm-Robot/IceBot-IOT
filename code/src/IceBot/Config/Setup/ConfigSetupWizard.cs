@@ -7,7 +7,7 @@ namespace IceBot.Config
 {
     internal static class ConfigSetupWizard
     {
-        // Only the two fields NetBird itself actually needs. Everything else in SiteSettings
+        // NetBird itself only needs the setup key. Everything else in SiteSettings
         // (API key, robot IP, store account, COM ports, ProvisionedSteps, BeApiUrl) is left
         // untouched — see RunSystemSettings() for those.
         public static bool RunNetBird()
@@ -31,7 +31,6 @@ namespace IceBot.Config
             }
 
             settings.NetBirdSetupKey = netBirdSetupKey;
-            settings.PublicUrl = Prompt("Public URL cho BE (NetBird cap, vd: https://shop.api.tenban.com)", settings.PublicUrl);
 
             SiteConfigStore.Save(settings);
 
@@ -61,7 +60,6 @@ namespace IceBot.Config
             {
                 // Carried forward as-is — not this wizard's concern.
                 NetBirdSetupKey = current.NetBirdSetupKey,
-                PublicUrl = current.PublicUrl,
                 ApiKey = current.ApiKey,
                 StorePassword = current.StorePassword,
                 ProvisionedSteps = new List<string>(current.ProvisionedSteps),
@@ -172,7 +170,6 @@ namespace IceBot.Config
         {
             Console.WriteLine("--- Cau hinh hien tai ---");
             Console.WriteLine($"  NetBird setup key : {(string.IsNullOrEmpty(settings.NetBirdSetupKey) ? "(chua dat)" : "****")}");
-            Console.WriteLine($"  Public URL     : {settings.PublicUrl}");
             Console.WriteLine($"  Backend API URL: {settings.BeApiUrl}");
             Console.WriteLine($"  Execution endpoint: {(settings.ExecutionEndpointId == Guid.Empty ? "(chua dat)" : settings.ExecutionEndpointId.ToString("D"))}");
             Console.WriteLine($"  Full Edge runtime : {(settings.FullEdgeRuntimeId == Guid.Empty ? "(chua dat)" : settings.FullEdgeRuntimeId.ToString("D"))}");

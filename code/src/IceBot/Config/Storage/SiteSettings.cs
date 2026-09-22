@@ -5,12 +5,10 @@ namespace IceBot.Config
 {
     internal sealed class SiteSettings
     {
-        // Ingress tunnel — NetBird replaces the old DuckDNS + Cloudflare Tunnel setup. IceBot
-        // only needs the setup key; NetBird handles opening the path in and assigning PublicUrl.
+        // NetBird connects the Edge and Backend privately. The setup key is the only
+        // NetBird value required by this Edge configuration.
         public string NetBirdSetupKey { get; set; } = string.Empty;
-        public string PublicUrl { get; set; } = string.Empty;
-        // Public management API used by a fresh Edge during login/registration. A deployment may
-        // still override this with a private HTTPS NetBird address when mTLS must bypass a proxy.
+        // Backend management and mTLS API URL. It must resolve through NetBird and use HTTPS.
         public string BeApiUrl { get; set; } = "https://api.icebot.io.vn";
         public string ApiKey { get; set; } = string.Empty;
         public string RobotIp { get; set; } = AppConfig.DefaultRobotIp;
@@ -77,8 +75,7 @@ namespace IceBot.Config
         public List<string> ProvisionedSteps { get; set; } = new List<string>();
 
         public bool IsConfigured =>
-            !string.IsNullOrWhiteSpace(NetBirdSetupKey)
-            && !string.IsNullOrWhiteSpace(PublicUrl);
+            !string.IsNullOrWhiteSpace(NetBirdSetupKey);
     }
 
     internal sealed class SimulatedInventoryObservationSettings

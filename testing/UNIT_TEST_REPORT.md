@@ -1,5 +1,14 @@
 # IceBot-IOT Test Document
 
+## Remove obsolete NetBird public URL — 2026-09-22
+
+- Scope: remove the unused `PUBLIC_URL` prompt, persisted setting, environment variable, and `IsConfigured` requirement; Edge uses the NetBird setup key and HTTPS `BE_API_URL` for Backend communication.
+- Targeted: 14 total, 14 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --filter "FullyQualifiedName~SiteSettingsTests" --logger "trx;LogFileName=RemovePublicUrlRegression.trx"`.
+- Full harness: 135 total, 125 passed, 10 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --logger "trx;LogFileName=RemovePublicUrlFull.trx"`.
+- The same 10 environment/workspace failures remain outside this change: Windows temporary-file/certificate access failures and two firmware contract assertions against the already modified firmware source.
+- Release solution/package build: `deploy/installer/build-package.ps1 -Configuration Release -Runtime win-x64 -OutputDirectory .\artifacts\installer\IceBot-win-x64-no-public-url` succeeded with 0 warnings and 0 errors. `deploy/IceBot-Setup.exe --validate-only` passed.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/RemovePublicUrlRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/RemovePublicUrlFull.trx` (local test artifacts).
+
 ## App-local peripheral plugin deployment — 2026-09-22
 
 - Scope: keep peripheral plugin packages beside each Edge installation; development builds copy the tracked `DRIVER-DLL` packages into `code/src/IceBot/bin/<Configuration>/net472/drivers`, while `IceBot-Setup.exe` installs bundled packages into `<install-directory>/drivers`.
@@ -197,7 +206,7 @@ This document summarizes deterministic unit tests for the current IceBot Edge ap
 | SITE-CFG-TC02 | SetupCompletion IsIndependentFromDeploymentReadiness | All automated assertions pass. | Normal | Passed | 00:00:00.0720000 |
 | SITE-CFG-TC03 | DeviceIdSerialization IgnoresInvalidEntriesAndIsCaseInsensitive | All automated assertions pass. | Abnormal | Passed | 00:00:00.0010000 |
 | SITE-CFG-TC04 | ActiveWorkflowPeripheralDiscovery UsesTriggerDeviceMachineTypesInsteadOfArtifactFileNames | All automated assertions pass. | Normal | Passed | 00:00:00.4100000 |
-| SITE-CFG-TC05 | IsConfigured RequiresBothNetBirdKeyAndPublicUrl | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
+| SITE-CFG-TC05 | IsConfigured RequiresNetBirdSetupKey | All automated assertions pass. | Normal | Passed | 00:00:00.0010000 |
 | SITE-CFG-TC06 | ReadinessSafetyProfile UsesSafeForSimulationOrVerifiedPhysicalTelemetry | All automated assertions pass. | Normal | Passed | 00:00:00.0070000 |
 | SITE-CFG-TC07 | ReportedDevicesSnapshot IncrementsVersionWhenContentChanges | All automated assertions pass. | Boundary | Passed | 00:00:00.0010000 |
 | SITE-CFG-TC08 | MachineLookups AreCaseInsensitiveAndUnknownReturnsEmpty | The expected value or identifier is returned. | Abnormal | Passed | 00:00:00.0020000 |

@@ -75,7 +75,7 @@ set via 1.2 or entered inline at the login gate). "1.2" here means: main menu it
 hinh"), then item 2 in that submenu ("Cau hinh he thong") — each submenu renumbers from 1 on
 screen (no literal "1.2" keystroke; see `Cli/ConsoleMenu.cs`). Note this is a **different**
 submenu item than NetBird's own config (1.1, "Cau hinh NetBird") — `ConfigSetupWizard` is split
-into `RunNetBird()` (NetBird setup key + Public URL only) and `RunSystemSettings()` (API key,
+into `RunNetBird()` (NetBird setup key only) and `RunSystemSettings()` (API key,
 robot IP, store account/password, COM ports) precisely so these two concerns don't live in one
 combined prompt anymore.
 **Login is not a startup gate.** Menu and `serve` start without operator tokens because order
@@ -141,7 +141,7 @@ real installed CLI and IceBot **actively shells out to it** via `Config/NetBirdS
   elevation prompt that a non-interactive process can never satisfy — instead of hanging
   forever, `RunProcess` kills the child after the timeout and reports "may dang cho quyen admin
   (UAC), chay IceBot voi quyen Administrator".
-`SiteSettings.IsConfigured` now checks `NetBirdSetupKey` + `PublicUrl` (previously
+`SiteSettings.IsConfigured` now checks `NetBirdSetupKey` only (previously
 `DuckDnsSubdomain`/`DuckDnsToken`/`PublicUrl`). All DuckDNS/Cloudflare-specific fields
 (`DuckDnsSubdomain`, `DuckDnsToken`, `TunnelName`, `DuckDnsDomain`, the synced `duckdns.env`
 file) are gone from `SiteSettings`/`SiteConfigStore`/`AppConfig` — do not reintroduce them.

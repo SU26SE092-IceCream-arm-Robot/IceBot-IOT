@@ -40,7 +40,6 @@ namespace IceBot.Config
                 switch (key)
                 {
                     case "NETBIRD_SETUP_KEY": settings.NetBirdSetupKey = value; break;
-                    case "PUBLIC_URL": settings.PublicUrl = value; break;
                     case "BE_API_URL": settings.BeApiUrl = value; break;
                     case "API_KEY": settings.ApiKey = value; break;
                     case "ROBOT_IP": settings.RobotIp = value; break;
@@ -84,7 +83,6 @@ namespace IceBot.Config
             {
                 "# IceBot site config — do not commit to git",
                 $"NETBIRD_SETUP_KEY={settings.NetBirdSetupKey}",
-                $"PUBLIC_URL={settings.PublicUrl}",
                 $"BE_API_URL={settings.BeApiUrl}",
                 $"API_KEY={settings.ApiKey}",
                 $"ROBOT_IP={settings.RobotIp}",
@@ -214,7 +212,6 @@ namespace IceBot.Config
         public static void ApplyToEnvironment(SiteSettings settings)
         {
             SetEnv("ICEBOT_NETBIRD_SETUP_KEY", settings.NetBirdSetupKey);
-            SetEnv("ICEBOT_PUBLIC_URL", settings.PublicUrl);
             SetEnv("ICEBOT_BE_API_URL", settings.BeApiUrl);
             SetEnv("ICEBOT_API_KEY", settings.ApiKey);
             SetEnv("ICEBOT_ROBOT_IP", settings.RobotIp);

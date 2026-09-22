@@ -91,11 +91,10 @@ TriggerDevice(""ice_cream"", ""ON"")");
         }
 
         [Fact]
-        public void IsConfigured_RequiresBothNetBirdKeyAndPublicUrl()
+        public void IsConfigured_RequiresNetBirdSetupKey()
         {
             Assert.False(new SiteSettings().IsConfigured);
-            Assert.False(new SiteSettings { NetBirdSetupKey = "key" }.IsConfigured);
-            Assert.True(new SiteSettings { NetBirdSetupKey = "key", PublicUrl = "https://edge" }.IsConfigured);
+            Assert.True(new SiteSettings { NetBirdSetupKey = "key" }.IsConfigured);
         }
 
         [Fact]
