@@ -196,7 +196,8 @@ namespace IceBot.Api
             return ParseKioskManagement(SendWithRefresh(
                 new HttpMethod("PATCH"),
                 $"api/v1/management/kiosks/{kioskId:D}/status",
-                new { status = 2 }));
+                // Backend rejects numeric enum values globally; KioskStatus.Active must be sent by name.
+                new { status = "Active" }));
         }
 
         public ExecutionEndpointRegistrationResult FindOrCreate(Guid kioskId, string endpointCode)
