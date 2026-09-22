@@ -31,6 +31,7 @@ namespace IceBot.Api
     {
         public bool Success { get; set; }
         public Guid KioskId { get; set; }
+        public string KioskCode { get; set; } = string.Empty;
         public bool Created { get; set; }
         public string Message { get; set; } = string.Empty;
     }
@@ -87,6 +88,39 @@ namespace IceBot.Api
             _http = http;
         }
 
+        public KioskRegistrationResult ResolveSingleAccessibleKiosk()
+        {
+            var response = SendWithRefresh(
+                HttpMethod.Get,
+                "api/v1/management/kiosks",
+                null);
+            var kiosks = ParseList<BackendKiosk>(response, "danh sach kiosk cua tai khoan Org", out var error);
+            if (!string.IsNullOrWhiteSpace(error)) return FailKiosk(error);
+            if (kiosks.Count == 0)
+            {
+                return FailKiosk("Tai khoan Org khong duoc gan voi kiosk nao. Hay gan kiosk cho tai khoan truoc khi setup Edge.");
+            }
+
+            if (kiosks.Count != 1)
+            {
+                return FailKiosk(
+                    $"Tai khoan Org dang truy cap {kiosks.Count} kiosk; khong the tu dong chon an toan. Hay dung tai khoan duoc scope vao dung mot kiosk.");
+            }
+
+            var kiosk = kiosks[0];
+            if (kiosk.Id == Guid.Empty)
+                return FailKiosk("BE tra ve kiosk nhung khong co KioskId.");
+
+            return new KioskRegistrationResult
+            {
+                Success = true,
+                KioskId = kiosk.Id,
+                KioskCode = kiosk.Code,
+                Created = false,
+                Message = "Da tu dong lay KioskId tu kiosk duy nhat trong pham vi tai khoan Org."
+            };
+        }
+
         public KioskRegistrationResult FindOrCreateKiosk(string kioskCode, string machineName)
         {
             if (!TryNormalizeKioskCode(kioskCode, out var code, out var codeError))
@@ -108,6 +142,7 @@ namespace IceBot.Api
                 {
                     Success = true,
                     KioskId = matches[0].Id,
+                    KioskCode = matches[0].Code,
                     Created = false,
                     Message = "Da tim lai KioskId cua Edge tren BE."
                 };
@@ -149,6 +184,7 @@ namespace IceBot.Api
                 {
                     Success = true,
                     KioskId = matches[0].Id,
+                    KioskCode = matches[0].Code,
                     Created = false,
                     Message = "Kiosk da ton tai; da khoi phuc KioskId theo dinh danh Edge."
                 };
@@ -379,6 +415,7 @@ namespace IceBot.Api
                 {
                     Success = true,
                     KioskId = envelope.Data.Id,
+                    KioskCode = envelope.Data.Code,
                     Created = true,
                     Message = envelope.Message ?? "Dang ky kiosk thanh cong."
                 };

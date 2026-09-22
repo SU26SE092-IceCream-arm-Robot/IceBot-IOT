@@ -7,14 +7,14 @@ namespace IceBot.Config
     {
         public static void Run()
         {
-            Console.WriteLine();
-            Console.WriteLine("=== KHOI TAO MAY EDGE ===");
-            Console.WriteLine("Buoc 1/7: Xac dinh Kiosk Code");
-            var settings = SiteConfigStore.Load();
-            if (!EnsureKioskCode(settings)) return;
+            StoreAuth.RequireLogin();
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 2/7: Ket noi NetBird");
+            Console.WriteLine("=== KHOI TAO MAY EDGE ===");
+            var settings = SiteConfigStore.Load();
+
+            Console.WriteLine();
+            Console.WriteLine("Buoc 1/6: Ket noi NetBird");
             if (!ConfigSetupWizard.RunNetBird())
             {
                 Console.WriteLine("[ERROR] Chua the dang ky Edge vi NetBird chua ket noi.");
@@ -22,12 +22,12 @@ namespace IceBot.Config
             }
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 3/7: Cau hinh Robot va cong COM");
+            Console.WriteLine("Buoc 2/6: Cau hinh Robot va cong COM");
             ConfigSetupWizard.RunRobotSettings();
             ConfigSetupWizard.RunMachinePortSettings();
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 4/7: Kiem tra/dang ky Kiosk voi BE");
+            Console.WriteLine("Buoc 3/6: Tu dong xac dinh/dang ky Kiosk voi BE");
             RegisterExecutionEndpointIfMissing();
         }
 
@@ -43,7 +43,7 @@ namespace IceBot.Config
             Guid? backendProfileIdentity = null;
             if (settings.ExecutionEndpointId != Guid.Empty)
             {
-                Console.WriteLine("Buoc 5/7: Kiem tra Execution Endpoint");
+                Console.WriteLine("Buoc 4/6: Kiem tra Execution Endpoint");
                 Console.WriteLine($"[OK] Edge da co Execution Endpoint ID: {settings.ExecutionEndpointId:D}");
                 var current = api.GetEndpoint(kioskId, settings.ExecutionEndpointId);
                 if (!current.Success)
@@ -57,7 +57,7 @@ namespace IceBot.Config
             }
             else
             {
-                Console.WriteLine("Buoc 5/7: Dang ky Execution Endpoint");
+                Console.WriteLine("Buoc 4/6: Dang ky Execution Endpoint");
                 var endpointCode = ExecutionEndpointRegistrationApi.BuildEndpointCode(Environment.MachineName);
                 Console.WriteLine($"Dang ky ma Edge: {endpointCode}");
                 var result = api.FindOrCreate(kioskId, endpointCode);
@@ -78,7 +78,7 @@ namespace IceBot.Config
             settings.KioskId = kioskId;
             SiteConfigStore.Save(settings);
             Console.WriteLine();
-            Console.WriteLine("Buoc 6/7: Provision mTLS");
+            Console.WriteLine("Buoc 5/6: Provision mTLS");
             CompleteMutualTls(api, settings, endpointStatus, backendProfileIdentity);
         }
 
@@ -158,7 +158,7 @@ namespace IceBot.Config
         private static void ActivateKioskAndProbe(ExecutionEndpointRegistrationApi api, SiteSettings settings)
         {
             Console.WriteLine();
-            Console.WriteLine("Buoc 7/7: Kich hoat kiosk va kiem tra ket noi");
+            Console.WriteLine("Buoc 6/6: Kich hoat kiosk va kiem tra ket noi");
             var activation = api.ActivateKiosk(settings.KioskId);
             if (!activation.Success)
             {
@@ -182,15 +182,18 @@ namespace IceBot.Config
 
         private static Guid ResolveOrRegisterKiosk(ExecutionEndpointRegistrationApi api, SiteSettings settings)
         {
-            if (!EnsureKioskCode(settings)) return Guid.Empty;
-
             if (settings.KioskId != Guid.Empty)
             {
                 Console.WriteLine($"[OK] Tai su dung KioskId da luu: {settings.KioskId:D}");
                 return settings.KioskId;
             }
 
-            var result = api.FindOrCreateKiosk(settings.KioskCode, Environment.MachineName);
+            // Existing installations with a saved KioskCode remain compatible, but a fresh
+            // Edge no longer asks the technician to type the code. It resolves the kiosk from
+            // the logged-in Org account and accepts only one visible kiosk.
+            var result = string.IsNullOrWhiteSpace(settings.KioskCode)
+                ? api.ResolveSingleAccessibleKiosk()
+                : api.FindOrCreateKiosk(settings.KioskCode, Environment.MachineName);
             if (!result.Success)
             {
                 Console.WriteLine("[ERROR] " + result.Message);
@@ -198,38 +201,14 @@ namespace IceBot.Config
             }
 
             settings.KioskId = result.KioskId;
+            if (!string.IsNullOrWhiteSpace(result.KioskCode))
+                settings.KioskCode = result.KioskCode;
             SiteConfigStore.Save(settings);
             Console.WriteLine("[OK] " + result.Message);
+            if (!string.IsNullOrWhiteSpace(result.KioskCode))
+                Console.WriteLine($"Kiosk Code: {result.KioskCode}");
             Console.WriteLine($"KioskId: {result.KioskId:D}");
             return result.KioskId;
-        }
-
-        private static bool EnsureKioskCode(SiteSettings settings)
-        {
-            if (!string.IsNullOrWhiteSpace(settings.KioskCode))
-            {
-                Console.WriteLine($"[OK] Tai su dung Kiosk Code da luu: {settings.KioskCode}");
-                return true;
-            }
-
-            settings.KioskCode = PromptKioskCode();
-            if (string.IsNullOrWhiteSpace(settings.KioskCode)) return false;
-            SiteConfigStore.Save(settings);
-            Console.WriteLine($"[OK] Da luu Kiosk Code: {settings.KioskCode}");
-            return true;
-        }
-
-        private static string PromptKioskCode()
-        {
-            while (true)
-            {
-                Console.Write("Nhap Kiosk Code in tren vo may: ");
-                var input = Console.ReadLine();
-                if (input == null) return string.Empty;
-                if (ExecutionEndpointRegistrationApi.TryNormalizeKioskCode(input, out var code, out var error))
-                    return code;
-                Console.WriteLine("[ERROR] " + error);
-            }
         }
     }
 }
