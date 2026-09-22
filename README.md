@@ -130,8 +130,8 @@ code/src/IceBot/bin/Release/net472/InitIceBot.exe
 ```
 
 `IceBot.exe serve` là alias tường minh của chế độ runtime. Hai file EXE phải nằm cùng thư mục để
-dùng chung `config/`, `certificates/`, `workflow/` và `data/`; các Lua kiểm thử nằm trong `context/lua-tests/`. Driver là ngoại lệ:
-cả bản dev và production đều đọc từ `C:\ProgramData\IceBot\drivers`.
+dùng chung `config/`, `certificates/`, `workflow/` và `data`; các Lua kiểm thử nằm trong `context/lua-tests/`. Plugin driver là app-local:
+bản dev đọc từ `code/src/IceBot/bin/<Configuration>/net472/drivers`, còn bản cài đọc từ `<install-directory>/drivers`.
 
 ### Tạo package cài đặt
 
@@ -166,9 +166,9 @@ Chạy bằng quyền Administrator. Setup sẽ:
 1. Kiểm tra .NET Framework 4.7.2+; nếu thiếu, chạy bộ cài offline trong `prerequisites/`.
 2. Cài NetBird từ installer offline; nếu không có thì dùng `winget`.
 3. Mở hộp thoại để người dùng chọn thư mục cài đặt; mặc định là `C:\Program Files\IceBot`.
-4. Xác minh SHA-256 của Fairino SDK và hai driver, tạo dữ liệu ứng dụng và cài driver vào kho dùng chung
-   `C:\ProgramData\IceBot\drivers`; chỉ cấp quyền ghi cần thiết cho tài khoản Windows đang cài đặt.
-   Thư mục đích dùng chính `machineType` trong manifest (`bt_cup_l90`, `ice_cream`); khi nâng cấp,
+4. Xác minh SHA-256 của Fairino SDK và các plugin driver, tạo dữ liệu ứng dụng và cài plugin vào
+   `<install-directory>\drivers`; thư mục plugin không được cấp quyền ghi cho runtime thông thường.
+   Thư mục đích dùng `machineType` trong manifest (hiện có `bt_cup_l90`, `ice_cream`); khi nâng cấp,
    Setup loại thư mục legacy trùng `machineType` để registry không phụ thuộc thứ tự duyệt filesystem.
 5. Tạo shortcut `IceBot` và `Init IceBot` trên Desktop/Start Menu.
 6. Từ chối cài/nâng cấp nếu `IceBot.exe` hoặc `InitIceBot.exe` còn chạy, tránh trộn binary cũ và mới.
@@ -345,9 +345,8 @@ Edge tải Lua khi đồng bộ deployment rồi sử dụng bản cục bộ ch
 Máy ngoại vi được Edge điều khiển trực tiếp phải có serial transport và protocol điều khiển được mô tả, cùng Edge plugin driver tương ứng; transport có thể là RS232 hoặc RS485 theo từng thiết bị. Các máy trong sơ đồ hệ thống dùng RS485. Plugin DLL gửi tín hiệu khi kế hoạch thực thi tới lệnh `TriggerDevice`. RS485 là lớp vật lý; protocol lệnh và frame có thể riêng theo từng thiết bị, nên chỉ có đầu nối RS485 chưa đủ để tích hợp.
 
 Core `code/src/IceBot/Machines/` hiện chỉ còn plugin loader và registry. Không có code giao thức
-hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục
-`C:\ProgramData\IceBot\drivers` trống,
-`MachineRegistry.Modules` cũng trống.
+hay driver thiết bị cụ thể nào được compile vào `IceBot.exe`. Nếu thư mục app-local
+`drivers` trống, `MachineRegistry.Modules` cũng trống.
 
 Driver máy thả cốc đã được tách hoàn toàn khỏi `IceBot.exe`. Package build sẵn nằm tại:
 
@@ -358,14 +357,14 @@ DRIVER-DLL/CupDropping/
 ```
 
 `IceBot-Setup.exe` tự xác minh rồi cài package máy thả cốc vào
-`C:\ProgramData\IceBot\drivers\bt_cup_l90\` và package máy kem vào
-`C:\ProgramData\IceBot\drivers\ice_cream\`. Khi cài lại/nâng cấp, Setup dùng `machineType` làm tên
+`<install-directory>\drivers\bt_cup_l90\` và package máy kem vào
+`<install-directory>\drivers\ice_cream\`. Khi cài lại/nâng cấp, Setup dùng `machineType` làm tên
 thư mục chuẩn và dọn các thư mục legacy có cùng `machineType`; plugin bên thứ ba khác không bị xóa.
 
 Để thêm hoặc thay máy mà không sửa source IceBot, tạo plugin target `net472` dựa trên `IceBot.Driver.Abstractions`, sau đó cài:
 
 ```text
-C:\ProgramData\IceBot\drivers\<driver-name>\
+<Edge install directory>\drivers\<driver-name>\
 ├── driver.json
 └── Vendor.Driver.dll
 ```

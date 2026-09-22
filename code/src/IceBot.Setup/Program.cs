@@ -47,7 +47,7 @@ internal static class Program
             ValidateBundle(payloadDirectory, bundleDirectory);
             if (HasArgument(args, "--validate-only"))
             {
-                Console.WriteLine("[OK] Bundle hợp lệ: Fairino robot3.7.8, runtime và hai driver đã được xác minh.");
+                Console.WriteLine("[OK] Bundle hợp lệ: Fairino robot3.7.8, runtime và các plugin driver đã được xác minh.");
                 return 0;
             }
 
@@ -79,11 +79,10 @@ internal static class Program
             Console.WriteLine($"[3/5] Cài IceBot vào {installDirectory}");
             CopyPayload(payloadDirectory, installDirectory);
 
-            Console.WriteLine("[4/5] Tạo dữ liệu và cài driver máy ngoại vi");
+            Console.WriteLine("[4/5] Tạo dữ liệu và cài plugin máy ngoại vi");
             CreateRuntimeDirectories(installDirectory);
             SetRuntimePermissions(installDirectory);
-            CreateSharedDriverDirectory();
-            InstallBundledDrivers(bundleDirectory);
+            InstallBundledDrivers(bundleDirectory, installDirectory);
 
             Console.WriteLine("[5/5] Tạo shortcut");
             CreateShortcuts(installDirectory);
@@ -166,28 +165,50 @@ internal static class Program
             throw new InvalidOperationException($"Fairino SDK không tương thích: {sdk ?? "không xác định"}.");
 
         ValidateHash(Path.Combine(payloadDirectory, "libfairino.dll"), expectedHash, "libfairino.dll");
-        ValidateDriverPackage(bundleDirectory, "CupDropping", "bt_cup_l90");
-        ValidateDriverPackage(bundleDirectory, "IceCream", "ice_cream");
+        ValidateDriverPackages(bundleDirectory);
     }
 
-    private static void ValidateDriverPackage(string bundleDirectory, string packageName, string expectedMachineType)
+    private static void ValidateDriverPackages(string bundleDirectory)
     {
-        var packageDirectory = Path.Combine(bundleDirectory, "drivers", packageName);
+        var driversDirectory = Path.Combine(bundleDirectory, "drivers");
+        if (!Directory.Exists(driversDirectory))
+            throw new DirectoryNotFoundException("Bundle thieu thu muc drivers.");
+
+        var machineTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var packageDirectory in Directory.GetDirectories(driversDirectory))
+        {
+            var machineType = ValidateDriverPackage(packageDirectory);
+            if (!machineTypes.Add(machineType))
+                throw new InvalidDataException($"Bundle trung machineType driver: {machineType}.");
+        }
+    }
+
+    private static string ValidateDriverPackage(string packageDirectory)
+    {
+        var packageName = Path.GetFileName(packageDirectory);
         var manifestPath = Path.Combine(packageDirectory, "driver.json");
         if (!File.Exists(manifestPath))
             throw new FileNotFoundException($"Bundle thiếu driver {packageName}.");
 
         using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var root = document.RootElement;
-        var machineType = root.GetProperty("machineType").GetString();
-        var assemblyName = root.GetProperty("assembly").GetString();
+        var machineType = root.GetProperty("machineType").GetString() ?? string.Empty;
+        var assemblyName = root.GetProperty("assembly").GetString() ?? string.Empty;
+        var entryType = root.GetProperty("entryType").GetString() ?? string.Empty;
+        var driverVersion = root.GetProperty("driverVersion").GetString() ?? string.Empty;
         var expectedHash = root.GetProperty("sha256").GetString();
-        if (!string.Equals(machineType, expectedMachineType, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(machineType) || machineType == "." || machineType == ".." ||
+            Path.GetFileName(machineType) != machineType ||
+            machineType.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             throw new InvalidOperationException($"Driver {packageName} có machineType không đúng: {machineType}.");
         if (string.IsNullOrWhiteSpace(assemblyName) || Path.GetFileName(assemblyName) != assemblyName)
             throw new InvalidOperationException($"Driver {packageName} có tên assembly không hợp lệ.");
 
+        if (string.IsNullOrWhiteSpace(entryType) || string.IsNullOrWhiteSpace(driverVersion))
+            throw new InvalidDataException($"Driver {packageName} thieu entryType hoac driverVersion.");
+
         ValidateHash(Path.Combine(packageDirectory, assemblyName), expectedHash, $"driver {packageName}");
+        return machineType;
     }
 
     private static void ValidateHash(string filePath, string? expectedHash, string label)
@@ -349,7 +370,7 @@ internal static class Program
 
     private static void CreateRuntimeDirectories(string installDirectory)
     {
-        foreach (var name in new[] { "config", "certificates", "workflow", "test-workflow", "data", "data/order-inbox" })
+        foreach (var name in new[] { "config", "certificates", "workflow", "test-workflow", "data", "data/order-inbox", "drivers" })
             Directory.CreateDirectory(Path.Combine(installDirectory, name));
     }
 
@@ -364,30 +385,14 @@ internal static class Program
         }
     }
 
-    private static void CreateSharedDriverDirectory()
-    {
-        var path = GetSharedDriverDirectory();
-        Directory.CreateDirectory(path);
-        var userSid = WindowsIdentity.GetCurrent().User?.Value
-            ?? throw new InvalidOperationException("Không xác định được tài khoản Windows đang cài đặt.");
-        Run("icacls.exe", $"\"{path}\" /grant *{userSid}:(OI)(CI)M", "cấp quyền thư mục driver dùng chung");
-    }
-
-    private static string GetSharedDriverDirectory()
-    {
-        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        if (string.IsNullOrWhiteSpace(commonData))
-            throw new InvalidOperationException("Không xác định được ProgramData.");
-        return Path.Combine(commonData, "IceBot", "drivers");
-    }
-
-    private static void InstallBundledDrivers(string bundleDirectory)
+    private static void InstallBundledDrivers(string bundleDirectory, string installDirectory)
     {
         var source = Path.Combine(bundleDirectory, "drivers");
         if (!Directory.Exists(source))
             throw new DirectoryNotFoundException("Bundle thieu thu muc drivers.");
 
-        var destination = GetSharedDriverDirectory();
+        var destination = Path.Combine(installDirectory, "drivers");
+        Directory.CreateDirectory(destination);
         foreach (var packageDirectory in Directory.GetDirectories(source))
         {
             var manifestPath = Path.Combine(packageDirectory, "driver.json");

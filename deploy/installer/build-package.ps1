@@ -14,6 +14,7 @@ $appOutput = Join-Path $repositoryRoot "code\src\IceBot\bin\$Configuration\net47
 $setupProject = Join-Path $repositoryRoot "code\src\IceBot.Setup\IceBot.Setup.csproj"
 $cupDriverBuild = Join-Path $repositoryRoot "driver-sdk\IceBot.Driver.CupDropping\build-package.ps1"
 $iceCreamDriverBuild = Join-Path $repositoryRoot "driver-sdk\IceBot.Driver.IceCream\build-package.ps1"
+$driverPackagesRoot = Join-Path $repositoryRoot "DRIVER-DLL"
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repositoryRoot "artifacts\installer\IceBot-$Runtime"
@@ -57,8 +58,13 @@ try {
             throw "Installer payload must not contain mutable local state: $mutableRoot"
         }
     }
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot "DRIVER-DLL\CupDropping") -Destination $drivers -Recurse -Force
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot "DRIVER-DLL\IceCream") -Destination $drivers -Recurse -Force
+    $driverPackages = Get-ChildItem -LiteralPath $driverPackagesRoot -Directory
+    if (-not $driverPackages) {
+        throw "No driver packages found in $driverPackagesRoot."
+    }
+    foreach ($driverPackage in $driverPackages) {
+        Copy-Item -LiteralPath $driverPackage.FullName -Destination $drivers -Recurse -Force
+    }
 
     $requiredPayloadFiles = @(
         "IceBot.exe",

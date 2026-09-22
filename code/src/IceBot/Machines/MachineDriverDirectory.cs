@@ -7,11 +7,10 @@ namespace IceBot.Machines
     {
         public static string Resolve()
         {
-            var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            if (string.IsNullOrWhiteSpace(commonData))
-                throw new InvalidOperationException("Khong xac dinh duoc thu muc ProgramData cua Windows.");
-
-            return Path.Combine(commonData, "IceBot", "drivers");
+            // Keep each Edge installation self-contained. In development this resolves
+            // beside the executable in code/src/IceBot/bin/<Configuration>/net472;
+            // the project copies the tracked DRIVER-DLL packages there at build time.
+            return Path.Combine(AppContext.BaseDirectory, "drivers");
         }
     }
 }

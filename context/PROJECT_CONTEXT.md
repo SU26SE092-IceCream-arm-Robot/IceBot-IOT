@@ -65,7 +65,7 @@ Setup.exe -> InitIceBot.exe -> IceBot.exe
 
 ### Setup.exe
 
-Owns machine installation only: prerequisites, NetBird, immutable application files, empty mutable directories, ACLs, shared drivers, and shortcuts. Packaging excludes build-machine `config`, certificates, data, drivers, and downloaded workflows; installation/upgrade is rejected while IceBot or InitIceBot is running. Bundled peripheral packages are installed under a canonical directory named by manifest `machineType`; upgrades remove legacy directories that declare the same `machineType`, while unrelated third-party packages are preserved. Setup does not log in, register a kiosk/endpoint, provision mTLS, or start production.
+Owns machine installation only: prerequisites, NetBird, immutable application files, empty mutable directories, ACLs, app-local peripheral plugins, and shortcuts. Packaging excludes build-machine `config`, certificates, data, drivers, and downloaded workflows; installation/upgrade is rejected while IceBot or InitIceBot is running. Bundled peripheral packages are installed under `<install-directory>\drivers\<machineType>`; upgrades remove legacy directories that declare the same `machineType`, while unrelated third-party packages in that Edge directory are preserved. Setup does not log in, register a kiosk/endpoint, provision mTLS, or start production.
 
 ### InitIceBot.exe
 
@@ -257,13 +257,27 @@ Therefore:
 - simulated inventory emulates a sensor gateway only in Simulated mode;
 - simulation references existing Backend `IngredientDispenserStateId` and `DeviceId`; Edge does not invent Cloud topology.
 
-External peripheral packages live under:
+External peripheral packages live beside the Edge application:
 
 ```text
-C:\ProgramData\IceBot\drivers\<driver-name>\
+<Edge install directory>\drivers\<driver-name>\
   driver.json
   Vendor.Driver.dll
 ```
+
+This is an extensible per-Edge plugin store, not a fixed list of two devices. Each
+Edge-controlled peripheral machine is installed as its own package under this
+directory. The package manifest declares the canonical `machineType`, assembly,
+entry type, version, and SHA-256; the runtime discovers and validates packages
+through this contract. `IceBot-Setup.exe` embeds the currently bundled packages,
+validates their manifests and assembly hashes, and installs them beside the
+installed executables. Development builds copy the tracked `DRIVER-DLL` packages
+to `code/src/IceBot/bin/<Configuration>/net472/drivers`, so repository development
+does not depend on an installed Edge or a shared machine-wide driver directory.
+The current bundled examples are `bt_cup_l90` (cup dropping) and `ice_cream`
+(ice-cream machine), but future peripheral machines must use their own
+`machineType` directory and must not be added as device-specific code in the
+IceBot core.
 
 `IMachineModule` provides identity and step names. `IMachineTrigger` is optional for hardware physically connected to this Edge. An Edge-controlled serial peripheral must provide a documented serial transport, a documented device-control protocol, and an Edge plugin driver. The transport may be RS232 or RS485 according to the device; device commands, frame formats, status codes, and checksums may be device-specific. Core contains no device-specific protocol.
 

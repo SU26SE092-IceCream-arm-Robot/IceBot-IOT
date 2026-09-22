@@ -4,8 +4,8 @@ using System.IO;
 
 namespace IceBot.Machines
 {
-    // Plugin-only registry: every peripheral driver comes from
-    // %ProgramData%/IceBot/drivers/*/driver.json in both development and production.
+    // Plugin-only registry: every peripheral driver comes from the app-local
+    // drivers/*/driver.json directory in both development and production.
     // An empty drivers directory intentionally produces an empty machine list.
     internal static class MachineRegistry
     {

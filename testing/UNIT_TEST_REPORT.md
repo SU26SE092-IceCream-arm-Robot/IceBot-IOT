@@ -1,5 +1,14 @@
 # IceBot-IOT Test Document
 
+## App-local peripheral plugin deployment — 2026-09-22
+
+- Scope: keep peripheral plugin packages beside each Edge installation; development builds copy the tracked `DRIVER-DLL` packages into `code/src/IceBot/bin/<Configuration>/net472/drivers`, while `IceBot-Setup.exe` installs bundled packages into `<install-directory>/drivers`.
+- Targeted: 12 total, 12 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --filter "FullyQualifiedName~MachinePluginLoaderTests" --logger "trx;LogFileName=AppLocalDriversRegression.trx"`.
+- Full harness: 135 total, 125 passed, 10 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --logger "trx;LogFileName=AppLocalDriversFull.trx"`.
+- The 10 full-harness failures were environment/workspace failures outside this change: Windows temporary-file/certificate access failures in order-queue and mTLS tests, plus two firmware contract assertions against the already modified firmware source. The app-local plugin targeted suite passed.
+- Release solution/package build: `deploy/installer/build-package.ps1 -Configuration Release -Runtime win-x64 -OutputDirectory .\artifacts\installer\IceBot-win-x64-generic-drivers` succeeded with 0 warnings and 0 errors. `deploy/IceBot-Setup.exe --validate-only` verified the embedded Fairino payload and all bundled driver manifests/checksums.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/AppLocalDriversRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/AppLocalDriversFull.trx` (local test artifacts).
+
 ## Complete repository build verification — 2026-09-14
 
 - Scope: track the missing setup, machine canonicalization, and Fairino safety helpers; include readiness profiles and pending runtime/driver changes; synchronize the two-argument trigger contract and directional driver documentation.

@@ -10,15 +10,12 @@ namespace IceBot.Harness.Tests
     public class MachinePluginLoaderTests
     {
         [Fact]
-        public void DriverDirectory_UsesSharedProgramDataLocation()
+        public void DriverDirectory_UsesAppLocalLocation()
         {
-            var expected = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "IceBot",
-                "drivers");
+            var expected = Path.Combine(AppContext.BaseDirectory, "drivers");
 
             Assert.Equal(expected, MachineDriverDirectory.Resolve());
-            Assert.DoesNotContain(AppContext.BaseDirectory, MachineDriverDirectory.Resolve(), StringComparison.OrdinalIgnoreCase);
+            Assert.StartsWith(AppContext.BaseDirectory, MachineDriverDirectory.Resolve(), StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]

@@ -40,7 +40,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\drivers\**\*">
+    <!-- Keep development output self-contained like an installed Edge. -->
+    <None Include="..\..\..\DRIVER-DLL\**\*">
       <Link>drivers\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
