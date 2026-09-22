@@ -185,20 +185,23 @@ Kỹ thuật viên thực hiện:
 2. Chọn **Cấu hình → Thiết lập Edge lần đầu → Bắt đầu / tiếp tục thiết lập tự động**.
 3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code.
 4. Nhập NetBird setup key.
-5. Xác nhận Robot IP, hardware profile và nhập cổng COM riêng cho từng máy ngoại vi.
+5. Nhập **tên địa điểm Edge** (ví dụ `Betea`) để tạo mã endpoint `ICEBOT-EDGE-Betea`.
+6. Xác nhận Robot IP, hardware profile và nhập cổng COM riêng cho từng máy ngoại vi.
 
 Các bước còn lại chạy tự động:
 
 1. Kiểm tra NetBird đã được Setup cài và chạy `netbird up`.
 2. Nếu máy đã lưu `KIOSK_ID`, tái sử dụng ID đó.
 3. Nếu chưa có, tìm Kiosk theo đúng Kiosk Code; không tìm thấy thì tự đăng ký Kiosk dưới cửa hàng duy nhất mà tài khoản được truy cập.
-4. Tìm hoặc tạo Full Edge Execution Endpoint với code `EDGE-{WINDOWS_MACHINE_NAME}`.
+4. Tìm hoặc tạo Full Edge Execution Endpoint với code `ICEBOT-EDGE-{TEN_DIA_DIEM}`; tên địa điểm được lưu trong `EDGE_LOCATION_NAME`.
 5. Lưu `KIOSK_ID` và `EXECUTION_ENDPOINT_ID` vào cấu hình cục bộ.
 6. Tạo hoặc tái sử dụng certificate RSA-3072 tại `certificates/icebot-edge-client.pfx`.
 7. Tạo `FULL_EDGE_RUNTIME_ID`, gửi fingerprint certificate để provision endpoint và kích hoạt Kiosk.
 8. Gửi heartbeat mTLS thật để xác nhận Edge kết nối được BE.
 
 Nếu endpoint đã `Active`, InitIceBot yêu cầu đúng PFX hiện có; không tự tạo certificate mới vì fingerprint sẽ không khớp với BE.
+
+Tên địa điểm chỉ dùng để đặt mã endpoint khi đăng ký Edge mới. Nếu cấu hình đã có `EXECUTION_ENDPOINT_ID`, InitIceBot tiếp tục kiểm tra endpoint đó; muốn tạo Edge identity mới cần dùng cấu hình cục bộ mới và tên địa điểm chưa được dùng.
 
 ### 3. `IceBot.exe` — vận hành bán hàng
 
@@ -283,6 +286,7 @@ Cấu hình site nằm trong `config/icebot.site.env` cạnh file EXE và không
 | `NETBIRD_SETUP_KEY` | Kết nối Edge vào mạng NetBird |
 | `KIOSK_CODE` | Code vật lý do kỹ thuật viên nhập một lần |
 | `KIOSK_ID` | ID do BE trả về, được tái sử dụng ở những lần sau |
+| `EDGE_LOCATION_NAME` | Tên địa điểm do kỹ thuật viên nhập để tạo mã `ICEBOT-EDGE-{TEN_DIA_DIEM}` |
 | `EXECUTION_ENDPOINT_ID` | Danh tính endpoint nhận lệnh của chính Edge |
 | `FULL_EDGE_RUNTIME_ID` | Runtime identity ổn định của Full Edge |
 | `EXECUTION_CLIENT_CERT_PATH` | Đường dẫn PFX dùng cho mTLS |

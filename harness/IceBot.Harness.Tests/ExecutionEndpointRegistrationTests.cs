@@ -13,6 +13,28 @@ namespace IceBot.Harness.Tests
             Assert.Equal("EDGE-EDGE-PC-01", ExecutionEndpointRegistrationApi.BuildEndpointCode("edge pc.01"));
         }
 
+        [Theory]
+        [InlineData("Betea", "ICEBOT-EDGE-Betea")]
+        [InlineData("Betea Store 01", "ICEBOT-EDGE-Betea-Store-01")]
+        public void BuildEndpointCodeFromLocation_UsesEnteredLocation(string location, string expected)
+        {
+            var valid = ExecutionEndpointRegistrationApi.TryBuildEndpointCodeFromLocation(
+                location, out var code, out var error);
+
+            Assert.True(valid, error);
+            Assert.Equal(expected, code);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("---")]
+        [InlineData("BAD=LOCATION")]
+        public void BuildEndpointCodeFromLocation_RejectsInvalidValues(string location)
+        {
+            Assert.False(ExecutionEndpointRegistrationApi.TryBuildEndpointCodeFromLocation(
+                location, out _, out _));
+        }
+
         [Fact]
         public void NormalizeKioskCode_PreservesPrintedCodeAndUppercasesIt()
         {

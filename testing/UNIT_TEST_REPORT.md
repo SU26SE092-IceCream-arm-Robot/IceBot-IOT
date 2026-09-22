@@ -1,5 +1,13 @@
 # IceBot-IOT Test Document
 
+## Manual Edge location endpoint naming — 2026-09-22
+
+- Scope: replace Windows computer-name-derived endpoint codes with a technician-entered location label persisted as `EDGE_LOCATION_NAME`; generate new endpoint codes as `ICEBOT-EDGE-{location}` and validate the local-config input.
+- Targeted: 18 total, 18 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --filter "FullyQualifiedName~ExecutionEndpointRegistrationTests" --logger "trx;LogFileName=ManualEdgeLocationRegression.trx"`.
+- Full harness: 140 total, 138 passed, 2 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --logger "trx;LogFileName=ManualEdgeLocationFullEscalated.trx"`.
+- The 2 full-harness failures are existing firmware contract assertions for diagnostics and EXTI source text; they are unrelated to the Edge location/configuration change. The full run outside the sandbox passed all file-replace and certificate tests.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/ManualEdgeLocationRegression.trx` and `harness/IceBot.Harness.Tests/TestResults/ManualEdgeLocationFullEscalated.trx`.
+
 ## Remove obsolete NetBird public URL — 2026-09-22
 
 - Scope: remove the unused `PUBLIC_URL` prompt, persisted setting, environment variable, and `IsConfigured` requirement; Edge uses the NetBird setup key and HTTPS `BE_API_URL` for Backend communication.

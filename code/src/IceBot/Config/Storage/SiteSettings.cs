@@ -36,6 +36,11 @@ namespace IceBot.Config
         public Dictionary<string, Guid> MachineDeviceIds { get; set; } =
             new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
+        // Human-entered location label used to create a unique Full Edge endpoint code.
+        // It is deliberately separate from the Windows computer name so multiple Edge
+        // installations on one development machine can be initialized independently.
+        public string EdgeLocationName { get; set; } = string.Empty;
+
         public Guid GetMachineDeviceId(string machineType) =>
             MachineDeviceIds.TryGetValue(machineType, out var deviceId) ? deviceId : Guid.Empty;
 

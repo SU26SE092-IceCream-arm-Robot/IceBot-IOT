@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using IceBot.Api;
 using IceBot.Machines;
 
 namespace IceBot.Config
@@ -63,6 +64,7 @@ namespace IceBot.Config
                 ApiKey = current.ApiKey,
                 StorePassword = current.StorePassword,
                 ProvisionedSteps = new List<string>(current.ProvisionedSteps),
+                EdgeLocationName = current.EdgeLocationName,
                 ActiveConfigurationDeploymentId = current.ActiveConfigurationDeploymentId,
                 ActiveConfigurationReleaseId = current.ActiveConfigurationReleaseId,
                 ActiveConfigurationReleaseChecksum = current.ActiveConfigurationReleaseChecksum,
@@ -139,6 +141,32 @@ namespace IceBot.Config
             Console.WriteLine("[OK] Da luu cau hinh robot.");
         }
 
+        public static bool RunEdgeLocationSettings()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== CAU HINH DIA DIEM EDGE ===");
+            Console.WriteLine("Nhap ten dia diem de tao ma Edge, vi du: Betea -> ICEBOT-EDGE-Betea.");
+            Console.WriteLine("Nhan ENTER de giu gia tri hien tai.");
+            Console.WriteLine();
+
+            var settings = SiteConfigStore.Load();
+            while (true)
+            {
+                var location = Prompt("Ten dia diem Edge", settings.EdgeLocationName);
+                if (ExecutionEndpointRegistrationApi.TryBuildEndpointCodeFromLocation(
+                    location, out var endpointCode, out var error))
+                {
+                    settings.EdgeLocationName = location;
+                    SiteConfigStore.Save(settings);
+                    Console.WriteLine("[OK] Da luu ten dia diem Edge: " + location);
+                    Console.WriteLine("Ma Edge se dang ky: " + endpointCode);
+                    return true;
+                }
+
+                Console.WriteLine("[ERROR] " + error);
+            }
+        }
+
         public static void RunMachinePortSettings()
         {
             Console.WriteLine();
@@ -179,6 +207,7 @@ namespace IceBot.Config
             Console.WriteLine($"  Robot IP       : {settings.RobotIp}");
             Console.WriteLine($"  Tai khoan cua hang : {(string.IsNullOrEmpty(settings.StoreAccount) ? "(chua dat)" : settings.StoreAccount)}");
             Console.WriteLine($"  Kiosk code          : {(string.IsNullOrEmpty(settings.KioskCode) ? "(chua nhap)" : settings.KioskCode)}");
+            Console.WriteLine($"  Edge location       : {(string.IsNullOrEmpty(settings.EdgeLocationName) ? "(chua nhap)" : settings.EdgeLocationName)}");
             Console.WriteLine($"  Da dang nhap BE    : {(string.IsNullOrEmpty(settings.OperatorAccessToken) ? "CHUA (dung Khoi tao Edge trong InitIceBot.exe)" : "ROI")}");
             foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {

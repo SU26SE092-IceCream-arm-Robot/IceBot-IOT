@@ -1,6 +1,6 @@
 # IceBot-IOT Project Context
 
-Last reviewed: 2026-09-08
+Last reviewed: 2026-09-22
 
 ## Purpose
 
@@ -76,11 +76,12 @@ Owns technician-authorized initialization:
 1. Persist the physical Kiosk Code.
 2. Connect NetBird.
 3. Confirm robot identity/profile and configure one COM port per installed peripheral trigger.
-4. Resolve or register the kiosk.
-5. Resolve or create the Full Edge execution endpoint.
-6. Create/reuse the DPAPI-protected PFX and provision its fingerprint.
-7. Activate the kiosk when allowed.
-8. Send mTLS heartbeat and robot-device snapshot.
+4. Ask for and persist the Edge location name. A new endpoint code is generated as `ICEBOT-EDGE-{location}`; it is not derived from the Windows computer name.
+5. Resolve or register the kiosk.
+6. Resolve or create the Full Edge execution endpoint.
+7. Create/reuse the DPAPI-protected PFX and provision its fingerprint.
+8. Activate the kiosk when allowed.
+9. Send mTLS heartbeat and robot-device snapshot.
 The technician configuration UI is task-based:
 
 ```text
@@ -126,6 +127,7 @@ Cloud communication is initiated by Edge over HTTPS/mTLS. NetBird provides priva
 | `NETBIRD_SETUP_KEY` | NetBird enrollment key |
 | `KIOSK_CODE` | Physical kiosk code |
 | `KIOSK_ID` | Backend kiosk identity |
+| `EDGE_LOCATION_NAME` | Human-entered location label used for a new endpoint code `ICEBOT-EDGE-{location}` |
 | `EXECUTION_ENDPOINT_ID` | Edge command endpoint |
 | `FULL_EDGE_RUNTIME_ID` | Stable runtime identity |
 | `EXECUTION_CLIENT_CERT_PATH` | Local PFX path |

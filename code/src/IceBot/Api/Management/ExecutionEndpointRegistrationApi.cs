@@ -302,6 +302,61 @@ namespace IceBot.Api
             return value.Length <= 100 ? value : value.Substring(0, 100);
         }
 
+        internal static bool TryBuildEndpointCodeFromLocation(
+            string locationName,
+            out string endpointCode,
+            out string error)
+        {
+            endpointCode = string.Empty;
+            error = string.Empty;
+
+            var source = (locationName ?? string.Empty).Trim();
+            if (source.Length == 0)
+            {
+                error = "Ten dia diem khong duoc de trong.";
+                return false;
+            }
+
+            if (source.IndexOf('=') >= 0 || source.IndexOf('\r') >= 0 || source.IndexOf('\n') >= 0)
+            {
+                error = "Ten dia diem khong duoc chua dau '=' hoac ky tu xuong dong.";
+                return false;
+            }
+
+            const string prefix = "ICEBOT-EDGE-";
+            var builder = new StringBuilder(prefix);
+            var hasLocationCharacter = false;
+            var pendingSeparator = false;
+            foreach (var c in source)
+            {
+                if (char.IsLetterOrDigit(c))
+                {
+                    if (pendingSeparator && hasLocationCharacter)
+                        builder.Append('-');
+                    builder.Append(c);
+                    hasLocationCharacter = true;
+                    pendingSeparator = false;
+                }
+                else
+                {
+                    pendingSeparator = true;
+                }
+            }
+
+            if (!hasLocationCharacter)
+            {
+                error = "Ten dia diem phai co it nhat mot chu cai hoac chu so.";
+                return false;
+            }
+
+            var value = builder.ToString().TrimEnd('-');
+            if (value.Length > 100)
+                value = value.Substring(0, 100).TrimEnd('-');
+
+            endpointCode = value;
+            return true;
+        }
+
         private static ExecutionEndpointRegistrationResult Reuse(BackendExecutionEndpoint endpoint, string message) =>
             new ExecutionEndpointRegistrationResult
             {
