@@ -145,7 +145,7 @@ namespace IceBot.Config
         {
             Console.WriteLine();
             Console.WriteLine("=== CAU HINH DIA DIEM EDGE ===");
-            Console.WriteLine("Nhap ten dia diem de tao ma Edge, vi du: Betea -> ICEBOT-EDGE-Betea.");
+            Console.WriteLine("Nhap ma Edge/ten dia diem, vi du: Betea -> Betea.");
             Console.WriteLine("Nhan ENTER de giu gia tri hien tai.");
             Console.WriteLine();
 

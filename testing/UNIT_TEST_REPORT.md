@@ -1,5 +1,12 @@
 # IceBot-IOT Test Document
 
+## Simulated peripheral online snapshot — 2026-09-23
+
+- Scope: in `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, include mapped trigger-plugin peripherals in the Edge hardware snapshot; Backend applies a current mapped observation as `Online` for devices in `Provisioning` or `Offline` without overriding `Disabled`, `Maintenance`, `Error`, or `Retired`.
+- Edge targeted: 3 total, 3 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --disable-build-servers -p:BuildInParallel=false -p:MaxCpuCount=1 --filter "FullyQualifiedName~RobotDeviceDiscoveryTests" --logger "trx;LogFileName=SimulatedPeripheralDiscovery.trx"`.
+- Backend targeted: 4 total, 4 passed, 0 failed, 0 skipped. Command: `dotnet test .\tests\IceBot.UnitTests\IceBot.UnitTests.csproj -c Release --no-restore -m:1 -nr:false --filter "FullyQualifiedName~DeviceLifecycleTests" --logger "trx;LogFileName=SimulatedPeripheralStatus.trx"`.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/SimulatedPeripheralDiscovery.trx` and `IceBot-Backend/tests/IceBot.UnitTests/TestResults/SimulatedPeripheralStatus.trx`.
+
 ## Manual Edge location endpoint naming — 2026-09-22
 
 - Scope: replace Windows computer-name-derived endpoint codes with a technician-entered location label persisted as `EDGE_LOCATION_NAME`; generate new endpoint codes as `ICEBOT-EDGE-{location}` and validate the local-config input.

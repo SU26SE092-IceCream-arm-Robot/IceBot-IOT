@@ -10,12 +10,12 @@ namespace IceBot.Harness.Tests
         [Fact]
         public void BuildEndpointCode_IsStableAndBackendSafe()
         {
-            Assert.Equal("EDGE-EDGE-PC-01", ExecutionEndpointRegistrationApi.BuildEndpointCode("edge pc.01"));
+            Assert.Equal("EDGE-PC-01", ExecutionEndpointRegistrationApi.BuildEndpointCode("edge pc.01"));
         }
 
         [Theory]
-        [InlineData("Betea", "ICEBOT-EDGE-Betea")]
-        [InlineData("Betea Store 01", "ICEBOT-EDGE-Betea-Store-01")]
+        [InlineData("Betea", "Betea")]
+        [InlineData("Betea Store 01", "Betea-Store-01")]
         public void BuildEndpointCodeFromLocation_UsesEnteredLocation(string location, string expected)
         {
             var valid = ExecutionEndpointRegistrationApi.TryBuildEndpointCodeFromLocation(

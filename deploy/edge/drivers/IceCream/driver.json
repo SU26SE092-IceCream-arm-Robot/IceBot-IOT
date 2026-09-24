@@ -1,0 +1,8 @@
+﻿{
+    "schemaVersion":  1,
+    "machineType":  "ice_cream",
+    "assembly":  "IceBot.Driver.IceCream.dll",
+    "entryType":  "IceBot.Driver.IceCream.IceCreamDriver",
+    "driverVersion":  "1.0.0",
+    "sha256":  "efdac587cd736c376f5f0b643c14ea87ecb5f956d0cda17acfdd30287341b448"
+}

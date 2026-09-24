@@ -219,7 +219,8 @@ namespace IceBot.Api
             {
                 if (!string.Equals(existing.ExecutionProfile, "FullEdge", StringComparison.OrdinalIgnoreCase))
                     return Fail($"Ma {endpointCode} da ton tai nhung khong phai FullEdge.");
-                return Reuse(existing, "Edge da duoc dang ky tren BE; da khoi phuc Execution Endpoint ID.");
+                if (!string.Equals(existing.Status, "Retired", StringComparison.OrdinalIgnoreCase))
+                    return Reuse(existing, "Edge da duoc dang ky tren BE; da khoi phuc Execution Endpoint ID.");
             }
 
             var provisioningEndpoint = SelectUnambiguousProvisioningFullEdgeEndpoint(
@@ -292,7 +293,7 @@ namespace IceBot.Api
         internal static string BuildEndpointCode(string machineName)
         {
             var source = string.IsNullOrWhiteSpace(machineName) ? "UNKNOWN" : machineName.Trim();
-            var builder = new StringBuilder("EDGE-");
+            var builder = new StringBuilder();
             foreach (var c in source)
             {
                 builder.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? char.ToUpperInvariant(c) : '-');
@@ -323,8 +324,7 @@ namespace IceBot.Api
                 return false;
             }
 
-            const string prefix = "ICEBOT-EDGE-";
-            var builder = new StringBuilder(prefix);
+            var builder = new StringBuilder();
             var hasLocationCharacter = false;
             var pendingSeparator = false;
             foreach (var c in source)

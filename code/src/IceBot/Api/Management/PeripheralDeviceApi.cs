@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -25,6 +26,29 @@ namespace IceBot.Api
         public bool Success { get; set; }
         public Guid DeviceId { get; set; }
         public string Message { get; set; } = string.Empty;
+    }
+
+    internal sealed class PeripheralDeviceSummary
+    {
+        public Guid Id { get; set; }
+        public Guid? KioskId { get; set; }
+        public long DeviceTypeId { get; set; }
+        public string DeviceTypeCode { get; set; } = string.Empty;
+        public Guid? DeviceModelId { get; set; }
+        public string? DeviceModelCode { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? SerialNumber { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? PositionLabel { get; set; }
+        public string? FirmwareVersion { get; set; }
+    }
+
+    internal sealed class PeripheralDeviceListResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public IReadOnlyList<PeripheralDeviceSummary> Devices { get; set; } = Array.Empty<PeripheralDeviceSummary>();
     }
 
     internal sealed class PeripheralDeviceApi
@@ -58,6 +82,19 @@ namespace IceBot.Api
             return Parse(Send(kioskId, request, SiteConfigStore.Load().OperatorAccessToken));
         }
 
+        public PeripheralDeviceListResult List(Guid kioskId)
+        {
+            if (kioskId == Guid.Empty) return FailList("KioskId khong hop le.");
+
+            var first = SendList(kioskId, SiteConfigStore.Load().OperatorAccessToken);
+            if (first.StatusCode != HttpStatusCode.Unauthorized) return ParseList(first);
+
+            if (!StoreAuth.TryRefresh(out var refreshMessage))
+                return FailList("BE tu choi access token va khong refresh duoc: " + refreshMessage);
+
+            return ParseList(SendList(kioskId, SiteConfigStore.Load().OperatorAccessToken));
+        }
+
         private ApiResponse Send(Guid kioskId, PeripheralDeviceRegistration request, string accessToken)
         {
             if (!TryBuildUri(kioskId, out var uri, out var error))
@@ -84,10 +121,61 @@ namespace IceBot.Api
             }
         }
 
+        private ApiResponse SendList(Guid kioskId, string accessToken)
+        {
+            if (!TryBuildListUri(kioskId, out var uri, out var error))
+                return new ApiResponse(HttpStatusCode.BadRequest, string.Empty, error);
+            if (string.IsNullOrWhiteSpace(accessToken))
+                return new ApiResponse(HttpStatusCode.Unauthorized, string.Empty, "Chua co access token BE.");
+
+            try
+            {
+                using (var message = new HttpRequestMessage(HttpMethod.Get, uri))
+                {
+                    message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    using (var response = _http.SendAsync(message).GetAwaiter().GetResult())
+                    {
+                        return new ApiResponse(response.StatusCode,
+                            response.Content.ReadAsStringAsync().GetAwaiter().GetResult(), string.Empty);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException || ex is System.Threading.Tasks.TaskCanceledException)
+            {
+                return new ApiResponse(0, string.Empty, "Khong ket noi duoc BE: " + ex.Message);
+            }
+        }
+
         private static PeripheralDeviceRegistrationResult Parse(ApiResponse response)
         {
             if (!string.IsNullOrWhiteSpace(response.TransportError)) return Fail(response.TransportError);
             return ParseRegistrationResponse(response.StatusCode, response.Body);
+        }
+
+        private static PeripheralDeviceListResult ParseList(ApiResponse response)
+        {
+            if (!string.IsNullOrWhiteSpace(response.TransportError)) return FailList(response.TransportError);
+            return ParseDeviceListResponse(response.StatusCode, response.Body);
+        }
+
+        internal static PeripheralDeviceListResult ParseDeviceListResponse(HttpStatusCode statusCode, string bodyJson)
+        {
+            try
+            {
+                var body = JsonSerializer.Deserialize<DeviceListApiResponse>(bodyJson, JsonOptions);
+                if ((int)statusCode < 200 || (int)statusCode >= 300 || body == null || !body.Succeeded || body.Data == null)
+                    return FailList(body?.Message ?? $"BE tu choi lay danh sach thiet bi (HTTP {(int)statusCode}).");
+                return new PeripheralDeviceListResult
+                {
+                    Success = true,
+                    Message = body.Message ?? "Da lay danh sach thiet bi.",
+                    Devices = body.Data
+                };
+            }
+            catch (JsonException)
+            {
+                return FailList($"Response danh sach thiet bi tu BE khong hop le (HTTP {(int)statusCode}).");
+            }
         }
 
         internal static PeripheralDeviceRegistrationResult ParseRegistrationResponse(HttpStatusCode statusCode, string bodyJson)
@@ -130,8 +218,30 @@ namespace IceBot.Api
             return true;
         }
 
+        private static bool TryBuildListUri(Guid kioskId, out Uri uri, out string error)
+        {
+            uri = null!;
+            error = string.Empty;
+            var baseUrl = SiteConfigStore.Load().BeApiUrl?.Trim();
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                error = "Chua cau hinh BE_API_URL (can URL private cua BE tren NetBird).";
+                return false;
+            }
+            if (!Uri.TryCreate(baseUrl!.TrimEnd('/') + "/", UriKind.Absolute, out var root) || root == null)
+            {
+                error = "BE_API_URL khong hop le.";
+                return false;
+            }
+            uri = new Uri(root, $"api/v1/management/devices?kioskId={kioskId:D}");
+            return true;
+        }
+
         private static PeripheralDeviceRegistrationResult Fail(string message) =>
             new PeripheralDeviceRegistrationResult { Success = false, Message = message };
+
+        private static PeripheralDeviceListResult FailList(string message) =>
+            new PeripheralDeviceListResult { Success = false, Message = message };
 
         private sealed class DeviceApiResponse
         {
@@ -141,6 +251,13 @@ namespace IceBot.Api
         }
 
         private sealed class DeviceData { public Guid Id { get; set; } }
+
+        private sealed class DeviceListApiResponse
+        {
+            public bool Succeeded { get; set; }
+            public string? Message { get; set; }
+            public List<PeripheralDeviceSummary>? Data { get; set; }
+        }
 
         private sealed class ApiResponse
         {

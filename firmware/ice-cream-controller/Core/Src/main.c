@@ -62,6 +62,39 @@ static volatile uint8_t rxFrameReady = 0;
 
 typedef enum { MOTOR_STOP_STATE = 0, MOTOR_UP, MOTOR_DOWN } MotorDir;
 
+typedef enum
+{
+    MOTOR_STOP_CAUSE_BOOT = 1,
+    MOTOR_STOP_CAUSE_COMMAND = 2,
+    MOTOR_STOP_CAUSE_UPPER_LIMIT = 3,
+    MOTOR_STOP_CAUSE_LOWER_LIMIT = 4,
+    MOTOR_STOP_CAUSE_DEADLINE = 5
+} MotorStopCause;
+
+typedef struct
+{
+    uint32_t sequence;
+    uint32_t timestampMs;
+    uint8_t direction;
+    uint8_t cause;
+    uint16_t gpioSnapshot;
+} IceBotDiagStopEvent;
+
+#define ICEBOT_DIAG_STOP_EVENT_CAPACITY 8U
+
+/* Public, volatile symbols are intentionally kept for Release/ST-Link inspection. */
+volatile uint32_t icebot_diag_boot_reset_flags_raw __attribute__((used));
+volatile uint32_t icebot_diag_boot_reset_flags_after_clear __attribute__((used));
+volatile uint32_t icebot_diag_uptime_ms __attribute__((used));
+volatile uint32_t icebot_diag_upper_active_event_count __attribute__((used));
+volatile uint32_t icebot_diag_lower_active_event_count __attribute__((used));
+volatile uint32_t icebot_diag_upper_last_active_event_ms __attribute__((used));
+volatile uint32_t icebot_diag_lower_last_active_event_ms __attribute__((used));
+volatile uint16_t icebot_diag_upper_last_active_event_gpio __attribute__((used));
+volatile uint16_t icebot_diag_lower_last_active_event_gpio __attribute__((used));
+volatile uint32_t icebot_diag_stop_event_count __attribute__((used));
+volatile IceBotDiagStopEvent icebot_diag_stop_events[ICEBOT_DIAG_STOP_EVENT_CAPACITY] __attribute__((used));
+
 static volatile MotorDir currentDir = MOTOR_STOP_STATE;
 static volatile uint32_t stopDeadline = 0;
 static volatile uint8_t hasDeadline = 0;
@@ -84,7 +117,12 @@ static void SendFrame(const uint8_t *frame, uint8_t len);
 static void ProcessFrame(const uint8_t *frame, uint8_t len);
 static void Protocol_Poll(void);
 static void Motor_SetPwm(TIM_HandleTypeDef *htim, uint32_t channel, uint8_t dutyPercent);
-static uint8_t Motor_Stop(void);
+static uint8_t Motor_Stop(MotorStopCause cause);
+static void Diagnostics_CaptureBootResetCause(void);
+static uint16_t Diagnostics_ReadGpioSnapshot(void);
+static uint16_t Diagnostics_MakeGpioSnapshot(uint8_t upperHigh, uint8_t lowerHigh);
+static void Diagnostics_RecordStop(MotorStopCause cause, MotorDir direction, uint16_t gpioSnapshot);
+static void Diagnostics_RecordLimitActive(uint16_t gpioPin, uint8_t upperActive, uint8_t lowerActive);
 static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationTenths);
 static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationTenths);
 static void Motor_Poll(void);
@@ -110,6 +148,9 @@ int main(void)
 
   /* MCU Configuration--------------------------------------------------------*/
 
+  /* Capture sticky reset flags before HAL/system-clock code can alter them. */
+  Diagnostics_CaptureBootResetCause();
+
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
@@ -133,7 +174,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
-  Motor_Stop();
+  Motor_Stop(MOTOR_STOP_CAUSE_BOOT);
   upperLimitActive = UpperLimit_IsActive();
   lowerLimitActive = LowerLimit_IsActive();
   HAL_UART_Receive_IT(&huart1, &rxBuf[0], 1);
@@ -143,6 +184,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    icebot_diag_uptime_ms = HAL_GetTick();
     Protocol_Poll();
     Motor_Poll();
     /* USER CODE END WHILE */
@@ -486,14 +528,92 @@ static void Motor_SetPwm(TIM_HandleTypeDef *htim, uint32_t channel, uint8_t duty
     __HAL_TIM_SET_COMPARE(htim, channel, compare);
 }
 
+static void Diagnostics_CaptureBootResetCause(void)
+{
+    icebot_diag_boot_reset_flags_raw = RCC->CSR;
+    RCC->CSR |= RCC_CSR_RMVF;
+    icebot_diag_boot_reset_flags_after_clear = RCC->CSR;
+}
+
+static uint16_t Diagnostics_MakeGpioSnapshot(uint8_t upperHigh, uint8_t lowerHigh)
+{
+    uint16_t snapshot = 0;
+    if (upperHigh)
+    {
+        snapshot |= 0x0001U;
+    }
+    if (lowerHigh)
+    {
+        snapshot |= 0x0002U;
+    }
+    return snapshot;
+}
+
+static uint16_t Diagnostics_ReadGpioSnapshot(void)
+{
+    return Diagnostics_MakeGpioSnapshot(
+        HAL_GPIO_ReadPin(UPPER_LIMIT_SWITCH_GPIO_Port, UPPER_LIMIT_SWITCH_Pin) == GPIO_PIN_SET,
+        HAL_GPIO_ReadPin(LOWER_LIMIT_SWITCH_GPIO_Port, LOWER_LIMIT_SWITCH_Pin) == GPIO_PIN_SET);
+}
+
+static void Diagnostics_RecordStop(MotorStopCause cause, MotorDir direction, uint16_t gpioSnapshot)
+{
+    uint32_t sequence;
+    uint32_t slot;
+    volatile IceBotDiagStopEvent *event;
+
+    /* Caller holds the stop critical section across PWM-off, state update, and this record. */
+    sequence = icebot_diag_stop_event_count++;
+    slot = sequence % ICEBOT_DIAG_STOP_EVENT_CAPACITY;
+    event = &icebot_diag_stop_events[slot];
+    event->sequence = 0;
+    event->timestampMs = HAL_GetTick();
+    event->direction = (uint8_t)direction;
+    event->cause = (uint8_t)cause;
+    event->gpioSnapshot = gpioSnapshot;
+    event->sequence = sequence + 1U;
+    icebot_diag_uptime_ms = event->timestampMs;
+}
+
+static void Diagnostics_RecordLimitActive(uint16_t gpioPin, uint8_t upperActive, uint8_t lowerActive)
+{
+    uint32_t now = HAL_GetTick();
+    uint16_t snapshot = Diagnostics_MakeGpioSnapshot(!upperActive, !lowerActive);
+
+    if (gpioPin == UPPER_LIMIT_SWITCH_Pin && upperActive)
+    {
+        icebot_diag_upper_active_event_count++;
+        icebot_diag_upper_last_active_event_ms = now;
+        icebot_diag_upper_last_active_event_gpio = snapshot;
+    }
+    else if (gpioPin == LOWER_LIMIT_SWITCH_Pin && lowerActive)
+    {
+        icebot_diag_lower_active_event_count++;
+        icebot_diag_lower_last_active_event_ms = now;
+        icebot_diag_lower_last_active_event_gpio = snapshot;
+    }
+}
+
 // R_EN/L_EN is hardwired to 5V (always enabled, not STM32-controlled) — stopping the motor
 // means forcing both PWM duties to 0, there is no separate hardware disable line.
-static uint8_t Motor_Stop(void)
+static uint8_t Motor_Stop(MotorStopCause cause)
 {
+    uint32_t primask = __get_PRIMASK();
+    MotorDir direction;
+    uint16_t gpioSnapshot;
+
+    __disable_irq();
+    direction = currentDir;
     Motor_SetPwm(&htim1, TIM_CHANNEL_1, 0);
     Motor_SetPwm(&htim3, TIM_CHANNEL_4, 0);
     currentDir = MOTOR_STOP_STATE;
     hasDeadline = 0;
+    gpioSnapshot = Diagnostics_ReadGpioSnapshot();
+    Diagnostics_RecordStop(cause, direction, gpioSnapshot);
+    if (primask == 0U)
+    {
+        __enable_irq();
+    }
     return 1;
 }
 
@@ -510,7 +630,7 @@ static uint8_t Motor_RunUp(uint8_t speedPercent, uint8_t durationTenths)
     }
     if (UpperLimit_IsActive())
     {
-        Motor_Stop();
+        Motor_Stop(MOTOR_STOP_CAUSE_UPPER_LIMIT);
         return 0; // physical upper limit is active
     }
     /* PB1/TIM3_CH4 is physical UP; PA8/TIM1_CH1 is physical DOWN. */
@@ -541,7 +661,7 @@ static uint8_t Motor_RunDown(uint8_t speedPercent, uint8_t durationTenths)
     }
     if (LowerLimit_IsActive())
     {
-        Motor_Stop();
+        Motor_Stop(MOTOR_STOP_CAUSE_LOWER_LIMIT);
         return 0; // physical lower limit is active
     }
     /* PA8/TIM1_CH1 is physical DOWN. */
@@ -575,14 +695,19 @@ static void Motor_Poll(void)
 {
     upperLimitActive = UpperLimit_IsActive();
     lowerLimitActive = LowerLimit_IsActive();
-    if ((upperLimitActive && currentDir == MOTOR_UP) || (lowerLimitActive && currentDir == MOTOR_DOWN))
+    if (upperLimitActive && currentDir == MOTOR_UP)
     {
-        Motor_Stop();
+        Motor_Stop(MOTOR_STOP_CAUSE_UPPER_LIMIT);
+        return;
+    }
+    if (lowerLimitActive && currentDir == MOTOR_DOWN)
+    {
+        Motor_Stop(MOTOR_STOP_CAUSE_LOWER_LIMIT);
         return;
     }
     if (hasDeadline && (int32_t)(HAL_GetTick() - stopDeadline) >= 0)
     {
-        Motor_Stop();
+        Motor_Stop(MOTOR_STOP_CAUSE_DEADLINE);
     }
 }
 
@@ -623,7 +748,7 @@ static void ProcessFrame(const uint8_t *frame, uint8_t len)
         }
         case 0x04: // Motor stop
         {
-            uint8_t ok = Motor_Stop();
+            uint8_t ok = Motor_Stop(MOTOR_STOP_CAUSE_COMMAND);
             uint8_t data[1] = { ok };
             replyLen = BuildReply(reply, 0x04, 0xAA, data, 1);
             break;
@@ -656,12 +781,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     if (GPIO_Pin == UPPER_LIMIT_SWITCH_Pin || GPIO_Pin == LOWER_LIMIT_SWITCH_Pin)
     {
-        upperLimitActive = UpperLimit_IsActive();
-        lowerLimitActive = LowerLimit_IsActive();
-        if ((upperLimitActive && currentDir == MOTOR_UP) || (lowerLimitActive && currentDir == MOTOR_DOWN))
+        uint8_t observedUpperActive = UpperLimit_IsActive();
+        uint8_t observedLowerActive = LowerLimit_IsActive();
+
+        upperLimitActive = observedUpperActive;
+        lowerLimitActive = observedLowerActive;
+        if (currentDir == MOTOR_UP && observedUpperActive)
         {
-            Motor_Stop();
+            Motor_Stop(MOTOR_STOP_CAUSE_UPPER_LIMIT);
         }
+        else if (currentDir == MOTOR_DOWN && observedLowerActive)
+        {
+            Motor_Stop(MOTOR_STOP_CAUSE_LOWER_LIMIT);
+        }
+        Diagnostics_RecordLimitActive(GPIO_Pin, observedUpperActive, observedLowerActive);
     }
 }
 

@@ -43,8 +43,8 @@ namespace IceBot.Config
             var kioskId = ResolveOrRegisterKiosk(api, settings);
             if (kioskId == Guid.Empty) return;
 
-            Guid endpointId;
-            string endpointStatus;
+            var endpointId = Guid.Empty;
+            var endpointStatus = string.Empty;
             Guid? backendProfileIdentity = null;
             if (settings.ExecutionEndpointId != Guid.Empty)
             {
@@ -56,11 +56,22 @@ namespace IceBot.Config
                     Console.WriteLine("[ERROR] " + current.Message);
                     return;
                 }
-                endpointId = settings.ExecutionEndpointId;
-                endpointStatus = current.Status;
-                backendProfileIdentity = current.ProfileIdentity;
+                if (string.Equals(current.Status, "Retired", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("[WARN] Execution Endpoint cu da Retired; se tim FullEdge dang cho cau hinh.");
+                    settings.ExecutionEndpointId = Guid.Empty;
+                    settings.FullEdgeRuntimeId = Guid.Empty;
+                    SiteConfigStore.Save(settings);
+                }
+                else
+                {
+                    endpointId = settings.ExecutionEndpointId;
+                    endpointStatus = current.Status;
+                    backendProfileIdentity = current.ProfileIdentity;
+                }
             }
-            else
+
+            if (settings.ExecutionEndpointId == Guid.Empty)
             {
                 Console.WriteLine("Buoc 5/7: Dang ky Execution Endpoint");
                 if (!ExecutionEndpointRegistrationApi.TryBuildEndpointCodeFromLocation(

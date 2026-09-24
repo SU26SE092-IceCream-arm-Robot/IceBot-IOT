@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using IceBot.Config;
+using IceBot.Machines;
 using IceBot.Robot.Hardware;
 using Xunit;
 
@@ -38,6 +40,24 @@ namespace IceBot.Harness.Tests
             };
 
             Assert.Empty(new ConfiguredRobotDeviceDiscovery().Discover(settings));
+        }
+
+        [Fact]
+        public void ConfiguredPeripheralDiscovery_ReportsMappedTriggerPlugins()
+        {
+            var settings = new SiteSettings();
+            var triggers = MachineRegistry.Modules.OfType<IMachineTrigger>().ToArray();
+            Assert.NotEmpty(triggers);
+
+            foreach (var trigger in triggers)
+                settings.MachineDeviceIds[trigger.MachineType] = Guid.NewGuid();
+
+            var devices = new ConfiguredPeripheralDeviceDiscovery().Discover(settings);
+
+            Assert.Equal(triggers.Length, devices.Count);
+            Assert.All(devices, device => Assert.Contains(triggers, trigger =>
+                string.Equals(trigger.MachineType, device.SourceDeviceKey, StringComparison.OrdinalIgnoreCase)));
+            Assert.All(devices, device => Assert.Equal("ICEBOT_SIMULATED_PERIPHERAL", device.RuntimeTargetCode));
         }
     }
 }

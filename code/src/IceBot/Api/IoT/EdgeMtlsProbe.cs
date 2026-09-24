@@ -86,16 +86,22 @@ namespace IceBot.Api
 
             using (client)
             {
-                var devices = new ConfiguredRobotDeviceDiscovery().Discover(settings)
+                var devices = new ConfiguredRobotDeviceDiscovery().Discover(settings).ToList();
+                if (AppConfig.RobotExecutionMode == RobotExecutionMode.Simulated)
+                {
+                    devices.AddRange(new ConfiguredPeripheralDeviceDiscovery().Discover(settings));
+                }
+
+                var orderedDevices = devices
                     .OrderBy(item => item.SourceDeviceKey, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
-                if (devices.Length == 0)
+                if (orderedDevices.Length == 0)
                 {
                     message = "Khong co robot device profile de report; kiem tra PRIMARY_ROBOT_* trong site config.";
                     return false;
                 }
 
-                var signature = string.Join("|", devices.Select(item =>
+                var signature = string.Join("|", orderedDevices.Select(item =>
                     $"{item.SourceDeviceKey}:{item.DeviceId:D}:{item.RuntimeTargetCode}:{item.MachineModelCode}"));
                 var snapshot = SiteConfigStore.GetReportedDevicesSnapshotVersion(signature);
 
@@ -106,7 +112,7 @@ namespace IceBot.Api
                         sourceExecutorId = settings.FullEdgeRuntimeId,
                         snapshotRevision = snapshot.Revision,
                         observedAt = snapshot.ObservedAt,
-                        devices = devices.Select(item => new
+                        devices = orderedDevices.Select(item => new
                         {
                             sourceDeviceKey = item.SourceDeviceKey,
                             deviceId = item.DeviceId,
@@ -132,7 +138,7 @@ namespace IceBot.Api
                             return false;
                         }
 
-                        message = $"BE da nhan hardware snapshot revision {snapshot.Revision} ({devices.Length} device).";
+                        message = $"BE da nhan hardware snapshot revision {snapshot.Revision} ({orderedDevices.Length} device).";
                         return true;
                     }
                 }

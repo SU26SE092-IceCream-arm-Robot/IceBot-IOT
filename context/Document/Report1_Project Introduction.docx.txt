@@ -1,0 +1,228 @@
+﻿CAPSTONE PROJECT REPORT
+Report 1 – Project Introduction
+ 
+  
+
+
+
+
+
+
+
+
+ 
+– Ho Chi Minh, May 2026 –
+
+
+Table of Contents
+I. Record of Changes        3
+II. Project Introduction        4
+1. Overview        4
+1.1 Project Information        4
+1.2 Project Team        4
+2. Product Background        4
+3. Existing Systems        4
+3.1 Reis & Irvy’s         4
+3.2 RobotAnno        5
+4. Business Opportunity        5
+5. Software Product Vision        5
+6. Project Scope & Limitations        6
+6.1 Project Scope        6
+6.2 Limitations & Exclusions        10
+
+
+ 
+________________
+I. Record of Changes
+Date
+	   A*
+M, D
+	In charge
+	Change Description
+	26/5/2026
+	A
+	TuanTH
+	Add Project introduction.
+	27/5/2026
+	A
+	TuanTH
+	Add Major features, limitations, exclusions.
+	15/8/2026
+	A, M
+	TuanTH
+	Modify Exclusion, Add Limitation.
+	 
+	 
+	
+
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	*A - Added M - Modified D - Deleted
+
+
+ 
+________________
+II. Project Introduction
+1. Overview
+1.1 Project Information
+* Project Name: IceBot – Design and Implementation of a Multi-Location Automated Ice Cream Vending System with Robotic Arm Integration
+* Project Code: IB
+* Group Name: GSU26SE28
+* Semester: Summer2026 (05/2026 - 09/2026)
+* Software Type: Web Application, Automatic System, Desktop App
+1.2 Project Team
+Full Name
+	Role
+	Email
+	Mobile
+	Lâm Hữu Khánh Phương
+	Lecturer
+	 phuonglhk@fpt.edu.vn
+	0915353001
+	Trần Hoàng Tuấn
+	Leader
+	 tuanthse151518@fpt.edu.vn
+	0906771080
+	Đoàn Lê Thành Trung
+	Member
+	 trungdltse183054@fpt.edu.vn
+	0931445712
+	Chu Tuấn Kiệt
+	Member
+	 kietctse150863@fpt.edu.vn
+	0582121840
+	Võ Nhật Hưng
+	Member
+	 hungvnse173374@fpt.edu.vn
+	0971357136
+	Trần Quang Thuận
+	Member
+	 thuantse182998@fpt.edu.vn
+	0925453575
+	Table 2.1.2.1 Project’s member list
+2. Product Background
+The Food and Beverage industry is increasingly adopting automation and unmanned retail models to reduce labor costs, improve service consistency, and support operation in high-traffic locations. Smart vending kiosks are now common in malls, campuses, offices, hospitals, airports, tourist areas, and entertainment centers. At the same time, advances in IoT, robotics, and cloud computing make it possible to monitor machines remotely, coordinate multiple kiosks, and operate service systems with less manual supervision.
+However, many existing ice cream vending systems still have limitations in automation, user experience, and centralized management. Some machines can sell products automatically, but they often provide only basic interactions and limited visibility for remote operators. When multiple machines are deployed in different locations, it becomes difficult to manage sales, inventory, machine health, maintenance schedules, and customer-facing menus consistently.
+The IceBot project is created to address these issues through a multi-location robotic vending platform. The system does not focus only on one physical kiosk; it also focuses on the software platform needed to manage a network of kiosks, connect device status to the cloud, and allow different stakeholders to participate in the operation.
+3. Existing Systems
+3.1 System Reis & Irvy’s – Robotic Frozen Yogurt / Ice Cream Kiosk
+Reis & Irvy’s is an automated robotic kiosk that serves frozen yogurt, ice cream, gelato, and sorbet. Customers can select their preferred dessert flavor and toppings through a touchscreen interface. The robot then prepares and dispenses the product automatically, usually in under 60 seconds. The system is designed for high-traffic locations such as shopping malls, airports, stadiums, universities, hospitals, and entertainment centers. 
+Link: https://www.reisandirvys.com/
+3.2 System RobotAnno – 6-Axis Robot Ice Cream Machine / Kiosk
+RobotAnno’s 6-Axis Robot Ice Cream Machine is an enclosed robotic ice cream kiosk that uses a six-axis robotic arm to prepare and serve ice cream automatically. Customers can place orders through a self-service interface, choose flavors or jam options, complete payment, and receive ice cream prepared by the robot. The system is designed as a smart vending solution for shopping malls, tourist areas, exhibitions, amusement parks, and other public locations. Link: https://www.annorobots.com/enclosed-robot-ice-cream-machine/
+4. Business Opportunity
+The limitations of current ice cream vending systems create a strong opportunity to develop a next-generation robotic ice cream kiosk platform. By combining a robotic arm, IoT sensors, cloud-based management, and a user-friendly ordering interface, the system can deliver a more automated, scalable, and engaging F&B retail experience. 
+5. Software Product Vision
+The vision of this software product is to build a smart robotic ice cream kiosk management platform that connects customers, robotic kiosks, operators, and cloud services into one unified system. The platform aims to support fully automated ice cream ordering, preparation, payment, monitoring, and maintenance management.
+Instead of operating each kiosk as a separate machine, the software enables centralized control and real-time supervision across multiple kiosk locations. Operators can monitor sales performance, machine status, inventory levels, payment transactions, and system errors through a cloud-based dashboard. This helps reduce manual workload, improve operational efficiency, and support scalable deployment.
+The system also focuses on improving customer experience by providing a simple and interactive ordering interface. Customers can select flavors, toppings, and payment methods easily, while the robotic arm performs the serving process in a visual and engaging way. This turns the vending process into both a service and an entertainment experience.
+From a technical perspective, the product follows an edge-cloud architecture. The edge system installed inside each kiosk is responsible for real-time robot control, local device coordination, and temporary offline operation. The cloud system handles centralized data management, analytics, reporting, remote monitoring, and multi-location administration.
+The long-term vision is to create a reliable, scalable, and intelligent F&B automation platform that can be expanded beyond ice cream kiosks to support other robotic food vending use cases in the future.
+ 6. Project Scope & Limitations
+6.1 Major Features
+Customer Features
+FE-1: View menu on the tablet screen
+FE-2: Choose item(s) on the menu and then place order
+FE-3: Make payment through QR scanning
+FE-4: Track order progress
+FE-5: Cancel order
+
+
+Organization Admin Features
+FE-6: Manage own organization, stores, kiosks, menus
+FE-7: View orders and transactions, of the organization include each store
+FE-8: Manage organization accounts, assign accounts role and store
+FE-9: Interact with Fairobot Studio by import 3d objects in the workspace scene, create workflows, then export workflows as LUA file(s)
+FE-10: Manage Organization LUA that was imported
+FE-11: Organize workflow steps,orders
+FE-12: Bind workflows to products so the system can automatically do the workflows that is assign to the product
+FE-13: Create bundle workflow bindings for the system
+FE-14: Deploys bundle for automatic workflow to back-end
+
+
+Manager Features
+FE-15: Create/manage menu, update menu and enable/disable menu in manager respective store
+FE-16: Manage inventory in manager respective store
+FE-17: Create maintenance tickets
+
+
+Staff Features
+FE-18: Create refund request
+FE-19: Create maintenance ticket
+
+
+Technician Features
+FE-20: View assigned tickets
+FE-21: Resolve tickets that have
+
+
+System Admin Features
+FE-22: Manage organizations, view all information of the organization that use the service
+FE-23: View total sales of all organizations
+FE-24: View setup progress of organizations
+FE-25: View synchronization progress
+FE-26: Manage organization admin accounts and technician accounts
+FE-27: Configure web static information and payment information
+FE-28: View edge status of all organizations
+FE-29: Manage maintenance tickets, then be able to assign to a technician
+FE-30: View kiosk information of all organizations
+
+
+External Payment Integration
+FE-31: Process customer payment through Payment System / PayOS
+ 6.2 Limitations & Exclusions
+Limitations (LI):[a]
+LI-1: The system depends on network connectivity for cloud synchronization, remote management, online payment processing, and communication between kiosks and the centralized backend. Temporary network interruptions may delay synchronization and cloud-dependent operations.
+LI-2: The kiosk edge system can continue limited local device and robot operations during temporary network interruptions; however, cloud synchronization, online payment processing, remote administration, and other Internet-dependent functions are unavailable until connectivity is restored.
+LI-3: The current version of the system supports only the Fairino FR5 robotic arm. Other robotic arm models and variants are not supported in the current project version.
+LI-4: Physical maintenance activities such as ingredient refilling, cleaning, sensor inspection, cup replacement, and hardware repair must be performed manually by staff or technicians.
+LI-5: The software can detect or report certain operational faults and may perform limited recovery actions such as retrying commands or pausing operations. However, physical failures such as cup jams, dispenser faults, motor failures, ingredient depletion, or damaged hardware require manual technician intervention.
+LI-6: All payment transactions are currently processed through the PayOS account configured for the centralized IceBot backend. Organization-specific payment accounts are not supported in the current version.
+LI-7: Payment availability, QR code generation, payment confirmation, refunds, and transaction status depend on the external payment provider. IceBot cannot guarantee immediate payment confirmation or refund completion when the third-party payment service is unavailable or delayed.
+LI-8: Machine status, ingredient levels, device conditions, and other operational information depend on data provided by connected sensors and kiosk devices. Incorrect sensor readings, disconnected devices, or hardware failures may result in delayed or inaccurate system status.
+LI-9: Data synchronization between kiosk edge systems and the centralized cloud backend may not always occur immediately. Network instability, kiosk downtime, or temporary service interruption may cause delays before local data is reflected in the centralized system.
+
+
+Exclusions (EX):
+EX-1: The system supports QR-based online payment only. Cash payment, cash collection, and cash-change mechanisms are outside the scope of the current version.
+EX-2: The system does not physically repair mechanical or electrical failures. Hardware replacement, jam removal, ingredient refilling, cleaning, and other physical maintenance tasks require manual intervention.
+EX-3: The kiosk is not designed for outdoor deployment or environments with extreme temperature, high humidity, water exposure, excessive dust, or other harsh environmental conditions.
+EX-4: The system does not provide AI-based visual surveillance, facial recognition, customer behavior analysis, or automatic detection of abnormal customer behavior.
+
+
+[a]không được sai, check lại

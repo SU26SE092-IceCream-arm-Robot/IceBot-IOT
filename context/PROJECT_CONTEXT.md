@@ -65,7 +65,7 @@ Setup.exe -> InitIceBot.exe -> IceBot.exe
 
 ### Setup.exe
 
-Owns machine installation only: prerequisites, NetBird, immutable application files, empty mutable directories, ACLs, app-local peripheral plugins, and shortcuts. Packaging excludes build-machine `config`, certificates, data, drivers, and downloaded workflows; installation/upgrade is rejected while IceBot or InitIceBot is running. Bundled peripheral packages are installed under `<install-directory>\drivers\<machineType>`; upgrades remove legacy directories that declare the same `machineType`, while unrelated third-party packages in that Edge directory are preserved. Setup does not log in, register a kiosk/endpoint, provision mTLS, or start production.
+Owns machine installation only: prerequisites, NetBird, immutable application files, empty mutable directories, ACLs, and shortcuts. Packaging excludes build-machine `config`, certificates, data, drivers, and downloaded workflows; installation/upgrade is rejected while IceBot or InitIceBot is running. Setup creates an empty `<install-directory>\drivers` directory; peripheral driver packages are supplied and copied by the operator after installation. Setup does not log in, register a kiosk/endpoint, provision mTLS, or start production.
 
 ### InitIceBot.exe
 
@@ -76,7 +76,7 @@ Owns technician-authorized initialization:
 1. Persist the physical Kiosk Code.
 2. Connect NetBird.
 3. Confirm robot identity/profile and configure one COM port per installed peripheral trigger.
-4. Ask for and persist the Edge location name. A new endpoint code is generated as `ICEBOT-EDGE-{location}`; it is not derived from the Windows computer name.
+4. Ask for and persist the Edge location name/code. The normalized value is used directly as the endpoint code; it is not derived from the Windows computer name.
 5. Resolve or register the kiosk.
 6. Resolve or create the Full Edge execution endpoint.
 7. Create/reuse the DPAPI-protected PFX and provision its fingerprint.
@@ -127,7 +127,7 @@ Cloud communication is initiated by Edge over HTTPS/mTLS. NetBird provides priva
 | `NETBIRD_SETUP_KEY` | NetBird enrollment key |
 | `KIOSK_CODE` | Physical kiosk code |
 | `KIOSK_ID` | Backend kiosk identity |
-| `EDGE_LOCATION_NAME` | Human-entered location label used for a new endpoint code `ICEBOT-EDGE-{location}` |
+| `EDGE_LOCATION_NAME` | Human-entered Edge code/location normalized directly into the endpoint code |
 | `EXECUTION_ENDPOINT_ID` | Edge command endpoint |
 | `FULL_EDGE_RUNTIME_ID` | Stable runtime identity |
 | `EXECUTION_CLIENT_CERT_PATH` | Local PFX path |
@@ -158,7 +158,7 @@ MachineModelCode: FR5
 
 These are demo defaults, not registration constants. A later provider can report FR3, CR5, another runtime, or multiple devices without changing provisioning.
 
-The snapshot revision and `observedAt` change together when the device signature changes. Retries of unchanged content reuse both values so Backend treats reconnect delivery as idempotent instead of rejecting the same revision with different content. Hardware report answers what exists; readiness answers whether production can run now.
+The snapshot revision and `observedAt` change together when the device signature changes. Retries of unchanged content reuse both values so Backend treats reconnect delivery as idempotent instead of rejecting the same revision with different content. In Simulated mode, the snapshot also includes mapped trigger plugins with registered Backend `DeviceId` values; Backend treats those current mapped observations as online for devices still in `Provisioning` or `Offline`. Hardware report answers what exists and is currently observed; readiness answers whether production can run now. Backend does not override operator-controlled `Disabled`, `Maintenance`, `Error`, or `Retired` states from an Edge snapshot.
 
 ## Lua and Compatibility Boundary
 
@@ -258,6 +258,8 @@ Therefore:
 - no sensor means inventory is Unknown/manual, not automatically OutOfStock;
 - simulated inventory emulates a sensor gateway only in Simulated mode;
 - simulation references existing Backend `IngredientDispenserStateId` and `DeviceId`; Edge does not invent Cloud topology.
+
+Peripheral registration has two separate management actions. **Link existing device from Backend** calls `GET /api/v1/management/devices?kioskId={KioskId}`, excludes `Retired` devices, lets the operator select an existing Backend device for the selected `MachineType`, and stores its existing `DeviceId` in `MACHINE_DEVICE_IDS` without creating a duplicate. **Register new device with Backend** remains the create flow and is used only when no existing kiosk device matches.
 
 External peripheral packages live beside the Edge application:
 

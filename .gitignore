@@ -32,6 +32,8 @@ deploy/duckdns/duckdns.env
 deploy/cloudflare/config.yml
 deploy/cloudflare/*.json
 deploy/cloudflare/cloudflared.exe
+# Built installer is distributed outside the source repository.
+deploy/IceBot-Setup.exe
 
 # IceBot per-site config (next to exe at runtime)
 **/config/icebot.site.env

@@ -76,7 +76,7 @@ IceBot-IOT/
 │   ├── test-workflow/                   Lua mẫu để test robot
 │   └── workflow/                        Lua production, site-local/gitignored
 ├── driver-sdk/                          hướng dẫn và template driver
-├── DRIVER-DLL/                          package driver build sẵn, được nhúng vào bộ cài Edge
+├── DRIVER-DLL/                          package driver tùy chọn, người dùng tự thêm sau khi cài
 ├── harness/                             test tự động
 ├── context/                             context, architecture và test Lua
 │   ├── PROJECT_CONTEXT.md                nguồn sự thật chi tiết của dự án
@@ -139,7 +139,7 @@ bản dev đọc từ `code/src/IceBot/bin/<Configuration>/net472/drivers`, còn
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\installer\build-package.ps1
 ```
 
-File cài đặt duy nhất được tạo tại `artifacts/installer/IceBot-win-x64/IceBot-Setup.exe`. Runtime, Fairino SDK `robot3.7.8`, driver `bt_cup_l90` và driver máy kem đều được nhúng trong file; chỉ cần phân phối file EXE này.
+File cài đặt duy nhất được tạo tại `artifacts/installer/IceBot-win-x64/IceBot-Setup.exe`. Runtime và Fairino SDK `robot3.7.8` được nhúng trong file; driver ngoại vi không được đóng gói và phải được người dùng thêm sau khi cài.
 
 Payload chỉ chứa runtime bất biến. Script đóng gói loại `config/`, `certificates/`, `data/`, `drivers/` và `workflow/` của máy build để không nhúng token, PFX, Order hay deployment cục bộ. Installer từ chối bundle chứa các thư mục mutable này.
 
@@ -166,10 +166,9 @@ Chạy bằng quyền Administrator. Setup sẽ:
 1. Kiểm tra .NET Framework 4.7.2+; nếu thiếu, chạy bộ cài offline trong `prerequisites/`.
 2. Cài NetBird từ installer offline; nếu không có thì dùng `winget`.
 3. Mở hộp thoại để người dùng chọn thư mục cài đặt; mặc định là `C:\Program Files\IceBot`.
-4. Xác minh SHA-256 của Fairino SDK và các plugin driver, tạo dữ liệu ứng dụng và cài plugin vào
-   `<install-directory>\drivers`; thư mục plugin không được cấp quyền ghi cho runtime thông thường.
-   Thư mục đích dùng `machineType` trong manifest (hiện có `bt_cup_l90`, `ice_cream`); khi nâng cấp,
-   Setup loại thư mục legacy trùng `machineType` để registry không phụ thuộc thứ tự duyệt filesystem.
+4. Xác minh SHA-256 của Fairino SDK, tạo dữ liệu ứng dụng và tạo thư mục
+   `<install-directory>\drivers` trống để người dùng tự thêm plugin; thư mục plugin không được cấp
+   quyền ghi cho runtime thông thường.
 5. Tạo shortcut `IceBot` và `Init IceBot` trên Desktop/Start Menu.
 6. Từ chối cài/nâng cấp nếu `IceBot.exe` hoặc `InitIceBot.exe` còn chạy, tránh trộn binary cũ và mới.
 
@@ -185,7 +184,7 @@ Kỹ thuật viên thực hiện:
 2. Chọn **Cấu hình → Thiết lập Edge lần đầu → Bắt đầu / tiếp tục thiết lập tự động**.
 3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code.
 4. Nhập NetBird setup key.
-5. Nhập **tên địa điểm Edge** (ví dụ `Betea`) để tạo mã endpoint `ICEBOT-EDGE-Betea`.
+5. Nhập **mã Edge/tên địa điểm** (ví dụ `Betea`); mã endpoint được dùng trực tiếp sau khi chuẩn hóa.
 6. Xác nhận Robot IP, hardware profile và nhập cổng COM riêng cho từng máy ngoại vi.
 
 Các bước còn lại chạy tự động:
@@ -193,7 +192,7 @@ Các bước còn lại chạy tự động:
 1. Kiểm tra NetBird đã được Setup cài và chạy `netbird up`.
 2. Nếu máy đã lưu `KIOSK_ID`, tái sử dụng ID đó.
 3. Nếu chưa có, tìm Kiosk theo đúng Kiosk Code; không tìm thấy thì tự đăng ký Kiosk dưới cửa hàng duy nhất mà tài khoản được truy cập.
-4. Tìm hoặc tạo Full Edge Execution Endpoint với code `ICEBOT-EDGE-{TEN_DIA_DIEM}`; tên địa điểm được lưu trong `EDGE_LOCATION_NAME`.
+4. Tìm hoặc tạo Full Edge Execution Endpoint với code được chuẩn hóa trực tiếp từ `EDGE_LOCATION_NAME`.
 5. Lưu `KIOSK_ID` và `EXECUTION_ENDPOINT_ID` vào cấu hình cục bộ.
 6. Tạo hoặc tái sử dụng certificate RSA-3072 tại `certificates/icebot-edge-client.pfx`.
 7. Tạo `FULL_EDGE_RUNTIME_ID`, gửi fingerprint certificate để provision endpoint và kích hoạt Kiosk.
@@ -286,7 +285,7 @@ Cấu hình site nằm trong `config/icebot.site.env` cạnh file EXE và không
 | `NETBIRD_SETUP_KEY` | Kết nối Edge vào mạng NetBird |
 | `KIOSK_CODE` | Code vật lý do kỹ thuật viên nhập một lần |
 | `KIOSK_ID` | ID do BE trả về, được tái sử dụng ở những lần sau |
-| `EDGE_LOCATION_NAME` | Tên địa điểm do kỹ thuật viên nhập để tạo mã `ICEBOT-EDGE-{TEN_DIA_DIEM}` |
+| `EDGE_LOCATION_NAME` | Mã Edge/tên địa điểm do kỹ thuật viên nhập; được chuẩn hóa trực tiếp thành endpoint code |
 | `EXECUTION_ENDPOINT_ID` | Danh tính endpoint nhận lệnh của chính Edge |
 | `FULL_EDGE_RUNTIME_ID` | Runtime identity ổn định của Full Edge |
 | `EXECUTION_CLIENT_CERT_PATH` | Đường dẫn PFX dùng cho mTLS |
@@ -360,10 +359,9 @@ DRIVER-DLL/CupDropping/
 └── IceBot.Driver.CupDropping.dll
 ```
 
-`IceBot-Setup.exe` tự xác minh rồi cài package máy thả cốc vào
-`<install-directory>\drivers\bt_cup_l90\` và package máy kem vào
-`<install-directory>\drivers\ice_cream\`. Khi cài lại/nâng cấp, Setup dùng `machineType` làm tên
-thư mục chuẩn và dọn các thư mục legacy có cùng `machineType`; plugin bên thứ ba khác không bị xóa.
+`IceBot-Setup.exe` không đóng gói hoặc tự cài driver. Người dùng tự copy package driver vào
+`<install-directory>\drivers\<driver-name>\` sau khi cài đặt. Mỗi package cần có `driver.json`, DLL,
+`machineType` và SHA-256 hợp lệ theo contract bên dưới.
 
 Để thêm hoặc thay máy mà không sửa source IceBot, tạo plugin target `net472` dựa trên `IceBot.Driver.Abstractions`, sau đó cài:
 
@@ -379,10 +377,10 @@ Driver phải có public entry type, constructor không tham số và implement 
 IceBot sau khi cài hoặc thay plugin. Xem `driver-sdk/README.md`, template trong
 `driver-sdk/IceBot.Driver.Template` và driver thật trong `driver-sdk/IceBot.Driver.CupDropping`.
 
-Driver máy kem tích hợp cũ đã bị xóa khỏi core; plugin DLL máy kem hiện được build độc lập và
-được nhúng/cài cùng `IceBot-Setup.exe` theo đúng contract trên.
+Driver máy kem tích hợp cũ đã bị xóa khỏi core; plugin DLL máy kem được build độc lập và người dùng
+có thể thêm thủ công vào thư mục `drivers` theo đúng contract trên.
 
-Đăng ký máy với BE tại **InitIceBot → Cấu hình → Cấu hình thiết bị → Quản lý máy ngoại vi → Đăng ký thiết bị mới với Backend**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ và hiển thị máy nào chưa đăng ký.
+Đăng ký máy mới với BE tại **InitIceBot → Cấu hình → Cấu hình thiết bị → Quản lý máy ngoại vi → Đăng ký thiết bị mới với Backend**. BE trả `DeviceId`; Edge lưu ánh xạ đó trong `MACHINE_DEVICE_IDS`. Nếu thiết bị đã tồn tại trên kiosk, dùng **Liên kết thiết bị đã có từ Backend**: Edge gọi `GET /api/v1/management/devices?kioskId={KioskId}`, cho chọn thiết bị chưa `Retired` và chỉ lưu lại `DeviceId`, không tạo bản ghi trùng. Menu **Danh sách máy ngoại vi** chỉ đọc dữ liệu cục bộ.
 
 `MACHINE_DEVICE_IDS` chỉ dùng cho máy ngoại vi được Edge điều khiển trực tiếp, chẳng hạn máy thả cốc qua RS485. Nó không phải là danh sách toàn bộ thiết bị vật lý của kiosk.
 
@@ -421,7 +419,7 @@ Hiện tượng chạm tay vào NC đang hở làm dừng motor đã được gh
 dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj --configuration Release --no-restore
 ```
 
-Trong `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, Edge mô phỏng cả tay robot và lệnh `TriggerDevice`: vẫn kiểm tra plugin/machine type nhưng không mở COM và không gọi driver vật lý. Edge báo capability `ROBOT_ARM` tại workcell `ARM_PRIMARY` và `safety=Safe` để Backend dispatch cùng contract với production release; log readiness cũng in rõ `safety` và `mode` đã gửi. Menu test serial quét `TriggerDevice` trong Lua active (không dựa vào tên artifact UUID) rồi chỉ gọi `TestConnection` trên COM đã cấu hình. Alias Lua `icemachine` được ánh xạ về driver `ice_cream`; report hoàn tất/thất bại gửi `physicalOutputMayHaveOccurred=false`. Hardware snapshot không đổi sẽ tái sử dụng cùng `snapshotRevision` và `observedAt` để retry idempotent, tránh HTTP 409 từ Backend. Trong physical mode, mỗi readiness probe kết nối Fairino và chỉ báo `safety=Safe`/capability `ROBOT_ARM` sau khi SDK communication bình thường, E-stop bằng 0, SI0/SI1 bằng 0 và cả mã lỗi chính/phụ bằng 0. Lỗi đọc telemetry hoặc bất kỳ tín hiệu không an toàn nào sẽ báo `Unknown`/`Unsafe` và không công bố capability.
+Trong `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, Edge mô phỏng cả tay robot và lệnh `TriggerDevice`: vẫn kiểm tra plugin/machine type nhưng không mở COM và không gọi driver vật lý. Edge cũng đưa các peripheral plugin đã có `MACHINE_DEVICE_IDS` vào hardware snapshot; Backend dùng snapshot này để chuyển thiết bị từ `Provisioning`/`Offline` sang `Online`. Edge báo capability `ROBOT_ARM` tại workcell `ARM_PRIMARY` và `safety=Safe` để Backend dispatch cùng contract với production release; log readiness cũng in rõ `safety` và `mode` đã gửi. Menu test serial quét `TriggerDevice` trong Lua active (không dựa vào tên artifact UUID) rồi chỉ gọi `TestConnection` trên COM đã cấu hình. Alias Lua `icemachine` được ánh xạ về driver `ice_cream`; report hoàn tất/thất bại gửi `physicalOutputMayHaveOccurred=false`. Hardware snapshot không đổi sẽ tái sử dụng cùng `snapshotRevision` và `observedAt` để retry idempotent, tránh HTTP 409 từ Backend. Trong physical mode, mỗi readiness probe kết nối Fairino và chỉ báo `safety=Safe`/capability `ROBOT_ARM` sau khi SDK communication bình thường, E-stop bằng 0, SI0/SI1 bằng 0 và cả mã lỗi chính/phụ bằng 0. Lỗi đọc telemetry hoặc bất kỳ tín hiệu không an toàn nào sẽ báo `Unknown`/`Unsafe` và không công bố capability.
 
 Lần xác minh gần nhất: **131/131 test passed** ngày 2026-09-08, gồm phục hồi từng cây, nhật ký offline, các test Edge/driver và 5 firmware contract test. Build Release thành công; test tự động không thay thế kiểm thử phục hồi trên phần cứng thật. Báo cáo chi tiết: [testing/UNIT_TEST_REPORT.md](testing/UNIT_TEST_REPORT.md).
 

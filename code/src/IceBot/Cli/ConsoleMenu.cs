@@ -176,8 +176,9 @@ namespace IceBot.Cli
                 PrintBanner();
                 Console.WriteLine("QUAN LY MAY NGOAI VI");
                 Console.WriteLine("1. Danh sach thiet bi");
-                Console.WriteLine("2. Dang ky thiet bi moi voi Backend");
-                Console.WriteLine("3. Kiem tra ket noi Serial");
+                Console.WriteLine("2. Lien ket thiet bi da co tu Backend");
+                Console.WriteLine("3. Dang ky thiet bi moi voi Backend");
+                Console.WriteLine("4. Kiem tra ket noi Serial");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -186,8 +187,9 @@ namespace IceBot.Cli
                 switch (input.Trim())
                 {
                     case "1": PeripheralDeviceRegistrationWizard.PrintDeviceList(); Pause(); break;
-                    case "2": StoreAuth.RequireLogin(); PeripheralDeviceRegistrationWizard.Run(); Pause(); break;
-                    case "3": RunPeripheralConnectionTestMode(); break;
+                    case "2": StoreAuth.RequireLogin(); PeripheralDeviceRegistrationWizard.LinkExisting(); Pause(); break;
+                    case "3": StoreAuth.RequireLogin(); PeripheralDeviceRegistrationWizard.Run(); Pause(); break;
+                    case "4": RunPeripheralConnectionTestMode(); break;
                     case "0": return;
                     default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }

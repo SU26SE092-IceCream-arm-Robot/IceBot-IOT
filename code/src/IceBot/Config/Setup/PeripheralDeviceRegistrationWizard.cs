@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using IceBot.Api;
 using IceBot.Machines;
 
@@ -50,10 +51,10 @@ namespace IceBot.Config
 
             var machine = MachineRegistry.Modules[selection - 1];
             var settings = SiteConfigStore.Load();
-            var kioskText = Prompt("KioskId", settings.KioskId == Guid.Empty ? string.Empty : settings.KioskId.ToString("D"));
-            if (!Guid.TryParse(kioskText, out var kioskId) || kioskId == Guid.Empty)
+            var kioskId = settings.KioskId;
+            if (kioskId == Guid.Empty)
             {
-                Console.WriteLine("[ERROR] KioskId khong hop le.");
+                Console.WriteLine("[ERROR] Chua co KioskId da luu. Hay hoan tat khoi tao kiosk voi BE truoc.");
                 return;
             }
             if (!TryReadLong("DeviceTypeId", out var deviceTypeId) || deviceTypeId <= 0)
@@ -103,6 +104,71 @@ namespace IceBot.Config
             SiteConfigStore.Save(settings);
             Console.WriteLine($"[OK] {result.Message}");
             Console.WriteLine($"Da luu {machine.MachineType} -> DeviceId {result.DeviceId:D}");
+        }
+
+        public static void LinkExisting()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== LIEN KET MAY NGOAI VI DA CO TREN BE ===");
+            var settings = SiteConfigStore.Load();
+            if (settings.KioskId == Guid.Empty)
+            {
+                Console.WriteLine("[ERROR] Chua co KioskId da luu. Hay hoan tat khoi tao kiosk voi BE truoc.");
+                return;
+            }
+
+            for (var i = 0; i < MachineRegistry.Modules.Count; i++)
+            {
+                var module = MachineRegistry.Modules[i];
+                Console.WriteLine($"{i + 1}. {module.DisplayName} ({module.MachineType})");
+            }
+            if (!TryReadInt("Chon may Edge", out var machineSelection) ||
+                machineSelection < 1 || machineSelection > MachineRegistry.Modules.Count)
+            {
+                Console.WriteLine("[ERROR] Lua chon may khong hop le.");
+                return;
+            }
+
+            var result = new PeripheralDeviceApi().List(settings.KioskId);
+            if (!result.Success)
+            {
+                Console.WriteLine("[ERROR] " + result.Message);
+                return;
+            }
+
+            var devices = new List<PeripheralDeviceSummary>();
+            foreach (var device in result.Devices)
+            {
+                if (!string.Equals(device.Status, "Retired", StringComparison.OrdinalIgnoreCase))
+                    devices.Add(device);
+            }
+            if (devices.Count == 0)
+            {
+                Console.WriteLine("[ERROR] Kiosk khong co thiet bi BE nao co the lien ket.");
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Thiet bi BE co the lien ket:");
+            for (var i = 0; i < devices.Count; i++)
+            {
+                var device = devices[i];
+                Console.WriteLine($"{i + 1}. {device.Code} - {device.Name}");
+                Console.WriteLine($"   DeviceId: {device.Id:D}");
+                Console.WriteLine($"   Type: {device.DeviceTypeCode}, Status: {device.Status}");
+            }
+            if (!TryReadInt("Chon thiet bi BE", out var deviceSelection) ||
+                deviceSelection < 1 || deviceSelection > devices.Count)
+            {
+                Console.WriteLine("[ERROR] Lua chon thiet bi BE khong hop le.");
+                return;
+            }
+
+            var machine = MachineRegistry.Modules[machineSelection - 1];
+            var selected = devices[deviceSelection - 1];
+            settings.MachineDeviceIds[machine.MachineType] = selected.Id;
+            SiteConfigStore.Save(settings);
+            Console.WriteLine($"[OK] Da lien ket {machine.MachineType} -> DeviceId {selected.Id:D}.");
         }
 
         private static string Prompt(string label, string current)

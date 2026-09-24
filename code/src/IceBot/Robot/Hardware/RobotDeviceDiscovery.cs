@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using IceBot.Config;
+using IceBot.Machines;
 
 namespace IceBot.Robot.Hardware
 {
@@ -41,6 +43,32 @@ namespace IceBot.Robot.Hardware
                     MachineModelCode = settings.PrimaryRobotMachineModelCode.Trim()
                 }
             };
+        }
+    }
+
+    // Simulation can report configured peripheral plugins as active devices without opening
+    // serial ports. The Backend uses the existing reported-device snapshot to confirm that
+    // these mapped catalog devices are reachable by this Edge runtime.
+    internal sealed class ConfiguredPeripheralDeviceDiscovery
+    {
+        public IReadOnlyList<ReportedRobotDevice> Discover(SiteSettings settings)
+        {
+            return MachineRegistry.Modules
+                .OfType<IMachineTrigger>()
+                .Select(module => new
+                {
+                    Module = module,
+                    DeviceId = settings.GetMachineDeviceId(module.MachineType)
+                })
+                .Where(item => item.DeviceId != Guid.Empty)
+                .Select(item => new ReportedRobotDevice
+                {
+                    SourceDeviceKey = item.Module.MachineType,
+                    DeviceId = item.DeviceId,
+                    RuntimeTargetCode = "ICEBOT_SIMULATED_PERIPHERAL",
+                    MachineModelCode = item.Module.MachineType
+                })
+                .ToArray();
         }
     }
 }

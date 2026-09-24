@@ -79,10 +79,9 @@ internal static class Program
             Console.WriteLine($"[3/5] Cài IceBot vào {installDirectory}");
             CopyPayload(payloadDirectory, installDirectory);
 
-            Console.WriteLine("[4/5] Tạo dữ liệu và cài plugin máy ngoại vi");
+            Console.WriteLine("[4/5] Tạo dữ liệu và thư mục plugin máy ngoại vi");
             CreateRuntimeDirectories(installDirectory);
             SetRuntimePermissions(installDirectory);
-            InstallBundledDrivers(bundleDirectory, installDirectory);
 
             Console.WriteLine("[5/5] Tạo shortcut");
             CreateShortcuts(installDirectory);
@@ -165,7 +164,6 @@ internal static class Program
             throw new InvalidOperationException($"Fairino SDK không tương thích: {sdk ?? "không xác định"}.");
 
         ValidateHash(Path.Combine(payloadDirectory, "libfairino.dll"), expectedHash, "libfairino.dll");
-        ValidateDriverPackages(bundleDirectory);
     }
 
     private static void ValidateDriverPackages(string bundleDirectory)

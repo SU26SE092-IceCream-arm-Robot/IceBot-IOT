@@ -12,9 +12,6 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDirectory "..\
 $solution = Join-Path $repositoryRoot "code\IceBot-IOT.sln"
 $appOutput = Join-Path $repositoryRoot "code\src\IceBot\bin\$Configuration\net472"
 $setupProject = Join-Path $repositoryRoot "code\src\IceBot.Setup\IceBot.Setup.csproj"
-$cupDriverBuild = Join-Path $repositoryRoot "driver-sdk\IceBot.Driver.CupDropping\build-package.ps1"
-$iceCreamDriverBuild = Join-Path $repositoryRoot "driver-sdk\IceBot.Driver.IceCream\build-package.ps1"
-$driverPackagesRoot = Join-Path $repositoryRoot "DRIVER-DLL"
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repositoryRoot "artifacts\installer\IceBot-$Runtime"
@@ -34,9 +31,6 @@ try {
     dotnet build $solution -c $Configuration
     if ($LASTEXITCODE -ne 0) { throw "IceBot build failed." }
 
-    & $cupDriverBuild -Configuration $Configuration
-    & $iceCreamDriverBuild -Configuration $Configuration
-
     if (Test-Path -LiteralPath $OutputDirectory) {
         Remove-Item -LiteralPath $OutputDirectory -Recurse -Force
     }
@@ -44,11 +38,9 @@ try {
 
     $bundleRoot = Join-Path $workingDirectory "bundle"
     $payload = Join-Path $bundleRoot "payload"
-    $drivers = Join-Path $bundleRoot "drivers"
     $prerequisites = Join-Path $bundleRoot "prerequisites"
     $publishDirectory = Join-Path $workingDirectory "publish"
     New-Item -ItemType Directory -Path $payload -Force | Out-Null
-    New-Item -ItemType Directory -Path $drivers -Force | Out-Null
     $mutablePayloadRoots = @("config", "certificates", "data", "drivers", "workflow")
     Get-ChildItem -LiteralPath $appOutput | Where-Object {
         $mutablePayloadRoots -notcontains $_.Name
@@ -58,14 +50,6 @@ try {
             throw "Installer payload must not contain mutable local state: $mutableRoot"
         }
     }
-    $driverPackages = Get-ChildItem -LiteralPath $driverPackagesRoot -Directory
-    if (-not $driverPackages) {
-        throw "No driver packages found in $driverPackagesRoot."
-    }
-    foreach ($driverPackage in $driverPackages) {
-        Copy-Item -LiteralPath $driverPackage.FullName -Destination $drivers -Recurse -Force
-    }
-
     $requiredPayloadFiles = @(
         "IceBot.exe",
         "InitIceBot.exe",
