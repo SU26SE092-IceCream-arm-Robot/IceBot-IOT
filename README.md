@@ -159,6 +159,43 @@ Flow chuẩn:
 IceBot-Setup.exe → InitIceBot.exe → IceBot.exe
 ```
 
+### Tạo Edge mới từ một folder Edge cũ
+
+Khi dùng lại folder cài đặt của một Edge khác cho cửa hàng/Edge mới, hãy đóng cả
+`IceBot.exe` và `InitIceBot.exe` trước. Sao lưu nếu cần, sau đó xóa hai file certificate cũ:
+
+```text
+<install-directory>\certificates\icebot-edge-client.pfx
+<install-directory>\certificates\icebot-edge-client.pfx.password.dpapi
+```
+
+Để chạy lại toàn bộ wizard và đăng ký lại danh tính, xóa thêm:
+
+```text
+<install-directory>\config\icebot.site.env
+```
+
+Không cần xóa cả thư mục `config` hoặc `certificates`. Init sẽ tạo certificate mTLS mới,
+lấy lại `KioskId`, `ExecutionEndpointId`, `FullEdgeRuntimeId` và provision chúng với Backend.
+Chỉ xóa certificate khi folder này là bản sao dành cho Edge mới; không xóa certificate mà
+Edge cũ vẫn đang sử dụng.
+
+### OrgAdmin có nhiều Kiosk
+
+Nếu tài khoản OrgAdmin chỉ truy cập một Kiosk, Init có thể tự chọn Kiosk đó. Nếu tài khoản
+truy cập nhiều Kiosk, phải nhập mã Kiosk cụ thể trong file cấu hình trước khi chạy bước
+khởi tạo:
+
+```text
+<install-directory>\config\icebot.site.env
+KIOSK_CODE=KIOSK_THAODIEN
+```
+
+`KIOSK_CODE` phải thuộc phạm vi của tài khoản OrgAdmin đang đăng nhập. Có mã này, Init sẽ
+tìm đúng Kiosk rồi tự lấy `KIOSK_ID`, `EXECUTION_ENDPOINT_ID` và `FULL_EDGE_RUNTIME_ID`;
+không cần nhập thủ công các UUID đó. `EDGE_LOCATION_NAME`/tên địa điểm Edge là mã của
+Execution Endpoint, không thay thế cho `KIOSK_CODE`.
+
 ### 1. `IceBot-Setup.exe` — cài môi trường
 
 Chạy bằng quyền Administrator. Setup sẽ:
@@ -182,7 +219,8 @@ Kỹ thuật viên thực hiện:
 
 1. Đăng nhập bằng tài khoản cửa hàng.
 2. Chọn **Cấu hình → Thiết lập Edge lần đầu → Bắt đầu / tiếp tục thiết lập tự động**.
-3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code.
+3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code. Nếu OrgAdmin có nhiều Kiosk,
+   đặt `KIOSK_CODE` trong `config/icebot.site.env` để chọn đúng Kiosk.
 4. Nhập NetBird setup key.
 5. Nhập **mã Edge/tên địa điểm** (ví dụ `Betea`); mã endpoint được dùng trực tiếp sau khi chuẩn hóa.
 6. Xác nhận Robot IP, hardware profile và nhập cổng COM riêng cho từng máy ngoại vi.

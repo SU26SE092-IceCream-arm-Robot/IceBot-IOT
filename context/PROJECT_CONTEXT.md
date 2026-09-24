@@ -82,6 +82,14 @@ Owns technician-authorized initialization:
 7. Create/reuse the DPAPI-protected PFX and provision its fingerprint.
 8. Activate the kiosk when allowed.
 9. Send mTLS heartbeat and robot-device snapshot.
+
+Operational reset rule for cloning an old Edge folder: stop both executables, remove the
+old `certificates/icebot-edge-client.pfx` and its `.password.dpapi` sidecar, and remove
+`config/icebot.site.env` when the full local setup must be re-entered. Do not delete the
+certificate of an old Edge that is still in service. For an OrgAdmin scoped to multiple
+kiosks, `KIOSK_CODE` must be supplied in `config/icebot.site.env`; Init cannot safely choose
+among multiple accessible kiosks. `EDGE_LOCATION_NAME` selects the execution endpoint code,
+not the parent kiosk.
 The technician configuration UI is task-based:
 
 ```text

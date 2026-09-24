@@ -28,7 +28,19 @@ if (Test-Path -LiteralPath $workingDirectory) {
 }
 
 try {
-    dotnet build $solution -c $Configuration
+    $msbuildCommand = Get-Command msbuild.exe -ErrorAction SilentlyContinue
+    if ($null -eq $msbuildCommand) {
+        $visualStudioMsBuild = Join-Path ${env:ProgramFiles} 'Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe'
+        if (Test-Path -LiteralPath $visualStudioMsBuild) {
+            $msbuildCommand = Get-Item -LiteralPath $visualStudioMsBuild
+        }
+    }
+    if ($null -ne $msbuildCommand) {
+        & $msbuildCommand.FullName $solution /t:Build "/p:Configuration=$Configuration" /v:minimal
+    }
+    else {
+        dotnet build $solution -c $Configuration
+    }
     if ($LASTEXITCODE -ne 0) { throw "IceBot build failed." }
 
     if (Test-Path -LiteralPath $OutputDirectory) {

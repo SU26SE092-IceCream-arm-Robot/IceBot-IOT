@@ -29,6 +29,7 @@ namespace IceBot.Cli
                 Console.WriteLine();
                 Console.WriteLine("1. Cau hinh");
                 Console.WriteLine("2. Test may");
+                Console.WriteLine("3. Dang xuat BE");
                 Console.WriteLine("0. Thoat");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -44,6 +45,11 @@ namespace IceBot.Cli
                     case "2":
                         RunTestMenu();
                         break;
+                    case "3":
+                        StoreAuth.Logout();
+                        Console.WriteLine("[OK] Da dang xuat BE va xoa token tren may.");
+                        Pause();
+                        return;
                     case "0":
                         return;
                     default:

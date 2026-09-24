@@ -44,6 +44,15 @@ namespace IceBot.Api
             Console.WriteLine("Da luu key, se dung cho cac request gui len BE sau nay.");
         }
 
+        public static void Logout()
+        {
+            var settings = SiteConfigStore.Load();
+            settings.OperatorAccessToken = string.Empty;
+            settings.OperatorRefreshToken = string.Empty;
+            SiteConfigStore.Save(settings);
+            _loggedInThisRun = false;
+        }
+
         // Gate only operator-authorized management actions such as device registration. The
         // server/order receiver deliberately does not call this method: its identity is mTLS and
         // sales must continue even when operator login or the authentication API fails.
