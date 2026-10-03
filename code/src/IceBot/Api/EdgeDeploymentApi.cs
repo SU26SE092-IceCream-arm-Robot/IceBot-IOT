@@ -214,7 +214,7 @@ namespace IceBot.Api
                 if (!string.IsNullOrWhiteSpace(json))
                     envelope = JsonSerializer.Deserialize<ApiEnvelope<T>>(json, JsonOptions);
                 if (!response.IsSuccessStatusCode || envelope == null || !envelope.Succeeded)
-                    throw new InvalidOperationException(envelope?.Message ?? $"BE request failed (HTTP {(int)response.StatusCode}).");
+                    throw new EdgeApiException(response.StatusCode, envelope?.Message ?? $"BE request failed (HTTP {(int)response.StatusCode}).");
                 return envelope.Data!;
             }
         }
@@ -275,5 +275,16 @@ namespace IceBot.Api
         public bool Succeeded { get; set; }
         public string? Message { get; set; }
         public T? Data { get; set; }
+    }
+
+    internal sealed class EdgeApiException : InvalidOperationException
+    {
+        public System.Net.HttpStatusCode StatusCode { get; }
+
+        public EdgeApiException(System.Net.HttpStatusCode statusCode, string message)
+            : base(message)
+        {
+            StatusCode = statusCode;
+        }
     }
 }

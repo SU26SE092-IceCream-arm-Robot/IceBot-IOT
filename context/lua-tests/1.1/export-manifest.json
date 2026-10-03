@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "exportId": "8f501e21-9cbd-4348-acc6-e3d7fc6118ca",
+  "exportedAt": "2026-10-02T08:51:50.138Z",
+  "program": {
+    "code": "DEMO_0210",
+    "name": "demo-0210",
+    "runtimeTargetCode": "FAIRINO_LUA_V1",
+    "machineModelCode": "FR5",
+    "artifacts": [
+      {
+        "artifactCode": "DEMO_0210_STEP1",
+        "fileName": "demo-0210_step1.lua",
+        "sidecarFileName": "demo-0210_step1.icebot.json",
+        "runOrder": 1
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP2",
+        "fileName": "demo-0210_step2.lua",
+        "sidecarFileName": "demo-0210_step2.icebot.json",
+        "runOrder": 2
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP3",
+        "fileName": "demo-0210_step3.lua",
+        "sidecarFileName": "demo-0210_step3.icebot.json",
+        "runOrder": 3
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP4",
+        "fileName": "demo-0210_step4.lua",
+        "sidecarFileName": "demo-0210_step4.icebot.json",
+        "runOrder": 4
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP5",
+        "fileName": "demo-0210_step5.lua",
+        "sidecarFileName": "demo-0210_step5.icebot.json",
+        "runOrder": 5
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP6",
+        "fileName": "demo-0210_step6.lua",
+        "sidecarFileName": "demo-0210_step6.icebot.json",
+        "runOrder": 6
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP7",
+        "fileName": "demo-0210_step7.lua",
+        "sidecarFileName": "demo-0210_step7.icebot.json",
+        "runOrder": 7
+      },
+      {
+        "artifactCode": "DEMO_0210_STEP8",
+        "fileName": "demo-0210_step8.lua",
+        "sidecarFileName": "demo-0210_step8.icebot.json",
+        "runOrder": 8
+      }
+    ]
+  }
+}

@@ -1,8 +1,9 @@
 ﻿{
     "schemaVersion":  1,
-    "machineType":  "bt_cup_l90",
+    "machineType":  "cup_droping_machine_2",
+    "displayName":  "May tha coc",
     "assembly":  "IceBot.Driver.CupDropping.dll",
     "entryType":  "IceBot.Driver.CupDropping.CupDroppingDriver",
     "driverVersion":  "1.0.1",
-    "sha256":  "f7352f2dc8b260c67360ea7aac909a95ff86de12f02ce7fc8163bd0451af435a"
+    "sha256":  "efa8b6c0d36a223185fa567a9cc62c24de01167baa0928aa1fa9fd9fbd6144f8"
 }

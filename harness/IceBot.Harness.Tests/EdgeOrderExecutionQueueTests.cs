@@ -245,6 +245,48 @@ namespace IceBot.Harness.Tests
         }
 
         [Fact]
+        public void RuntimeFailure_PreservesRunningUnitAndRecoversOnRestart()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "icebot-runtime-fault-" + Guid.NewGuid().ToString("N"));
+            ProductionReportSink sink = (_, __, ___, ____, _____, ______) => { };
+            try
+            {
+                var order = BuildOrder(2);
+                EdgeOrderExecutionQueue.TryAdmit(order, directory);
+                EdgeOrderExecutionQueue.Activate(order.CommandId, directory, sink);
+
+                // Start unit 1
+                var first = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                Assert.Equal("Running", first.Status);
+                Assert.Equal(1, first.ProductionUnitNo);
+
+                // Simulating an execution fault (e.g. peripheral error):
+                // In our new design, the worker does NOT call FailUnit, keeping first in "Running".
+                // When operator cleans up and restarts, RecoverInterruptedJobs recovers it to "Pending"
+                var interruptions = new List<string>();
+                EdgeOrderExecutionQueue.RecoverInterruptedJobs(directory, (job, unit) => interruptions.Add(job.OrderNumber + ":" + unit.ProductionUnitNo));
+                Assert.Single(interruptions);
+                Assert.Equal("ORD-QUEUE:1", interruptions[0]);
+
+                var recovered = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                Assert.Equal(1, recovered.ProductionUnitNo);
+                Assert.Equal(2, recovered.Attempt);
+                Assert.Single(recovered.Interruptions);
+
+                // Now unit 1 completes
+                EdgeOrderExecutionQueue.CompleteUnit(order.CommandId, recovered.SourceProductionJobId, directory, sink);
+
+                // Now unit 2 can proceed
+                var second = EdgeOrderExecutionQueue.BeginNextUnit(EdgeOrderExecutionQueue.NextRunnable(directory)!, directory, sink);
+                Assert.Equal(2, second.ProductionUnitNo);
+                EdgeOrderExecutionQueue.CompleteUnit(order.CommandId, second.SourceProductionJobId, directory, sink);
+
+                Assert.Null(EdgeOrderExecutionQueue.NextRunnable(directory));
+            }
+            finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        }
+
+        [Fact]
         public void CompletionReportFailure_PreservesCompletedUnitAndRecoversReport()
         {
             var directory = Path.Combine(Path.GetTempPath(), "icebot-report-recovery-" + Guid.NewGuid().ToString("N"));

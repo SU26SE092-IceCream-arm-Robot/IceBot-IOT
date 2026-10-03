@@ -1,5 +1,35 @@
 # IceBot-IOT Test Document
 
+## Production Report Outbox Non-Retryable Error Handling — 2026-10-04
+
+- Scope:
+  1. Detect non-retryable Backend client rejections (HTTP 4xx, e.g. 400 Bad Request when an order/job was already closed or cancelled on Backend, or 409 Conflict) and immediately delete the corresponding report file from the local outbox directory with persistent incident logging into `data/logs/runtime-events.jsonl`.
+  2. Transient failures (network drops, HTTP 5xx, or 429 Too Many Requests) are retained in the outbox for subsequent retries.
+- Targeted: 6 new tests added:
+  - `ProductionReportOutboxTests.Flush_WhenBackendReturns400BadRequest_DeletesOutboxReportFileAndLogsIncident`
+  - `ProductionReportOutboxTests.Flush_WhenBackendReturns409Conflict_DeletesOutboxReportFile`
+  - `ProductionReportOutboxTests.Flush_WhenBackendReturnsTransientError_RetainsReportFileForRetry`
+  - `ProductionReportOutboxTests.Flush_WhenBackendReturns429TooManyRequests_RetainsReportFileForRetry`
+  - `ProductionReportOutboxTests.Flush_WhenSuccessful_DeletesReportFile`
+  - `EdgeDeploymentApiTests.EdgeApiException_PreservesStatusCodeAndMessage`
+- Harness result: 159 total, 159 passed, 0 failed, 0 skipped. Command: `dotnet test harness/IceBot.Harness.Tests/IceBot.Harness.Tests.csproj`.
+
+## Runtime Fault Recovery & Graceful Shutdown Telemetry — 2026-10-04
+
+- Scope:
+  1. Peripheral runtime error preserves unit in `Running` state without emitting a terminal `Failed` report to Backend; worker pauses and operator restart seamlessly recovers the unit to `Pending` to remake it from the beginning.
+  2. Graceful shutdown / crash telemetry produces valid JSON contracts matching Backend `Readiness` (`NotReady`, `Idle`, `Unknown`, `EDGE_SHUTDOWN`) and `Heartbeat` (`Offline`, `Stopped`).
+- Targeted: 2 new tests added:
+  - `EdgeOrderExecutionQueueTests.RuntimeFailure_PreservesRunningUnitAndRecoversOnRestart`
+  - `ExecutionEndpointRegistrationTests.ShutdownStatusPayload_MatchesBackendContract`
+- Harness result: 154 total, 154 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj`.
+
+## Kiosk provisioning eligibility for Edge setup — 2026-10-03
+
+- Scope: allow kiosks in `Status=Provisioning` or `Status=Active` with `OperationalState=Operational` to be resolved and selected during Edge technician setup; preserve non-eligible filtering for `Disabled`, `Retired`, and non-operational states; Edge Step 7 activates provisioning kiosks to `Active`.
+- Targeted: 27 total, 27 passed, 0 failed, 0 skipped. Command: `dotnet test .\harness\IceBot.Harness.Tests\IceBot.Harness.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~ExecutionEndpointRegistrationTests" --logger "trx;LogFileName=KioskProvisioningEligibilityRegression.trx"`.
+- Evidence: `harness/IceBot.Harness.Tests/TestResults/KioskProvisioningEligibilityRegression.trx`.
+
 ## Simulated peripheral online snapshot — 2026-09-23
 
 - Scope: in `ICEBOT_ROBOT_EXECUTION_MODE=Simulated`, include mapped trigger-plugin peripherals in the Edge hardware snapshot; Backend applies a current mapped observation as `Online` for devices in `Provisioning` or `Offline` without overriding `Disabled`, `Maintenance`, `Error`, or `Retired`.

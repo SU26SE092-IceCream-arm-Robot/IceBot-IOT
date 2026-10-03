@@ -83,7 +83,17 @@ namespace IceBot.Api
             while (true)
             {
                 var settings = SiteConfigStore.Load();
-                var account = Prompt("Tai khoan cua hang (go 'exit' de thoat)", settings.StoreAccount);
+                var promptLabel = string.IsNullOrWhiteSpace(settings.StoreAccount)
+                    ? "Tai khoan cua hang (go 'exit' de thoat): "
+                    : "Tai khoan cua hang (go 'exit' de thoat, ENTER de dung tk cu): ";
+                Console.Write(promptLabel);
+                var input = Console.ReadLine()?.Trim() ?? string.Empty;
+                var account = string.IsNullOrEmpty(input) ? settings.StoreAccount : input;
+                if (string.IsNullOrWhiteSpace(account))
+                {
+                    Console.WriteLine("Vui long nhap tai khoan.");
+                    continue;
+                }
                 if (string.Equals(account, "exit", StringComparison.OrdinalIgnoreCase))
                 {
                     Console.WriteLine("Thoat ung dung.");

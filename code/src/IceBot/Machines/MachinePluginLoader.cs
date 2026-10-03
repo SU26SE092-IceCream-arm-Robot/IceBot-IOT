@@ -12,6 +12,7 @@ namespace IceBot.Machines
     {
         public int SchemaVersion { get; set; }
         public string MachineType { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
         public string Assembly { get; set; } = string.Empty;
         public string EntryType { get; set; } = string.Empty;
         public string DriverVersion { get; set; } = string.Empty;
@@ -21,6 +22,8 @@ namespace IceBot.Machines
     internal sealed class MachinePluginLoadResult
     {
         public IReadOnlyList<IMachineModule> Modules { get; set; } = Array.Empty<IMachineModule>();
+        public IReadOnlyDictionary<IMachineModule, string> DisplayNames { get; set; } =
+            new Dictionary<IMachineModule, string>();
         public IReadOnlyList<string> Errors { get; set; } = Array.Empty<string>();
     }
 
@@ -29,16 +32,25 @@ namespace IceBot.Machines
         public static MachinePluginLoadResult Load(string driversDirectory)
         {
             var modules = new List<IMachineModule>();
+            var displayNames = new Dictionary<IMachineModule, string>();
             var errors = new List<string>();
             if (!Directory.Exists(driversDirectory))
-                return new MachinePluginLoadResult { Modules = modules, Errors = errors };
+                return new MachinePluginLoadResult { Modules = modules, DisplayNames = displayNames, Errors = errors };
 
             foreach (var manifestPath in Directory.GetFiles(driversDirectory, "driver.json", SearchOption.AllDirectories))
             {
-                try { modules.Add(LoadOne(manifestPath)); }
+                try
+                {
+                    var module = LoadOne(manifestPath);
+                    modules.Add(module);
+                    var manifest = JsonSerializer.Deserialize<MachinePluginManifest>(File.ReadAllText(manifestPath),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (manifest != null && !string.IsNullOrWhiteSpace(manifest.DisplayName))
+                        displayNames[module] = manifest.DisplayName.Trim();
+                }
                 catch (Exception ex) { errors.Add($"{manifestPath}: {ex.Message}"); }
             }
-            return new MachinePluginLoadResult { Modules = modules, Errors = errors };
+            return new MachinePluginLoadResult { Modules = modules, DisplayNames = displayNames, Errors = errors };
         }
 
         internal static IMachineModule LoadOne(string manifestPath)

@@ -14,8 +14,9 @@ namespace IceBot.Harness.Tests
     {
         [Theory]
         [InlineData("icemachine", "ice_cream")]
-        [InlineData("ICE_cream", "ICE_cream")]
+        [InlineData("ICE_cream", "ice_cream")]
         [InlineData(" bt_cup_l90 ", "bt_cup_l90")]
+        [InlineData("cup_droping_machine_2", "bt_cup_l90")]
         public void MachineTypeCanonicalizer_NormalizesKnownAliasAndWhitespace(string input, string expected)
         {
             Assert.Equal(expected, MachineTypeCanonicalizer.Canonicalize(input));

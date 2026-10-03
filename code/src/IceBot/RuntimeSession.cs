@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using IceBot.Config;
 
 namespace IceBot
 {
@@ -10,10 +11,10 @@ namespace IceBot
     // Do not configure unattended restart of this executable.
     internal sealed class RuntimeSession : IDisposable
     {
+        private static readonly object FileGate = new object();
         private readonly Mutex _mutex;
         private readonly string _marker;
         private readonly string _log;
-        private readonly object _gate = new object();
         private bool _faulted;
 
         internal RuntimeSession(string directory, string mutexName = @"Global\IceBot-Production-Runtime")
@@ -56,15 +57,25 @@ namespace IceBot
 
         internal void Record(string kind, string detail)
         {
-            lock (_gate)
+            RecordEvent(Path.GetDirectoryName(_log) ?? AppConfig.GetLogsDirectory(), kind, detail);
+        }
+
+        internal static void RecordEvent(string logDirectory, string kind, string detail)
+        {
+            lock (FileGate)
             {
+                Directory.CreateDirectory(logDirectory);
+                var logFile = Path.Combine(logDirectory, "runtime-events.jsonl");
                 var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
                 {
-                    timestamp = DateTimeOffset.UtcNow, kind, detail,
+                    timestamp = DateTimeOffset.UtcNow,
+                    kind,
+                    detail,
                     processId = System.Diagnostics.Process.GetCurrentProcess().Id,
                     appVersion = typeof(RuntimeSession).Assembly.GetName().Version?.ToString()
                 }) + Environment.NewLine);
-                using (var stream = new FileStream(_log, FileMode.Append, FileAccess.Write, FileShare.Read))
+
+                using (var stream = new FileStream(logFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
                 {
                     stream.Write(bytes, 0, bytes.Length);
                     stream.Flush(true);

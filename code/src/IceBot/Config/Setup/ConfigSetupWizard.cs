@@ -42,75 +42,7 @@ namespace IceBot.Config
             return connected;
         }
 
-        // Everything that is NOT NetBird and NOT a secret better left to its own dedicated
-        // prompt: robot IP, store account (identity only), COM ports. API key and the store
-        // password are deliberately NOT prompted here — API key has no other entry point yet
-        // (set it via ICEBOT_API_KEY or by editing icebot.site.env directly if needed), and the
-        // store password is only ever entered at the actual login gate (StoreAuth.RequireLogin
-        // / `IceBot.exe login`), not duplicated into a general settings screen.
-        public static void RunSystemSettings()
-        {
-            Console.WriteLine();
-            Console.WriteLine("=== Cau hinh he thong ===");
-            Console.WriteLine("Nhan ENTER de giu gia tri hien tai (neu co).");
-            Console.WriteLine();
 
-            var current = SiteConfigStore.Load();
-
-            var settings = new SiteSettings
-            {
-                // Carried forward as-is — not this wizard's concern.
-                NetBirdSetupKey = current.NetBirdSetupKey,
-                ApiKey = current.ApiKey,
-                StorePassword = current.StorePassword,
-                ProvisionedSteps = new List<string>(current.ProvisionedSteps),
-                EdgeLocationName = current.EdgeLocationName,
-                ActiveConfigurationDeploymentId = current.ActiveConfigurationDeploymentId,
-                ActiveConfigurationReleaseId = current.ActiveConfigurationReleaseId,
-                ActiveConfigurationReleaseChecksum = current.ActiveConfigurationReleaseChecksum,
-                ExecutionReportSequence = current.ExecutionReportSequence,
-                FullEdgeRuntimeId = current.FullEdgeRuntimeId,
-                BeApiUrl = Prompt("Backend API URL (vd: https://api.icebot.vn)", current.BeApiUrl),
-                ExecutionEndpointId = PromptGuid("Execution endpoint ID (BE provision)", current.ExecutionEndpointId),
-                ExecutionClientCertificatePath = Prompt("Execution client certificate PFX path", current.ExecutionClientCertificatePath),
-                RobotIp = Prompt("IP robot Fairino", string.IsNullOrWhiteSpace(current.RobotIp) ? AppConfig.DefaultRobotIp : current.RobotIp),
-                StoreAccount = Prompt("Tai khoan cua hang (BE cap)", current.StoreAccount),
-                MachinePorts = new Dictionary<string, string>(current.MachinePorts, StringComparer.OrdinalIgnoreCase),
-            };
-            PreserveBackendDeviceIdentities(current, settings);
-
-            // Store password isn't prompted here, but the account might still change — either
-            // way invalidates a previously saved session key (a key obtained under a different
-            // account no longer applies).
-            settings.OperatorAccessToken = settings.StoreAccount == current.StoreAccount
-                ? current.OperatorAccessToken
-                : string.Empty;
-            settings.OperatorRefreshToken = settings.StoreAccount == current.StoreAccount
-                ? current.OperatorRefreshToken
-                : string.Empty;
-
-            // One COM-port prompt per registered machine that actually needs serial (IMachineTrigger)
-            // — a plain arm-motion machine (IMachineModule only) has no port to configure.
-            foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
-            {
-                var port = Prompt($"COM port {trigger.DisplayName} (vd: COM3, de trong neu chua lap)", current.GetMachinePort(trigger.MachineType));
-                if (string.IsNullOrWhiteSpace(port))
-                {
-                    settings.MachinePorts.Remove(trigger.MachineType);
-                }
-                else
-                {
-                    settings.MachinePorts[trigger.MachineType] = port;
-                }
-            }
-
-            SiteConfigStore.Save(settings);
-
-            Console.WriteLine();
-            Console.WriteLine("[OK] Da luu cau hinh: " + SiteConfigStore.SiteConfigPath);
-            Console.WriteLine();
-            PrintSummary(settings);
-        }
 
         public static void RunBackendSettings()
         {
@@ -170,21 +102,172 @@ namespace IceBot.Config
         public static void RunMachinePortSettings()
         {
             Console.WriteLine();
-            Console.WriteLine("=== CAU HINH CONG COM ===");
+            Console.WriteLine("=== CAU HINH CONG COM MAY NGOAI VI ===");
             Console.WriteLine("Nhan ENTER de giu gia tri hien tai; nhap '-' de xoa cong da luu.");
             Console.WriteLine();
 
+            try
+            {
+                var availablePorts = System.IO.Ports.SerialPort.GetPortNames();
+                if (availablePorts.Length > 0)
+                {
+                    Console.WriteLine("Cac cong COM dang ket noi tren may tinh: " + string.Join(", ", availablePorts.OrderBy(p => p)));
+                }
+                else
+                {
+                    Console.WriteLine("[INFO] Hien tai Windows chua phat hien cong COM nao dang cam.");
+                }
+            }
+            catch
+            {
+                // Bo qua neu OS khong ho tro lay cong COM
+            }
+            Console.WriteLine();
+
+            var triggers = MachineRegistry.Modules.OfType<IMachineTrigger>().ToList();
+            if (triggers.Count == 0)
+            {
+                Console.WriteLine("[WARN] Chua co driver may ngoai vi nao duoc cai dat trong thu muc 'drivers/'.");
+                Console.WriteLine("       Hay copy package driver (May lam kem, May tha coc...) vao thu muc 'drivers/' truoc.");
+                return;
+            }
+
             var settings = SiteConfigStore.Load();
-            foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
+            foreach (var trigger in triggers)
             {
                 var current = settings.GetMachinePort(trigger.MachineType);
-                var port = Prompt($"COM port {trigger.DisplayName}", current);
+                var port = Prompt($"COM port {MachineRegistry.GetDisplayName(trigger)}", current);
                 if (port == "-") settings.MachinePorts.Remove(trigger.MachineType);
                 else if (!string.IsNullOrWhiteSpace(port)) settings.MachinePorts[trigger.MachineType] = port;
             }
             SiteConfigStore.Save(settings);
+            Console.WriteLine();
             Console.WriteLine("[OK] Da luu cau hinh cong COM.");
         }
+
+        public static void RunAutoDetectMachinePorts()
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== TU DONG NHAN DIEN CONG COM (REALTIME) ===");
+            var triggers = MachineRegistry.Modules.OfType<IMachineTrigger>().ToList();
+            if (triggers.Count == 0)
+            {
+                Console.WriteLine("[WARN] Chua co driver may ngoai vi nao duoc cai dat trong thu muc 'drivers/'.");
+                Console.WriteLine("       Hay copy package driver (May lam kem, May tha coc...) vao thu muc 'drivers/' truoc.");
+                return;
+            }
+
+            var settings = SiteConfigStore.Load();
+            Console.WriteLine("Quy trinh nhan dien:");
+            Console.WriteLine("  1. Rút cáp USB/Serial của thiết bị ra.");
+            Console.WriteLine("  2. Khi hệ thống yêu cầu, cắm lại cáp USB/Serial vào máy tính.");
+            Console.WriteLine("  3. Hệ thống sẽ tự phát hiện cổng COM mới và gán cấu hình.");
+            Console.WriteLine();
+
+            for (var i = 0; i < triggers.Count; i++)
+            {
+                var trigger = triggers[i];
+                var name = MachineRegistry.GetDisplayName(trigger);
+                var currentPort = settings.GetMachinePort(trigger.MachineType);
+
+                Console.WriteLine($"----------------------------------------");
+                Console.WriteLine($"Thiet bi {i + 1}/{triggers.Count}: {name}");
+                Console.WriteLine($"Cong hien tai: {(string.IsNullOrEmpty(currentPort) ? "(chua dat)" : currentPort)}");
+                Console.WriteLine("Lua chon:");
+                Console.WriteLine("  [ENTER]       : Bat dau lang nghe tu dong (cam day vao)");
+                Console.WriteLine("  [S] + ENTER   : Bo qua (giu nguyen cong hien tai)");
+                Console.WriteLine("  [-] + ENTER   : Xoa cong COM cua thiet bi nay");
+                Console.Write("Nhap lua chon: ");
+                var choice = Console.ReadLine()?.Trim();
+
+                if (string.Equals(choice, "S", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"-> Da bo qua {name}.");
+                    continue;
+                }
+                if (choice == "-")
+                {
+                    settings.MachinePorts.Remove(trigger.MachineType);
+                    Console.WriteLine($"-> Da xoa cong COM cua {name}.");
+                    continue;
+                }
+
+                var detectedPort = DetectNewPortInteractive(name);
+                if (!string.IsNullOrWhiteSpace(detectedPort))
+                {
+                    settings.MachinePorts[trigger.MachineType] = detectedPort!;
+                    Console.WriteLine($"[OK] Da gan {name} -> {detectedPort}");
+                }
+                else
+                {
+                    Console.WriteLine($"[INFO] Khong thay doi cong COM cho {name}.");
+                }
+            }
+
+            SiteConfigStore.Save(settings);
+            Console.WriteLine();
+            Console.WriteLine("[OK] Da luu cau hinh cong COM tu dong.");
+        }
+
+        private static string? DetectNewPortInteractive(string deviceName)
+        {
+            HashSet<string> GetCurrentPorts()
+            {
+                try
+                {
+                    return new HashSet<string>(System.IO.Ports.SerialPort.GetPortNames(), StringComparer.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                    return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                }
+            }
+
+            var initialPorts = GetCurrentPorts();
+            Console.WriteLine();
+            Console.WriteLine($">> Dang lang nghe... Hay CAM CAP USB/SERIAL cua [{deviceName}] vao may tinh.");
+            Console.WriteLine("   (Nhan phim ESC hoac phim bat ky de huy lang nghe neu muon dung lai)");
+
+            var spinner = new[] { '|', '/', '-', '\\' };
+            var spinnerIndex = 0;
+
+            while (true)
+            {
+                if (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey(true);
+                    if (key.Key == ConsoleKey.Escape || key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Spacebar)
+                    {
+                        Console.WriteLine("\n[DA HUY] Da huy lang nghe cong COM.");
+                        return null;
+                    }
+                }
+
+                var currentPorts = GetCurrentPorts();
+                var newPorts = currentPorts.Except(initialPorts).ToList();
+                if (newPorts.Count > 0)
+                {
+                    var newPort = newPorts[0];
+                    Console.WriteLine($"\n[PHAT HIEN] Tim thay cong COM moi: {newPort}!");
+                    return newPort;
+                }
+
+                // Neu co cong bi rut ra trong luc cho, cap nhat lai initialPorts de khi cam lai nhan dien duoc
+                var removedPorts = initialPorts.Except(currentPorts).ToList();
+                if (removedPorts.Count > 0)
+                {
+                    foreach (var p in removedPorts)
+                    {
+                        Console.WriteLine($"\n[INFO] Cong {p} da duoc rut ra. Gio ban co the cam lai vao.");
+                    }
+                    initialPorts = currentPorts;
+                }
+
+                Console.Write($"\r   Dang cho thiet bi [{spinner[spinnerIndex++ % spinner.Length]}] (Cong hien tai: {string.Join(",", currentPorts)})...   ");
+                System.Threading.Thread.Sleep(300);
+            }
+        }
+
         internal static void PreserveBackendDeviceIdentities(SiteSettings current, SiteSettings updated)
         {
             updated.KioskCode = current.KioskCode;
@@ -212,10 +295,8 @@ namespace IceBot.Config
             foreach (var trigger in MachineRegistry.Modules.OfType<IMachineTrigger>())
             {
                 var port = settings.GetMachinePort(trigger.MachineType);
-                Console.WriteLine($"  {trigger.DisplayName,-15}: {(string.IsNullOrEmpty(port) ? "(chua cau hinh)" : port)}");
+                Console.WriteLine($"  {MachineRegistry.GetDisplayName(trigger),-15}: {(string.IsNullOrEmpty(port) ? "(chua cau hinh)" : port)}");
             }
-            Console.WriteLine($"  BE private URL : {settings.BeApiUrl}");
-            Console.WriteLine($"  Execution ID   : {(settings.ExecutionEndpointId == Guid.Empty ? "(chua cau hinh)" : settings.ExecutionEndpointId.ToString("D"))}");
             Console.WriteLine("  Order command  : mTLS pull tu Backend");
         }
 

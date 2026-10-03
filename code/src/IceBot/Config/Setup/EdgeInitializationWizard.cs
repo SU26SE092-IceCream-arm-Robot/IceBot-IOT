@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using IceBot.Api;
 
 namespace IceBot.Config
@@ -22,17 +24,11 @@ namespace IceBot.Config
             }
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 2/7: Cau hinh Robot va cong COM");
+            Console.WriteLine("Buoc 2/7: Cau hinh Robot Fairino");
             ConfigSetupWizard.RunRobotSettings();
-            ConfigSetupWizard.RunMachinePortSettings();
 
             Console.WriteLine();
-            Console.WriteLine("Buoc 3/7: Cau hinh ten dia diem Edge");
-            if (!ConfigSetupWizard.RunEdgeLocationSettings())
-                return;
-
-            Console.WriteLine();
-            Console.WriteLine("Buoc 4/7: Tu dong xac dinh/dang ky Kiosk voi BE");
+            Console.WriteLine("Buoc 3/7: Xac dinh Kiosk voi BE");
             RegisterExecutionEndpointIfMissing();
         }
 
@@ -42,6 +38,12 @@ namespace IceBot.Config
             var api = new ExecutionEndpointRegistrationApi();
             var kioskId = ResolveOrRegisterKiosk(api, settings);
             if (kioskId == Guid.Empty) return;
+
+            Console.WriteLine();
+            Console.WriteLine("Buoc 4/7: Cau hinh ten dia diem Edge");
+            if (!ConfigSetupWizard.RunEdgeLocationSettings())
+                return;
+            settings = SiteConfigStore.Load();
 
             var endpointId = Guid.Empty;
             var endpointStatus = string.Empty;
@@ -209,27 +211,80 @@ namespace IceBot.Config
                 return settings.KioskId;
             }
 
-            // Existing installations with a saved KioskCode remain compatible, but a fresh
-            // Edge no longer asks the technician to type the code. It resolves the kiosk from
-            // the logged-in Org account and accepts only one visible kiosk.
-            var result = string.IsNullOrWhiteSpace(settings.KioskCode)
-                ? api.ResolveSingleAccessibleKiosk()
-                : api.FindOrCreateKiosk(settings.KioskCode, Environment.MachineName);
-            if (!result.Success)
+            var kiosks = api.ListAccessibleOperationalKiosks(out var listError);
+            if (!string.IsNullOrWhiteSpace(listError))
             {
-                Console.WriteLine("[ERROR] " + result.Message);
+                Console.WriteLine("[ERROR] " + listError);
                 return Guid.Empty;
             }
 
-            settings.KioskId = result.KioskId;
-            if (!string.IsNullOrWhiteSpace(result.KioskCode))
-                settings.KioskCode = result.KioskCode;
+            if (kiosks.Count == 0)
+            {
+                Console.WriteLine("[ERROR] Tai khoan Org khong co kiosk hop le (Active/Provisioning va Operational).");
+                return Guid.Empty;
+            }
+
+            BackendKiosk selectedKiosk;
+            if (kiosks.Count == 1)
+            {
+                selectedKiosk = kiosks[0];
+                Console.WriteLine($"[OK] Tu dong chon kiosk duy nhat: {selectedKiosk.Code} - {selectedKiosk.Name}");
+            }
+            else
+            {
+                Console.WriteLine($"Tai khoan co {kiosks.Count} kiosk hop le:");
+                for (var i = 0; i < kiosks.Count; i++)
+                {
+                    Console.WriteLine($"  {i + 1}. {kiosks[i].Code} | {kiosks[i].Name} ({kiosks[i].Status})");
+                }
+
+                while (true)
+                {
+                    var promptDefault = !string.IsNullOrWhiteSpace(settings.KioskCode) ? $" [{settings.KioskCode}]" : string.Empty;
+                    Console.Write($"Chon kiosk [1-{kiosks.Count}] hoac nhap KIOSK_CODE{promptDefault}: ");
+                    var input = Console.ReadLine()?.Trim();
+                    if (string.IsNullOrWhiteSpace(input) && !string.IsNullOrWhiteSpace(settings.KioskCode))
+                    {
+                        input = settings.KioskCode;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(input))
+                    {
+                        Console.WriteLine("[ERROR] Vui long chon kiosk.");
+                        continue;
+                    }
+
+                    if (int.TryParse(input, out var index) && index >= 1 && index <= kiosks.Count)
+                    {
+                        selectedKiosk = kiosks[index - 1];
+                        break;
+                    }
+
+                    var matched = kiosks.FirstOrDefault(k => string.Equals(k.Code, input, StringComparison.OrdinalIgnoreCase));
+                    if (matched != null)
+                    {
+                        selectedKiosk = matched;
+                        break;
+                    }
+
+                    Console.WriteLine("[ERROR] Lua chon khong hop le. Vui long chon lai.");
+                }
+            }
+
+            if (selectedKiosk.Id == Guid.Empty)
+            {
+                Console.WriteLine("[ERROR] Kiosk duoc chon khong co KioskId hop le.");
+                return Guid.Empty;
+            }
+
+            settings.KioskId = selectedKiosk.Id;
+            settings.KioskCode = selectedKiosk.Code;
             SiteConfigStore.Save(settings);
-            Console.WriteLine("[OK] " + result.Message);
-            if (!string.IsNullOrWhiteSpace(result.KioskCode))
-                Console.WriteLine($"Kiosk Code: {result.KioskCode}");
-            Console.WriteLine($"KioskId: {result.KioskId:D}");
-            return result.KioskId;
+
+            Console.WriteLine("[OK] Da xac dinh Kiosk thanh cong.");
+            Console.WriteLine($"Kiosk Code: {selectedKiosk.Code} ({selectedKiosk.Name})");
+            Console.WriteLine($"KioskId: {selectedKiosk.Id:D}");
+            return selectedKiosk.Id;
         }
     }
 }

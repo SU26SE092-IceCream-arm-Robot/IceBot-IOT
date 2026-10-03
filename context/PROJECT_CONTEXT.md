@@ -90,16 +90,31 @@ certificate of an old Edge that is still in service. For an OrgAdmin scoped to m
 kiosks, `KIOSK_CODE` must be supplied in `config/icebot.site.env`; Init cannot safely choose
 among multiple accessible kiosks. `EDGE_LOCATION_NAME` selects the execution endpoint code,
 not the parent kiosk.
-The technician configuration UI is task-based:
+The technician configuration UI is task-based and structured without duplicate actions:
 
 ```text
-Configuration
-  -> First-time Edge setup / resume
-  -> Connectivity: Backend URL, NetBird, mTLS checks and certificate status
-  -> Devices: robot profile, peripheral registration, COM mapping and hardware report
-  -> Configuration status
-  -> Advanced recovery: deployment sync, hardware/report retry, heartbeat/readiness
+Main Menu:
+1. Che do Robot (Fairino/Simulation)
+2. Thiet lap Edge lan dau (Wizard)
+   -> 2.1. Bat dau / tiep tuc thiet lap tu dong (7 steps)
+   -> 2.2. Kiem tra tien do thiet lap
+3. Cau hinh he thong
+   -> 3.1. Cau hinh ket noi (Backend URL, NetBird setup key & connection, mTLS certificate status)
+   -> 3.2. Cau hinh thiet bi (Robot profile, manual COM ports, realtime auto-detect COM, Backend peripheral management)
+   -> 3.3. Xem tong quan trang thai cau hinh
+4. Kiem tra thiet bi (Test Mode)
+   -> 4.1. Test ket noi Backend qua mTLS (Heartbeat & readiness)
+   -> 4.2. Test tay may Robot Fairino (RPC ping & sample Lua run)
+   -> 4.3. Test ket noi may ngoai vi (Serial ping qua COM)
+5. Cong cu nang cao (Sync & Outbox)
+   -> 5.1. Dong bo deployment ngay (Pull workflow Lua)
+   -> 5.2. Gui lai snapshot thiet bi (Hardware profile snapshot)
+   -> 5.3. Gui lai bao cao dang cho (Flush outbox reports)
+6. Dang xuat BE (Xoa token tren may)
+0. Thoat
 ```
+
+Security & privacy rule: StoreAccount credentials and sensitive identifiers must not be exposed in plain text console prompts during login or summary dumps (the login prompt only offers ENTER to reuse without leaking the account email).
 
 Manual deployment synchronization and report flushing are recovery/diagnostic actions. They do not replace the unattended production command receiver and durable retry loops. Setup completion requires Kiosk, endpoint/runtime identities, HTTPS Backend URL, NetBird, an existing client PFX, and robot identity/profile. Production readiness additionally requires an active deployment/release/checksum and an existing active workflow directory. Backend-issued identities are not edited in normal settings menus.
 
@@ -215,9 +230,10 @@ Invariants:
 - duplicate delivery is idempotent by `CommandId`;
 - durable jobs left at `AwaitingAck` replay the idempotent Backend ACK after restart before queue activation;
 - after staff removes the interrupted product and checks the workcell, manually launching `IceBot.exe` authorizes restarting the interrupted `Running` unit from its beginning;
+- runtime errors during execution (such as peripheral communication drops or device faults) preserve the unit in `Running` state and pause the worker without emitting a terminal `Failed` report to Backend, allowing the operator to inspect hardware, clear the workcell, and restart `IceBot.exe` to remake the unit seamlessly;
 - persisted `Completed` units are never remade; physical completion without persisted `Completed` is treated as incomplete;
 - each interrupted local attempt is retained on the unit with its start/detection time; retries keep the same cloud production identity and do not emit a terminal interruption report;
-- existing `Failed` or legacy `RequiresManualIntervention` jobs remain blocked; this policy handles process interruption, not arbitrary terminal failures;
+- existing `Failed` or legacy `RequiresManualIntervention` jobs remain blocked; this policy handles process interruption and recoverable runtime faults, not unrecoverable rejections;
 - report sequence numbers are persisted and monotonic.
 
 `ProductionReportOutbox` persists evidence before delivery and retries Accepted, Running, Completed, Failed, and manual-intervention outcomes.
@@ -291,13 +307,21 @@ The current bundled examples are `bt_cup_l90` (cup dropping) and `ice_cream`
 `machineType` directory and must not be added as device-specific code in the
 IceBot core.
 
-`IMachineModule` provides identity and step names. `IMachineTrigger` is optional for hardware physically connected to this Edge. An Edge-controlled serial peripheral must provide a documented serial transport, a documented device-control protocol, and an Edge plugin driver. The transport may be RS232 or RS485 according to the device; device commands, frame formats, status codes, and checksums may be device-specific. Core contains no device-specific protocol.
+`IMachineModule` provides identity and step names. `IMachineTrigger` is optional for hardware physically connected to this Edge. An Edge-controlled serial peripheral must provide a documented serial transport, a documented device-control protocol, and an Edge plugin driver. The transport may be RS232 or RS485 according to the device; device commands, frame formats, status codes, and checksums may be device-specific. Core contains no device-specific protocol. `MachineTypeCanonicalizer` normalizes known legacy or uppercase workflow aliases (e.g., `icemachine`, `ice_cream_machine`, `ice_cream_machine_1/2` -> `ice_cream`; `cup_droping_machine`, `cup_droping_machine_1/2` -> `bt_cup_l90`) into canonical driver package machine types.
 
-## Readiness
+## Readiness and Shutdown Telemetry
 
 Readiness is operational evidence, not hardware identity. It includes storage/local-state health, report backlog, robot activity/safety evidence, queue capacity, and active deployment state where available.
 
 Simulation may explicitly report simulated safety. Physical mode must not claim safety merely because the process runs; it must instead receive a healthy Fairino SDK sample with E-stop, SI0/SI1, and robot errors all clear. Missing optional sensor topology is evaluated by Backend policy and must not invalidate endpoint identity by default.
+
+Graceful shutdown and unhandled crash telemetry:
+- `EdgeMtlsProbe.SendShutdownStatus` emits an immediate, short-timeout report to Backend before process termination:
+  - Readiness: `readiness = "NotReady"`, `activity = "Idle"`, `safety = "Unknown"`, `faultCode = "EDGE_SHUTDOWN"` (or `"UNHANDLED_CRASH"`).
+  - Heartbeat: `status = "Offline"`, `robotStatus = "Stopped"`, `networkStatus = "Offline"`.
+- Lifecycle hooks in `Program.Main` capture `AppDomain.UnhandledException`, `AppDomain.ProcessExit`, and `Console.CancelKeyPress`.
+- In `ConsoleMenu.RunServeModeCore`, typing `exit` notifies Backend before breaking the serve loop.
+- Interlocked guards guarantee shutdown telemetry executes at most once per process.
 
 ## Repository Map
 
@@ -438,6 +462,7 @@ This directory currently contains test/demo variants such as `real-demo-1408.lua
 - Keep robot execution serial until multi-customer operation is explicitly designed.
 - Keep README, this project context, unit tests, and `testing/UNIT_TEST_REPORT.md` synchronized with behavior changes.
 - For interrupted production, staff must clear the product and check the workcell before manually restarting IceBot.exe; restart then authorizes remaking the incomplete unit. Never bypass this operating procedure through unattended process restart.
+- For production report outbox, when Backend rejects a report with non-retryable HTTP 4xx (e.g., 400 Bad Request due to cancelled/closed order on Backend, or 409 Conflict), Edge logs the incident into `data/logs/runtime-events.jsonl` (viewable via `InitIceBot.exe` option 2) and deletes the report file from the local outbox directory to prevent queue blocking and avoid disk bloating. Transient errors (HTTP 5xx, connection timeouts, or 429 Too Many Requests) are retained for retry.
 
 ## Technology
 

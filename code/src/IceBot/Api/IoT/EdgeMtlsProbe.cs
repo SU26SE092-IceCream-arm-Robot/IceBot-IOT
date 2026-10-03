@@ -341,6 +341,84 @@ namespace IceBot.Api
             }
         }
 
+        private static int _shutdownReported = 0;
+
+        public static void SendShutdownStatus(string reason, bool isCrash = false)
+        {
+            if (System.Threading.Interlocked.Exchange(ref _shutdownReported, 1) != 0)
+                return;
+
+            var settings = SiteConfigStore.Load();
+            if (!TryCreateClient(settings, out var client, out var baseUri, out _))
+                return;
+
+            using (client)
+            {
+                client.Timeout = TimeSpan.FromSeconds(5);
+                try
+                {
+                    var revision = SiteConfigStore.NextExecutionReadinessRevision();
+                    var faultCode = isCrash ? "UNHANDLED_CRASH" : "EDGE_SHUTDOWN";
+
+                    var localStateDirectory = AppConfig.GetOrderJobsDirectory();
+                    var storageWritable = CanWriteLocalState(localStateDirectory);
+                    var root = Path.GetPathRoot(Path.GetFullPath(localStateDirectory));
+                    var freeSpaceBytes = string.IsNullOrWhiteSpace(root) ? 0 : new DriveInfo(root).AvailableFreeSpace;
+
+                    var readinessPayload = new
+                    {
+                        sourceExecutorId = settings.FullEdgeRuntimeId,
+                        stateRevision = revision,
+                        executorReportedAt = DateTimeOffset.UtcNow,
+                        readiness = "NotReady",
+                        activity = "Idle",
+                        safety = "Unknown",
+                        physicalOutputState = "Unknown",
+                        faultCode = faultCode,
+                        localPersistenceHealth = new
+                        {
+                            storageWritable,
+                            freeSpaceBytes,
+                            minimumRequiredFreeSpaceBytes = 256L * 1024 * 1024,
+                            localDatabaseHealth = storageWritable ? "Healthy" : "Unhealthy",
+                            pendingEventCount = ProductionReportOutbox.GetPendingCount(),
+                            maximumPendingEventCount = 1000
+                        },
+                        capabilities = new object[0]
+                    };
+
+                    using (var content1 = new StringContent(JsonSerializer.Serialize(readinessPayload), Encoding.UTF8, "application/json"))
+                    {
+                        client.PostAsync(
+                            new Uri(baseUri, $"api/v1/iot/execution-endpoints/{settings.ExecutionEndpointId:D}/readiness"),
+                            content1).GetAwaiter().GetResult();
+                    }
+
+                    var heartbeatPayload = new
+                    {
+                        originNodeId = settings.FullEdgeRuntimeId,
+                        heartbeatSequence = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        reportedAt = DateTimeOffset.UtcNow,
+                        status = "Offline",
+                        robotStatus = "Stopped",
+                        networkStatus = "Offline",
+                        appVersion = typeof(EdgeMtlsProbe).Assembly.GetName().Version?.ToString(),
+                        pendingSyncEventCount = 0
+                    };
+
+                    using (var content2 = new StringContent(JsonSerializer.Serialize(heartbeatPayload), Encoding.UTF8, "application/json"))
+                    {
+                        client.PostAsync(
+                            new Uri(baseUri, $"api/v1/iot/execution-endpoints/{settings.ExecutionEndpointId:D}/heartbeat"),
+                            content2).GetAwaiter().GetResult();
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+
         private static string DescribeTransportFailure(Exception exception)
         {
             var details = exception.Message;

@@ -1,10 +1,12 @@
 # IceBot-IOT
 
-## Recovery after power loss or an application crash
+## Recovery after power loss, crash, or peripheral runtime error
 
 To inspect local logs, open `InitIceBot.exe` and select **2. Nhat ky va su co (offline)**. This entry does not require Backend login or start production. Choose application events, order history, or both; optionally filter by local date (`yyyy-MM-dd`) and order number/ID. Results show ten entries per page, including each unit's status and interruption history. Enter `e` after viewing to export all filtered results to `data/diagnostic-exports/`. Unreadable records are reported without modifying or deleting their source files. Configuration and device tests remain behind the existing login under option 1.
 
 Before manually reopening `IceBot.exe`, staff must remove the interrupted product and check the robot, peripherals and workcell, including the path to `IceBot_Home`. Launching the executable authorizes restarting the interrupted production unit from the beginning, without an additional confirmation button. Do not configure unattended application restart.
+
+When a peripheral machine or robot communication drops during execution, the runtime safely pauses and preserves the unit in `Running` state without sending a terminal `Failed` report to Backend. Staff simply clears the workcell, verifies cable connections, and restarts `IceBot.exe` to remake that unit seamlessly.
 
 Units already persisted as `Completed` are preserved. For a four-unit order interrupted during unit three after units one and two were saved, Edge remakes unit three and then makes unit four. A physically finished unit whose `Completed` state was not saved is still incomplete. Existing terminal `Failed` or legacy `RequiresManualIntervention` records remain blocked.
 
@@ -23,7 +25,7 @@ IceBot nhận Order từ Backend, lấy các tệp Lua đã lưu trên máy theo
 - mTLS `ExecuteOrder` đã có queue bền vững, kiểm tra đúng Kiosk/Endpoint/release/Lua, ACK `Accepted`, chạy lần lượt từng cây và gửi trạng thái về BE.
 - API local cũ `POST /api/orders` đã bị loại bỏ; production chỉ có một lifecycle chuẩn là outbound mTLS command pull.
 - Đồng bộ Full Edge deployment tải bundle phát hành từ Backend, kiểm tra checksum rồi stage/activate trước khi nhận order. Runtime cũng pull `DeployConfiguration` cùng với các command khác; kỹ thuật viên không chép Lua thủ công vào thư mục workflow.
-- Trạng thái từng cây (`Accepted`, `Running`, `Completed`, `Failed`, `RequiresManualIntervention`) được lưu vào outbox bền vững và gửi về BE qua mTLS.
+- Trạng thái từng cây (`Accepted`, `Running`, `Completed`, `Failed`, `RequiresManualIntervention`) được lưu vào outbox bền vững và gửi về BE qua mTLS. Khi Backend từ chối report với lỗi 4xx không thể thử lại (như HTTP 400 Bad Request khi đơn đã bị hủy/đóng trên Backend, hoặc 409 Conflict), Edge ghi nhận sự cố vào `data/logs/runtime-events.jsonl` (kỹ thuật viên có thể xem trực tiếp trong mục 2 của `InitIceBot.exe`), xuất cảnh báo ra console và tự động xóa report khỏi outbox để giải phóng hàng đợi, tránh tắc nghẽn và không làm đầy ổ đĩa.
 
 ## Kiến trúc
 
@@ -42,7 +44,7 @@ IceBot-Setup.exe → InitIceBot.exe → IceBot.exe
 Các pattern chính:
 
 - Plugin Architecture cho driver DLL của máy ngoại vi.
-- Registry Pattern để ánh xạ `MachineType` và Lua step tới driver.
+- Registry Pattern & Canonicalizer để ánh xạ các alias của `MachineType` (`icemachine`, `cup_droping_machine`...) về đúng driver chuẩn (`ice_cream`, `bt_cup_l90`).
 - Producer–Consumer Queue để chỉ một worker điều khiển robot tại một thời điểm.
 - Wizard/Orchestrator cho quy trình khởi tạo Edge.
 - Durable inbox + execution queue/outbox để chống trùng Order và khôi phục an toàn theo `CommandId`.
@@ -217,13 +219,13 @@ có thể bỏ qua hộp thoại bằng `IceBot-Setup.exe --install-dir "D:\IceB
 
 Kỹ thuật viên thực hiện:
 
-1. Đăng nhập bằng tài khoản cửa hàng.
-2. Chọn **Cấu hình → Thiết lập Edge lần đầu → Bắt đầu / tiếp tục thiết lập tự động**.
-3. Nhập **Kiosk Code in trên vỏ máy** nếu máy chưa lưu code. Nếu OrgAdmin có nhiều Kiosk,
-   đặt `KIOSK_CODE` trong `config/icebot.site.env` để chọn đúng Kiosk.
-4. Nhập NetBird setup key.
+1. Đăng nhập bằng tài khoản cửa hàng (chỉ cần nhấn `ENTER` để sử dụng tài khoản đã lưu, không làm lộ email tài khoản ra màn hình).
+2. Chọn **2. Thiet lap Edge lan dau (Wizard) → 1. Bat dau / tiep tuc thiet lap tu dong**.
+3. Cấu hình IP và profile của Robot Fairino.
+4. Chọn hoặc xác định Kiosk với Backend (tự động liệt kê danh sách các Kiosk Active/Provisioning nếu OrgAdmin quản lý nhiều Kiosk).
 5. Nhập **mã Edge/tên địa điểm** (ví dụ `Betea`); mã endpoint được dùng trực tiếp sau khi chuẩn hóa.
-6. Xác nhận Robot IP, hardware profile và nhập cổng COM riêng cho từng máy ngoại vi.
+6. Xác minh/tạo Execution Endpoint, cấp phát mTLS và probe kết nối.
+7. Cấu hình cổng COM cho máy ngoại vi thông qua **3. Cau hinh he thong → 2. Cau hinh thiet bi** (hỗ trợ nhập tay hoặc tự động nhận diện Realtime khi cắm cáp USB).
 
 Các bước còn lại chạy tự động:
 
@@ -261,6 +263,7 @@ Sau khi khởi tạo thành công, chạy `IceBot.exe`. Runtime kết nối lạ
 - Bắt đầu pull `ExecuteOrder` từ BE mỗi 5 giây nếu đủ cấu hình mTLS.
 - Hiển thị cửa sổ CMD, PID, trạng thái order pull và báo cáo vận hành định kỳ mỗi 30 giây.
 - Nhập `exit` để dừng bình thường; nhập `test` để chạy workflow test đã cấu hình.
+- Tự động gửi trạng thái đóng (`Readiness: NotReady`, `Heartbeat: Offline`) lên Backend khi thoát ứng dụng bằng lệnh `exit`, đóng cửa sổ console (CancelKeyPress/ProcessExit), hoặc khi gặp lỗi unhandled crash, giúp Backend và WebApp cập nhật trạng thái Edge ngoại tuyến tức thì mà không cần can thiệp code Backend.
 
 Login thất bại trong `InitIceBot.exe` không làm dừng một `IceBot.exe` đang bán hàng.
 
@@ -278,35 +281,42 @@ Màn hình đầu tiên không yêu cầu đăng nhập:
 0. Thoat
 ```
 
-Mục nhật ký hỗ trợ lọc theo ngày, mã đơn, xem chi tiết từng cây và xuất kết quả. Sau khi chọn mục 1 và đăng nhập thành công, menu quản trị hiển thị:
+Mục nhật ký hỗ trợ lọc theo ngày, mã đơn, xem chi tiết từng cây và xuất kết quả. Sau khi chọn mục 1 và đăng nhập thành công, menu quản trị chuẩn hóa hiển thị:
 
 ```text
-1. Cau hinh
-   1. Thiet lap Edge lan dau
-      1. Bat dau / tiep tuc thiet lap tu dong
-      2. Kiem tra dieu kien va tien do thiet lap
-   2. Cau hinh ket noi
+1. Che do Robot (Fairino/Simulation)
+   1. Fairino (robot vat ly)
+   2. Simulation (khong ket noi robot vat ly)
+   0. Quay lai
+2. Thiet lap Edge lan dau (Wizard)
+   1. Bat dau / tiep tuc thiet lap tu dong
+   2. Kiem tra dieu kien va tien do thiet lap
+   0. Quay lai
+3. Cau hinh he thong
+   1. Cau hinh ket noi
       1. Backend API URL
-      2. NetBird
-      3. Kiem tra ket noi Backend qua mTLS
-      4. Xem thong tin chung chi mTLS
-   3. Cau hinh thiet bi
+      2. NetBird (Setup key & ket noi)
+      3. Xem thong tin chung chi mTLS
+      0. Quay lai
+   2. Cau hinh thiet bi
       1. Cau hinh Robot
-      2. Quan ly may ngoai vi
-         1. Danh sach thiet bi
-         2. Dang ky thiet bi moi voi Backend
-         3. Kiem tra ket noi Serial
-      3. Cau hinh cong COM
-      4. Bao cao lai hardware profile
-   4. Xem trang thai cau hinh
-   5. Cong cu nang cao
-      1. Dong bo deployment ngay
-      2. Gui lai hardware snapshot
-      3. Gui lai report dang cho
-      4. Gui heartbeat va readiness ngay
-2. Test may
-   1. Test tay Robot
-   2. Test ket noi may ngoai vi (Serial)
+      2. Cau hinh cong COM (nhap tay)
+      3. Tu dong nhan dien cong COM (Realtime)
+      4. Quan ly thiet bi Backend (Danh sach, link, dang ky)
+      0. Quay lai
+   3. Xem trang thai cau hinh
+   0. Quay lai
+4. Kiem tra thiet bi (Test Mode)
+   1. Test ket noi Backend qua mTLS
+   2. Test tay may Robot Fairino
+   3. Test ket noi may ngoai vi (Serial)
+   0. Quay lai
+5. Cong cu nang cao (Sync & Outbox)
+   1. Dong bo deployment ngay
+   2. Gui lai snapshot thiet bi (Hardware snapshot)
+   3. Gui lai bao cao dang cho (Flush outbox reports)
+   0. Quay lai
+6. Dang xuat BE
 0. Thoat
 ```
 

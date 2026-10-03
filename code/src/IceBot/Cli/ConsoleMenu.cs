@@ -27,9 +27,12 @@ namespace IceBot.Cli
                 var settings = SiteConfigStore.Load();
                 Console.WriteLine(GetConfigurationStatusLabel(settings));
                 Console.WriteLine();
-                Console.WriteLine("1. Cau hinh");
-                Console.WriteLine("2. Test may");
-                Console.WriteLine("3. Dang xuat BE");
+                Console.WriteLine("1. Che do Robot (Fairino/Simulation)");
+                Console.WriteLine("2. Thiet lap Edge lan dau (Wizard)");
+                Console.WriteLine("3. Cau hinh he thong");
+                Console.WriteLine("4. Kiem tra thiet bi (Test Mode)");
+                Console.WriteLine("5. Cong cu nang cao (Sync & Outbox)");
+                Console.WriteLine("6. Dang xuat BE");
                 Console.WriteLine("0. Thoat");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -40,12 +43,21 @@ namespace IceBot.Cli
                 switch (choice)
                 {
                     case "1":
-                        RunConfigMenu();
+                        RunExecutionModeMenu();
                         break;
                     case "2":
-                        RunTestMenu();
+                        RunFirstTimeSetupMenu();
                         break;
                     case "3":
+                        RunSystemConfigMenu();
+                        break;
+                    case "4":
+                        RunTestMenu();
+                        break;
+                    case "5":
+                        RunAdvancedToolsMenu();
+                        break;
+                    case "6":
                         StoreAuth.Logout();
                         Console.WriteLine("[OK] Da dang xuat BE va xoa token tren may.");
                         Pause();
@@ -60,7 +72,45 @@ namespace IceBot.Cli
             }
         }
 
-        internal static void RunConfigMenu()
+        private static void RunExecutionModeMenu()
+        {
+            while (true)
+            {
+                SafeClear();
+                PrintBanner();
+                var settings = SiteConfigStore.Load();
+                Console.WriteLine("CHE DO ROBOT");
+                Console.WriteLine($"Hien tai: {settings.ExecutionMode}");
+                Console.WriteLine();
+                Console.WriteLine("1. Fairino (robot vat ly)");
+                Console.WriteLine("2. Simulation (khong ket noi robot vat ly)");
+                Console.WriteLine("0. Quay lai");
+                Console.WriteLine();
+                Console.Write("Chon: ");
+                var input = Console.ReadLine();
+                if (input == null) return;
+
+                var choice = input.Trim();
+                if (choice == "0") return;
+                if (choice != "1" && choice != "2")
+                {
+                    Console.WriteLine("Lua chon khong hop le.");
+                    Pause();
+                    continue;
+                }
+
+                settings.ExecutionMode = choice == "2"
+                    ? RobotExecutionMode.Simulated
+                    : RobotExecutionMode.Fairino;
+                SiteConfigStore.Save(settings);
+                Console.WriteLine($"[OK] Da chuyen sang che do {settings.ExecutionMode}.");
+                Console.WriteLine("Hay dong va mo lai IceBot.exe de ap dung cho runtime.");
+                Pause();
+                return;
+            }
+        }
+
+        internal static void RunSystemConfigMenu()
         {
             while (true)
             {
@@ -69,12 +119,10 @@ namespace IceBot.Cli
                 var settings = SiteConfigStore.Load();
                 Console.WriteLine(GetConfigurationStatusLabel(settings));
                 Console.WriteLine();
-                Console.WriteLine("CAU HINH");
-                Console.WriteLine("1. Thiet lap Edge lan dau");
-                Console.WriteLine("2. Cau hinh ket noi");
-                Console.WriteLine("3. Cau hinh thiet bi");
-                Console.WriteLine("4. Xem trang thai cau hinh");
-                Console.WriteLine("5. Cong cu nang cao");
+                Console.WriteLine("CAU HINH HE THONG");
+                Console.WriteLine("1. Cau hinh ket noi");
+                Console.WriteLine("2. Cau hinh thiet bi");
+                Console.WriteLine("3. Xem trang thai cau hinh");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -83,11 +131,9 @@ namespace IceBot.Cli
 
                 switch (input.Trim())
                 {
-                    case "1": RunFirstTimeSetupMenu(); break;
-                    case "2": RunConnectionConfigMenu(); break;
-                    case "3": RunDeviceConfigMenu(); break;
-                    case "4": PrintConfigurationStatus(); Pause(); break;
-                    case "5": RunAdvancedToolsMenu(); break;
+                    case "1": RunConnectionConfigMenu(); break;
+                    case "2": RunDeviceConfigMenu(); break;
+                    case "3": PrintConfigurationStatus(); Pause(); break;
                     case "0": return;
                     default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }
@@ -126,9 +172,8 @@ namespace IceBot.Cli
                 PrintBanner();
                 Console.WriteLine("CAU HINH KET NOI");
                 Console.WriteLine("1. Backend API URL");
-                Console.WriteLine("2. NetBird");
-                Console.WriteLine("3. Kiem tra ket noi Backend qua mTLS");
-                Console.WriteLine("4. Xem thong tin chung chi mTLS");
+                Console.WriteLine("2. NetBird (Setup key & ket noi)");
+                Console.WriteLine("3. Xem thong tin chung chi mTLS");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -138,8 +183,7 @@ namespace IceBot.Cli
                 {
                     case "1": ConfigSetupWizard.RunBackendSettings(); Pause(); break;
                     case "2": ConfigSetupWizard.RunNetBird(); Pause(); break;
-                    case "3": TestBackendConnection(); Pause(); break;
-                    case "4": PrintCertificateStatus(); Pause(); break;
+                    case "3": PrintCertificateStatus(); Pause(); break;
                     case "0": return;
                     default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }
@@ -154,9 +198,9 @@ namespace IceBot.Cli
                 PrintBanner();
                 Console.WriteLine("CAU HINH THIET BI");
                 Console.WriteLine("1. Cau hinh Robot");
-                Console.WriteLine("2. Quan ly may ngoai vi");
-                Console.WriteLine("3. Cau hinh cong COM");
-                Console.WriteLine("4. Bao cao lai hardware profile");
+                Console.WriteLine("2. Cau hinh cong COM (nhap tay)");
+                Console.WriteLine("3. Tu dong nhan dien cong COM (Realtime)");
+                Console.WriteLine("4. Quan ly thiet bi Backend");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -165,9 +209,9 @@ namespace IceBot.Cli
                 switch (input.Trim())
                 {
                     case "1": ConfigSetupWizard.RunRobotSettings(); Pause(); break;
-                    case "2": RunPeripheralManagementMenu(); break;
-                    case "3": ConfigSetupWizard.RunMachinePortSettings(); Pause(); break;
-                    case "4": ReportHardwareProfile(); Pause(); break;
+                    case "2": ConfigSetupWizard.RunMachinePortSettings(); Pause(); break;
+                    case "3": ConfigSetupWizard.RunAutoDetectMachinePorts(); Pause(); break;
+                    case "4": RunPeripheralManagementMenu(); break;
                     case "0": return;
                     default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }
@@ -180,11 +224,10 @@ namespace IceBot.Cli
             {
                 SafeClear();
                 PrintBanner();
-                Console.WriteLine("QUAN LY MAY NGOAI VI");
+                Console.WriteLine("QUAN LY THIET BI BACKEND");
                 Console.WriteLine("1. Danh sach thiet bi");
                 Console.WriteLine("2. Lien ket thiet bi da co tu Backend");
                 Console.WriteLine("3. Dang ky thiet bi moi voi Backend");
-                Console.WriteLine("4. Kiem tra ket noi Serial");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -195,7 +238,6 @@ namespace IceBot.Cli
                     case "1": PeripheralDeviceRegistrationWizard.PrintDeviceList(); Pause(); break;
                     case "2": StoreAuth.RequireLogin(); PeripheralDeviceRegistrationWizard.LinkExisting(); Pause(); break;
                     case "3": StoreAuth.RequireLogin(); PeripheralDeviceRegistrationWizard.Run(); Pause(); break;
-                    case "4": RunPeripheralConnectionTestMode(); break;
                     case "0": return;
                     default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }
@@ -208,11 +250,10 @@ namespace IceBot.Cli
             {
                 SafeClear();
                 PrintBanner();
-                Console.WriteLine("CONG CU NANG CAO");
+                Console.WriteLine("CONG CU NANG CAO (SYNC & OUTBOX)");
                 Console.WriteLine("1. Dong bo deployment ngay");
-                Console.WriteLine("2. Gui lai hardware snapshot");
-                Console.WriteLine("3. Gui lai report dang cho");
-                Console.WriteLine("4. Gui heartbeat va readiness ngay");
+                Console.WriteLine("2. Gui lai snapshot thiet bi (Hardware snapshot)");
+                Console.WriteLine("3. Gui lai bao cao dang cho (Flush outbox reports)");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -223,7 +264,6 @@ namespace IceBot.Cli
                     case "1": WorkflowProvisioner.RunInteractive(); Pause(); break;
                     case "2": ReportHardwareProfile(); Pause(); break;
                     case "3": FlushPendingReports(); Pause(); break;
-                    case "4": TestBackendConnection(); Pause(); break;
                     case "0": return;
                     default: Console.WriteLine("Lua chon khong hop le."); Pause(); break;
                 }
@@ -306,9 +346,10 @@ namespace IceBot.Cli
             {
                 SafeClear();
                 PrintBanner();
-                Console.WriteLine("TEST MAY");
-                Console.WriteLine("1. Test tay Robot");
-                Console.WriteLine("2. Test ket noi may ngoai vi (Serial)");
+                Console.WriteLine("KIEM TRA THIET BI (TEST MODE)");
+                Console.WriteLine("1. Test ket noi Backend qua mTLS");
+                Console.WriteLine("2. Test tay may Robot Fairino");
+                Console.WriteLine("3. Test ket noi may ngoai vi (Serial)");
                 Console.WriteLine("0. Quay lai");
                 Console.WriteLine();
                 Console.Write("Chon: ");
@@ -319,9 +360,13 @@ namespace IceBot.Cli
                 switch (choice)
                 {
                     case "1":
-                        RunTestMode();
+                        TestBackendConnection();
+                        Pause();
                         break;
                     case "2":
+                        RunTestMode();
+                        break;
+                    case "3":
                         RunPeripheralConnectionTestMode();
                         break;
                     case "0":
@@ -471,6 +516,8 @@ namespace IceBot.Cli
 
                         if (string.Equals(line, "exit", StringComparison.OrdinalIgnoreCase))
                         {
+                            Console.WriteLine("Dang dong ket noi va thong bao Backend...");
+                            EdgeMtlsProbe.SendShutdownStatus("MANUAL_EXIT");
                             break;
                         }
 

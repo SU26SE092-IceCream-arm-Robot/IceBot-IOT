@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "artifactCode": "DEMO_0210_STEP5",
+  "artifactFileName": "demo-0210_step5.lua",
+  "runtimeTargetCode": "FAIRINO_LUA_V1",
+  "machineModelCode": "FR5",
+  "effects": [],
+  "orderingConstraints": []
+}

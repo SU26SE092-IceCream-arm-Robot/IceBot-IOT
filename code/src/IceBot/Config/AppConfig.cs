@@ -38,9 +38,14 @@ namespace IceBot.Config
             get
             {
                 var configured = Environment.GetEnvironmentVariable("ICEBOT_ROBOT_EXECUTION_MODE");
-                return string.Equals(configured, "Simulated", StringComparison.OrdinalIgnoreCase)
-                    ? RobotExecutionMode.Simulated
-                    : RobotExecutionMode.Fairino;
+                if (!string.IsNullOrWhiteSpace(configured))
+                {
+                    return string.Equals(configured, nameof(RobotExecutionMode.Simulated), StringComparison.OrdinalIgnoreCase)
+                        ? RobotExecutionMode.Simulated
+                        : RobotExecutionMode.Fairino;
+                }
+
+                return SiteConfigStore.Load().ExecutionMode;
             }
         }
 
@@ -135,6 +140,11 @@ namespace IceBot.Config
         public static string GetReportOutboxDirectory()
         {
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "report-outbox");
+        }
+
+        public static string GetLogsDirectory()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "logs");
         }
 
         public static string GetTestWorkflowDirectory()

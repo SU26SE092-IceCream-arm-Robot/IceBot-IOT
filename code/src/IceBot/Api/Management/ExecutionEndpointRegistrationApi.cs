@@ -18,6 +18,15 @@ namespace IceBot.Api
         public string Name { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string OperationalState { get; set; } = string.Empty;
+
+        public bool IsEligibleForSetup =>
+            (string.Equals(Status, "Active", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(Status, "Provisioning", StringComparison.OrdinalIgnoreCase)) &&
+            string.Equals(OperationalState, "Operational", StringComparison.OrdinalIgnoreCase);
+
+        public bool IsOperational =>
+            string.Equals(Status, "Active", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(OperationalState, "Operational", StringComparison.OrdinalIgnoreCase);
     }
 
     internal sealed class BackendStore
@@ -90,15 +99,11 @@ namespace IceBot.Api
 
         public KioskRegistrationResult ResolveSingleAccessibleKiosk()
         {
-            var response = SendWithRefresh(
-                HttpMethod.Get,
-                "api/v1/management/kiosks",
-                null);
-            var kiosks = ParseList<BackendKiosk>(response, "danh sach kiosk cua tai khoan Org", out var error);
+            var kiosks = ListAccessibleOperationalKiosks(out var error);
             if (!string.IsNullOrWhiteSpace(error)) return FailKiosk(error);
             if (kiosks.Count == 0)
             {
-                return FailKiosk("Tai khoan Org khong duoc gan voi kiosk nao. Hay gan kiosk cho tai khoan truoc khi setup Edge.");
+                return FailKiosk("Tai khoan Org khong co kiosk hop le (Active/Provisioning va Operational). Hay kiem tra lai pham vi tai khoan va trang thai kiosk.");
             }
 
             if (kiosks.Count != 1)
@@ -121,6 +126,49 @@ namespace IceBot.Api
             };
         }
 
+        public IReadOnlyList<BackendKiosk> ListAccessibleOperationalKiosks(out string error)
+        {
+            var response = SendWithRefresh(
+                HttpMethod.Get,
+                "api/v1/management/kiosks",
+                null);
+            var kiosks = ParseList<BackendKiosk>(response, "danh sach kiosk cua tai khoan Org", out error);
+            return string.IsNullOrWhiteSpace(error)
+                ? kiosks.Where(kiosk => kiosk.IsEligibleForSetup).ToArray()
+                : Array.Empty<BackendKiosk>();
+        }
+
+        public KioskRegistrationResult FindExistingOperationalKiosk(string kioskCode)
+        {
+            if (!TryNormalizeKioskCode(kioskCode, out var code, out var codeError))
+                return FailKiosk(codeError);
+
+            var response = SendWithRefresh(
+                HttpMethod.Get,
+                $"api/v1/management/kiosks?search={Uri.EscapeDataString(code)}",
+                null);
+            var kiosks = ParseList<BackendKiosk>(response, "kiosk theo ma", out var error);
+            if (!string.IsNullOrWhiteSpace(error)) return FailKiosk(error);
+
+            var matches = kiosks.Where(kiosk =>
+                string.Equals(kiosk.Code, code, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0)
+                return FailKiosk($"Khong tim thay kiosk co ma {code} trong pham vi tai khoan.");
+            if (matches.Count > 1)
+                return FailKiosk($"Co nhieu kiosk cung ma {code} trong pham vi tai khoan.");
+            if (!matches[0].IsEligibleForSetup)
+                return FailKiosk($"Kiosk {code} khong hop le de setup (Status={matches[0].Status}, OperationalState={matches[0].OperationalState}).");
+
+            return new KioskRegistrationResult
+            {
+                Success = true,
+                KioskId = matches[0].Id,
+                KioskCode = matches[0].Code,
+                Created = false,
+                Message = "Da tim lai KioskId cua Edge tren BE."
+            };
+        }
+
         public KioskRegistrationResult FindOrCreateKiosk(string kioskCode, string machineName)
         {
             if (!TryNormalizeKioskCode(kioskCode, out var code, out var codeError))
@@ -138,6 +186,8 @@ namespace IceBot.Api
                 return FailKiosk($"Co nhieu kiosk cung ma {code} trong pham vi tai khoan; khong the tu dong xac dinh an toan.");
             if (matches.Count == 1)
             {
+                if (!matches[0].IsEligibleForSetup)
+                    return FailKiosk($"Kiosk {code} khong hop le de setup (Status={matches[0].Status}, OperationalState={matches[0].OperationalState}).");
                 return new KioskRegistrationResult
                 {
                     Success = true,

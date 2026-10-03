@@ -1,8 +1,9 @@
 ﻿{
     "schemaVersion":  1,
-    "machineType":  "ice_cream",
+    "machineType":  "ice_cream_machine_2",
+    "displayName":  "May lam kem",
     "assembly":  "IceBot.Driver.IceCream.dll",
     "entryType":  "IceBot.Driver.IceCream.IceCreamDriver",
     "driverVersion":  "1.0.0",
-    "sha256":  "efdac587cd736c376f5f0b643c14ea87ecb5f956d0cda17acfdd30287341b448"
+    "sha256":  "4f805c835cf91a79bb6b50bb5af40e499289ec270fa055e3f0af5d12c3f99a16"
 }

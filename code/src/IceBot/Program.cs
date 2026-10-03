@@ -10,11 +10,27 @@ namespace IceBot
     {
         private static void Main(string[] args)
         {
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                IceBot.Api.EdgeMtlsProbe.SendShutdownStatus("CRASH", isCrash: true);
+            };
+
+            AppDomain.CurrentDomain.ProcessExit += (s, e) =>
+            {
+                IceBot.Api.EdgeMtlsProbe.SendShutdownStatus("PROCESS_EXIT");
+            };
+
+            Console.CancelKeyPress += (s, e) =>
+            {
+                IceBot.Api.EdgeMtlsProbe.SendShutdownStatus("CANCEL_KEY");
+            };
+
             using (var session = new RuntimeSession(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "logs")))
             {
                 try { MainCore(args); }
                 catch (Exception ex)
                 {
+                    IceBot.Api.EdgeMtlsProbe.SendShutdownStatus("EXCEPTION: " + ex.Message, isCrash: true);
                     session.RecordFailure(ex);
                     throw;
                 }

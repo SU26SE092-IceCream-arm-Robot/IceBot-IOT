@@ -15,6 +15,11 @@ namespace IceBot.Machines
         public static readonly IReadOnlyList<IMachineModule> Modules = BuildModules();
         public static IReadOnlyList<string> PluginErrors => PluginResult.Errors;
 
+        public static string GetDisplayName(IMachineModule module) =>
+            PluginResult.DisplayNames.TryGetValue(module, out var displayName)
+                ? displayName
+                : module.DisplayName;
+
         private static readonly Dictionary<string, IMachineModule> ByStepName = BuildStepIndex();
         private static readonly Dictionary<string, IMachineModule> ByMachineType = BuildMachineTypeIndex();
 

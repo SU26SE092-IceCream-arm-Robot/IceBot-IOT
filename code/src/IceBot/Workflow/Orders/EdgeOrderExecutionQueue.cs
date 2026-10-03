@@ -343,8 +343,9 @@ namespace IceBot.Workflow
                     }
                     catch (Exception ex)
                     {
-                        EdgeOrderExecutionQueue.FailUnit(job.CommandId, unit.SourceProductionJobId, AppConfig.GetOrderJobsDirectory(), ex);
-                        Console.WriteLine($"[ORDER] LOI {job.OrderNumber}, cay {unit.ProductionUnitNo}: {ex.Message}");
+                        Console.WriteLine($"[ORDER] SU CO KHI THUC THI: {job.OrderNumber}, cay {unit.ProductionUnitNo}: {ex.Message}");
+                        Console.WriteLine("[ORDER] Cay kem duoc giu o trang thai Running. Hay kiem tra phan cung, don dep va DONG MO LAI app de lam lai cay nay.");
+                        _stop.WaitOne(TimeSpan.FromSeconds(10));
                     }
                     ProductionReportOutbox.Flush();
                     DeploymentReportOutbox.Flush();

@@ -68,10 +68,12 @@ namespace IceBot.Harness.Tests
                 "void HAL_GPIO_EXTI_Callback", "void HAL_UART_RxCpltCallback");
 
             Assert.Contains("GPIO_Pin == UPPER_LIMIT_SWITCH_Pin || GPIO_Pin == LOWER_LIMIT_SWITCH_Pin", callback);
-            Assert.Contains("upperLimitActive = UpperLimit_IsActive();", callback);
-            Assert.Contains("lowerLimitActive = LowerLimit_IsActive();", callback);
-            Assert.Contains("(upperLimitActive && currentDir == MOTOR_UP) || (lowerLimitActive && currentDir == MOTOR_DOWN)", callback);
-            Assert.Contains("Motor_Stop(upperLimitActive ? MOTOR_STOP_CAUSE_UPPER_LIMIT : MOTOR_STOP_CAUSE_LOWER_LIMIT);", callback);
+            Assert.Contains("observedUpperActive = UpperLimit_IsActive();", callback);
+            Assert.Contains("observedLowerActive = LowerLimit_IsActive();", callback);
+            Assert.Contains("currentDir == MOTOR_UP && observedUpperActive", callback);
+            Assert.Contains("currentDir == MOTOR_DOWN && observedLowerActive", callback);
+            Assert.Contains("Motor_Stop(MOTOR_STOP_CAUSE_UPPER_LIMIT);", callback);
+            Assert.Contains("Motor_Stop(MOTOR_STOP_CAUSE_LOWER_LIMIT);", callback);
         }
 
         [Fact]
@@ -90,7 +92,7 @@ namespace IceBot.Harness.Tests
             Assert.Contains("MOTOR_STOP_CAUSE_LOWER_LIMIT", source);
             Assert.Contains("MOTOR_STOP_CAUSE_DEADLINE", source);
             Assert.Contains("Diagnostics_RecordLimitActive(GPIO_Pin, observedUpperActive, observedLowerActive);", source);
-            Assert.Contains("event->gpioSnapshot = Diagnostics_ReadGpioSnapshot();", source);
+            Assert.Contains("event->gpioSnapshot = gpioSnapshot;", source);
             Assert.Contains("event->sequence = sequence + 1U;", source);
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using IceBot.Robot;
 
 namespace IceBot.Config
 {
@@ -12,6 +13,7 @@ namespace IceBot.Config
         public string BeApiUrl { get; set; } = "https://api.icebot.io.vn";
         public string ApiKey { get; set; } = string.Empty;
         public string RobotIp { get; set; } = AppConfig.DefaultRobotIp;
+        public RobotExecutionMode ExecutionMode { get; set; } = RobotExecutionMode.Fairino;
         // Current hardware identity is reported by Edge after mTLS authentication. These defaults
         // keep the single-FR5 demo usable without making provisioning own robot compatibility.
         public string PrimaryRobotSourceDeviceKey { get; set; } = "arm-primary";

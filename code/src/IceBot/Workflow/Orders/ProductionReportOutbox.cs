@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using IceBot.Api;
@@ -102,9 +103,13 @@ namespace IceBot.Workflow
 
         public static void Flush()
         {
+            Flush(AppConfig.GetReportOutboxDirectory(), EdgeDeploymentApi.ReportProduction, AppConfig.GetLogsDirectory());
+        }
+
+        internal static void Flush(string directory, Action<ProductionReportData> sender, string? logsDirectory = null)
+        {
             lock (Gate)
             {
-                var directory = AppConfig.GetReportOutboxDirectory();
                 if (!Directory.Exists(directory)) return;
                 foreach (var path in Directory.GetFiles(directory, "*.json").OrderBy(item => item, StringComparer.Ordinal))
                 {
@@ -127,7 +132,14 @@ namespace IceBot.Workflow
 
                     try
                     {
-                        EdgeDeploymentApi.ReportProduction(report);
+                        sender(report);
+                        File.Delete(path);
+                    }
+                    catch (EdgeApiException ex) when (IsNonRetryableClientError(ex.StatusCode))
+                    {
+                        var detail = $"Backend tu choi report {Path.GetFileName(path)} (HTTP {(int)ex.StatusCode}: {ex.Message}). Cay {report.ProductionUnitNo} (OrderItem: {report.OrderItemId}). Huy bo file khoi outbox.";
+                        Console.WriteLine("[REPORT-OUTBOX] " + detail);
+                        LogIncident(detail, logsDirectory);
                         File.Delete(path);
                     }
                     catch (Exception ex)
@@ -137,6 +149,25 @@ namespace IceBot.Workflow
                     }
                 }
             }
+        }
+
+        private static void LogIncident(string detail, string? logsDirectory)
+        {
+            try
+            {
+                var directory = logsDirectory ?? AppConfig.GetLogsDirectory();
+                RuntimeSession.RecordEvent(directory, "ReportRejected", detail);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[REPORT-OUTBOX] Khong the ghi log su co: " + ex.Message);
+            }
+        }
+
+        private static bool IsNonRetryableClientError(HttpStatusCode statusCode)
+        {
+            int code = (int)statusCode;
+            return code >= 400 && code < 500 && code != 408 && code != 429;
         }
 
         public static int GetPendingCount()

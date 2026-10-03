@@ -62,5 +62,14 @@ namespace IceBot.Harness.Tests
             Assert.False(rejectedDeployment.ContainsKey("physicalOutputMayHaveOccurred"));
             Assert.Equal(false, rejectedOrder["physicalOutputMayHaveOccurred"]);
         }
+
+        [Fact]
+        public void EdgeApiException_PreservesStatusCodeAndMessage()
+        {
+            var exception = new EdgeApiException(System.Net.HttpStatusCode.BadRequest, "Custom error message");
+            Assert.Equal(System.Net.HttpStatusCode.BadRequest, exception.StatusCode);
+            Assert.Equal("Custom error message", exception.Message);
+            Assert.IsAssignableFrom<InvalidOperationException>(exception);
+        }
     }
 }

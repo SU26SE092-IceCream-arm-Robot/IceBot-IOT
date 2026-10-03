@@ -171,5 +171,78 @@ namespace IceBot.Harness.Tests
             Assert.Equal("Active", result.Status);
             Assert.Equal("Operational", result.OperationalState);
         }
+        [Theory]
+        [InlineData("Active", "Operational", true, true)]
+        [InlineData("Provisioning", "Operational", true, false)]
+        [InlineData("active", "operational", true, true)]
+        [InlineData("provisioning", "operational", true, false)]
+        [InlineData("Disabled", "Operational", false, false)]
+        [InlineData("Retired", "Operational", false, false)]
+        [InlineData("Active", "OutOfService", false, false)]
+        [InlineData("Provisioning", "OutOfService", false, false)]
+        [InlineData("Active", "Maintenance", false, false)]
+        public void BackendKiosk_EligibilityAndOperationalState_AreAccurate(
+            string status,
+            string operationalState,
+            bool expectedEligible,
+            bool expectedOperational)
+        {
+            var kiosk = new BackendKiosk
+            {
+                Status = status,
+                OperationalState = operationalState
+            };
+
+            Assert.Equal(expectedEligible, kiosk.IsEligibleForSetup);
+            Assert.Equal(expectedOperational, kiosk.IsOperational);
+        }
+
+        [Fact]
+        public void ShutdownStatusPayload_MatchesBackendContract()
+        {
+            var executorId = Guid.NewGuid();
+            var reportedAt = DateTimeOffset.UtcNow;
+
+            var readinessJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                sourceExecutorId = executorId,
+                stateRevision = 1L,
+                executorReportedAt = reportedAt,
+                readiness = "NotReady",
+                activity = "Idle",
+                safety = "Unknown",
+                physicalOutputState = "Unknown",
+                faultCode = "EDGE_SHUTDOWN",
+                localPersistenceHealth = new
+                {
+                    storageWritable = true,
+                    freeSpaceBytes = 1024L * 1024 * 1024,
+                    minimumRequiredFreeSpaceBytes = 256L * 1024 * 1024,
+                    localDatabaseHealth = "Healthy",
+                    pendingEventCount = 0,
+                    maximumPendingEventCount = 1000
+                },
+                capabilities = new object[0]
+            });
+
+            Assert.Contains("\"readiness\":\"NotReady\"", readinessJson);
+            Assert.Contains("\"activity\":\"Idle\"", readinessJson);
+            Assert.Contains("\"faultCode\":\"EDGE_SHUTDOWN\"", readinessJson);
+
+            var heartbeatJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                originNodeId = executorId,
+                heartbeatSequence = 123456789L,
+                reportedAt = reportedAt,
+                status = "Offline",
+                robotStatus = "Stopped",
+                networkStatus = "Offline",
+                appVersion = "1.0.0.0",
+                pendingSyncEventCount = 0
+            });
+
+            Assert.Contains("\"status\":\"Offline\"", heartbeatJson);
+            Assert.Contains("\"robotStatus\":\"Stopped\"", heartbeatJson);
+        }
     }
 }

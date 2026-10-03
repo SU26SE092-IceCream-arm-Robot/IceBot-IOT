@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using IceBot.Robot;
 
 namespace IceBot.Config
 {
@@ -43,6 +44,11 @@ namespace IceBot.Config
                     case "BE_API_URL": settings.BeApiUrl = value; break;
                     case "API_KEY": settings.ApiKey = value; break;
                     case "ROBOT_IP": settings.RobotIp = value; break;
+                    case "ROBOT_EXECUTION_MODE":
+                        settings.ExecutionMode = string.Equals(value, nameof(RobotExecutionMode.Simulated), StringComparison.OrdinalIgnoreCase)
+                            ? RobotExecutionMode.Simulated
+                            : RobotExecutionMode.Fairino;
+                        break;
                     case "PRIMARY_ROBOT_SOURCE_DEVICE_KEY": settings.PrimaryRobotSourceDeviceKey = value; break;
                     case "PRIMARY_ROBOT_RUNTIME_TARGET_CODE": settings.PrimaryRobotRuntimeTargetCode = value; break;
                     case "PRIMARY_ROBOT_MACHINE_MODEL_CODE": settings.PrimaryRobotMachineModelCode = value; break;
@@ -87,6 +93,7 @@ namespace IceBot.Config
                 $"BE_API_URL={settings.BeApiUrl}",
                 $"API_KEY={settings.ApiKey}",
                 $"ROBOT_IP={settings.RobotIp}",
+                $"ROBOT_EXECUTION_MODE={settings.ExecutionMode}",
                 $"PRIMARY_ROBOT_SOURCE_DEVICE_KEY={settings.PrimaryRobotSourceDeviceKey}",
                 $"PRIMARY_ROBOT_RUNTIME_TARGET_CODE={settings.PrimaryRobotRuntimeTargetCode}",
                 $"PRIMARY_ROBOT_MACHINE_MODEL_CODE={settings.PrimaryRobotMachineModelCode}",
@@ -217,6 +224,7 @@ namespace IceBot.Config
             SetEnv("ICEBOT_BE_API_URL", settings.BeApiUrl);
             SetEnv("ICEBOT_API_KEY", settings.ApiKey);
             SetEnv("ICEBOT_ROBOT_IP", settings.RobotIp);
+            SetEnv("ICEBOT_ROBOT_EXECUTION_MODE", settings.ExecutionMode.ToString());
             SetEnv("ICEBOT_STORE_ACCOUNT", settings.StoreAccount);
             SetEnv("ICEBOT_BE_ACCESS_TOKEN", settings.OperatorAccessToken);
             SetEnv("ICEBOT_BE_REFRESH_TOKEN", settings.OperatorRefreshToken);

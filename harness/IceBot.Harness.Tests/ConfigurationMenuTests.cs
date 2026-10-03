@@ -12,7 +12,7 @@ namespace IceBot.Harness.Tests
     public class ConfigurationMenuTests
     {
         [Fact]
-        public void ConfigMenu_ShowsFiveTaskBasedGroupsAndReturns()
+        public void SystemConfigMenu_ShowsTaskBasedGroupsAndReturns()
         {
             var originalIn = Console.In;
             var originalOut = Console.Out;
@@ -23,14 +23,12 @@ namespace IceBot.Harness.Tests
                 {
                     Console.SetIn(input);
                     Console.SetOut(output);
-                    ConsoleMenu.RunConfigMenu();
+                    ConsoleMenu.RunSystemConfigMenu();
 
                     var text = output.ToString();
-                    Assert.Contains("1. Thiet lap Edge lan dau", text);
-                    Assert.Contains("2. Cau hinh ket noi", text);
-                    Assert.Contains("3. Cau hinh thiet bi", text);
-                    Assert.Contains("4. Xem trang thai cau hinh", text);
-                    Assert.Contains("5. Cong cu nang cao", text);
+                    Assert.Contains("1. Cau hinh ket noi", text);
+                    Assert.Contains("2. Cau hinh thiet bi", text);
+                    Assert.Contains("3. Xem trang thai cau hinh", text);
                 }
                 finally
                 {
